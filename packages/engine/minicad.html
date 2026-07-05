@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MiniCAD — 2D drafting</title>
+<style>
+  :root{
+    --bg:#131519; --panel:#1c1f25; --panel2:#22262e; --line:#2e333d;
+    --text:#d8dbe2; --dim:#8b93a1; --accent:#43d6b5; --warn:#f2b950;
+    --sel:#4db8ff; --mono:ui-monospace,'Cascadia Mono','SF Mono',Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,'Segoe UI',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:13px}
+  #app{display:flex;flex-direction:column;height:100%}
+
+  /* ---------- top bar ---------- */
+  #topbar{display:flex;align-items:center;gap:6px;padding:6px 10px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+  #logo{font-family:var(--mono);font-weight:700;letter-spacing:.06em;color:var(--accent);margin-right:8px;user-select:none}
+  #logo span{color:var(--dim);font-weight:400}
+  .btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:4px 9px;border-radius:5px;cursor:pointer;font-size:12px;font-family:var(--mono)}
+  .btn:hover{border-color:var(--accent);color:var(--accent)}
+  .btn:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+  .btn kbd{color:var(--dim);margin-left:4px;font-size:10px}
+  .sep{width:1px;height:20px;background:var(--line);margin:0 4px}
+  #layerBox{display:flex;align-items:center;gap:5px;margin-left:auto}
+  select,input[type=color]{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:5px;padding:3px 6px;font-size:12px}
+  input[type=color]{padding:1px;width:26px;height:24px;cursor:pointer}
+
+  /* ---------- canvas ---------- */
+  #stage{position:relative;flex:1;min-height:0}
+  #cv{position:absolute;inset:0;width:100%;height:100%;cursor:none;display:block}
+  #coordRead{position:absolute;left:10px;bottom:8px;font-family:var(--mono);font-size:12px;color:var(--dim);pointer-events:none;background:rgba(19,21,25,.7);padding:2px 6px;border-radius:4px}
+
+  /* ---------- help ---------- */
+  #help{position:absolute;top:10px;right:10px;width:320px;max-height:calc(100% - 20px);overflow:auto;background:rgba(28,31,37,.97);border:1px solid var(--line);border-radius:8px;padding:14px 16px;display:none;z-index:5}
+  #help h2{font-size:13px;color:var(--accent);margin-bottom:8px;font-family:var(--mono)}
+  #help h3{font-size:11px;color:var(--dim);margin:10px 0 4px;text-transform:uppercase;letter-spacing:.08em}
+  #help table{width:100%;border-collapse:collapse}
+  #help td{padding:2px 4px;font-size:12px;vertical-align:top}
+  #help td:first-child{font-family:var(--mono);color:var(--warn);white-space:nowrap;width:86px}
+  #help .close{position:absolute;top:8px;right:10px;cursor:pointer;color:var(--dim)}
+
+  /* ---------- command area ---------- */
+  #cmdArea{background:var(--panel);border-top:1px solid var(--line);padding:4px 10px 8px;font-family:var(--mono)}
+  #history{height:54px;overflow-y:auto;font-size:12px;color:var(--dim);padding:2px 4px;white-space:pre-wrap}
+  #history .p{color:var(--text)}
+  #history .r{color:var(--accent)}
+  #history .e{color:#ef7b7b}
+  #cmdRow{display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:5px 10px}
+  #prompt{color:var(--warn);white-space:nowrap;font-size:13px}
+  #cmdInput{flex:1;background:transparent;border:none;outline:none;color:var(--text);font-family:var(--mono);font-size:13px}
+  #statusRow{display:flex;gap:6px;margin-top:6px;align-items:center}
+  .tog{font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--line);color:var(--dim);cursor:pointer;user-select:none;font-family:var(--mono)}
+  .tog.on{color:var(--accent);border-color:var(--accent)}
+  #statusRow .spacer{flex:1}
+  #hint{font-size:11px;color:var(--dim)}
+  @media (max-width:760px){ .btn kbd{display:none} #history{height:38px} }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="topbar">
+    <div id="logo">MINI<span>CAD</span></div>
+    <button class="btn" data-cmd="LINE">Line<kbd>L</kbd></button>
+    <button class="btn" data-cmd="PLINE">Pline<kbd>PL</kbd></button>
+    <button class="btn" data-cmd="RECTANG">Rect<kbd>REC</kbd></button>
+    <button class="btn" data-cmd="CIRCLE">Circle<kbd>C</kbd></button>
+    <button class="btn" data-cmd="TEXT">Text<kbd>T</kbd></button>
+    <div class="sep"></div>
+    <button class="btn" data-cmd="MOVE">Move<kbd>M</kbd></button>
+    <button class="btn" data-cmd="COPY">Copy<kbd>CO</kbd></button>
+    <button class="btn" data-cmd="ROTATE">Rotate<kbd>RO</kbd></button>
+    <button class="btn" data-cmd="OFFSET">Offset<kbd>O</kbd></button>
+    <button class="btn" data-cmd="ERASE">Erase<kbd>E</kbd></button>
+    <div class="sep"></div>
+    <button class="btn" data-cmd="ZOOMEXT">Zoom Ext<kbd>Z E</kbd></button>
+    <button class="btn" id="btnUndo">Undo<kbd>U</kbd></button>
+    <button class="btn" id="btnDxf">Export DXF</button>
+    <button class="btn" id="btnSave">Save</button>
+    <button class="btn" id="btnOpen">Open</button>
+    <input type="file" id="fileIn" accept=".json" style="display:none">
+    <button class="btn" id="btnHelp">?</button>
+    <div id="layerBox">
+      <label style="color:var(--dim);font-size:11px">LAYER</label>
+      <select id="layerSel"></select>
+      <input type="color" id="layerColor" title="Layer color">
+      <button class="btn" id="btnAddLayer" title="New layer">+</button>
+    </div>
+  </div>
+
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div id="coordRead">0.00, 0.00</div>
+    <div id="help">
+      <span class="close" onclick="toggleHelp(false)">✕</span>
+      <h2>Commands &amp; shortcuts</h2>
+      <h3>Draw</h3>
+      <table>
+        <tr><td>L / LINE</td><td>Line (chained; Enter to end)</td></tr>
+        <tr><td>PL / PLINE</td><td>Polyline — type <b>C</b> to close</td></tr>
+        <tr><td>REC</td><td>Rectangle by two corners</td></tr>
+        <tr><td>C / CIRCLE</td><td>Circle — center, then radius (click or type)</td></tr>
+        <tr><td>T / TEXT</td><td>Text — point, height, string</td></tr>
+      </table>
+      <h3>Modify</h3>
+      <table>
+        <tr><td>M / MOVE</td><td>Move selection: base point → destination</td></tr>
+        <tr><td>CO / COPY</td><td>Copy (multiple; Enter to end)</td></tr>
+        <tr><td>RO / ROTATE</td><td>Rotate: base point, angle (type ° or click)</td></tr>
+        <tr><td>SC / SCALE</td><td>Scale: base point, factor</td></tr>
+        <tr><td>O / OFFSET</td><td>Offset lines &amp; circles: distance → object → side</td></tr>
+        <tr><td>E / ERASE</td><td>Erase selection (or Delete key)</td></tr>
+        <tr><td>U</td><td>Undo &nbsp;·&nbsp; REDO to redo</td></tr>
+      </table>
+      <h3>Inspect / view</h3>
+      <table>
+        <tr><td>DI / DIST</td><td>Measure between two points</td></tr>
+        <tr><td>Z → E</td><td>Zoom extents (A = all)</td></tr>
+        <tr><td>Wheel</td><td>Zoom at cursor</td></tr>
+        <tr><td>Middle-drag</td><td>Pan (or hold Space + drag)</td></tr>
+      </table>
+      <h3>Point entry (like AutoCAD)</h3>
+      <table>
+        <tr><td>10,20</td><td>Absolute coordinates</td></tr>
+        <tr><td>@5,0</td><td>Relative to last point</td></tr>
+        <tr><td>@3&lt;45</td><td>Relative polar: distance &lt; angle</td></tr>
+        <tr><td>250</td><td>Direct distance along cursor direction</td></tr>
+      </table>
+      <h3>Toggles &amp; keys</h3>
+      <table>
+        <tr><td>F8</td><td>ORTHO</td></tr>
+        <tr><td>F3</td><td>OSNAP (endpoint ▪ midpoint △ center ○ quadrant ◇)</td></tr>
+        <tr><td>F7 / F9</td><td>Grid / grid snap</td></tr>
+        <tr><td>Right-click</td><td>= Enter (confirm / repeat last command)</td></tr>
+        <tr><td>Esc</td><td>Cancel command / clear selection</td></tr>
+        <tr><td>Drag →</td><td>Window select (fully inside)</td></tr>
+        <tr><td>Drag ←</td><td>Crossing select (touching)</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div id="cmdArea">
+    <div id="history"></div>
+    <div id="cmdRow">
+      <span id="prompt">Command:</span>
+      <input id="cmdInput" autocomplete="off" spellcheck="false" aria-label="Command input">
+    </div>
+    <div id="statusRow">
+      <span class="tog" id="tGrid">GRID</span>
+      <span class="tog" id="tSnap">SNAP</span>
+      <span class="tog on" id="tOrtho">ORTHO</span>
+      <span class="tog on" id="tOsnap">OSNAP</span>
+      <span class="spacer"></span>
+      <span id="hint">Type a command (L, C, REC…) or press ? — units are whatever you want them to be (mm, cm, m)</span>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* =========================================================
+   MiniCAD — a small 2D drafting tool with AutoCAD-style UX
+   Entities: line, circle, pline, text.  World is Y-up.
+   ========================================================= */
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const cmdInput = document.getElementById('cmdInput');
+const promptEl = document.getElementById('prompt');
+const historyEl = document.getElementById('history');
+const coordRead = document.getElementById('coordRead');
+
+let DPR = 1, W = 0, H = 0;
+
+/* ---------- document state ---------- */
+let entities = [];
+let idSeq = 1;
+let layers = [
+  {name:'0',     color:'#e8e8e8'},
+  {name:'walls', color:'#4db8ff'},
+  {name:'furniture', color:'#f2b950'},
+  {name:'annot', color:'#ef7b7b'},
+];
+let currentLayer = '0';
+let undoStack = [], redoStack = [];
+
+/* ---------- view ---------- */
+let view = { scale: 4, ox: 0, oy: 0 };  // screen = world*scale + o  (y flipped)
+function w2s(p){ return { x: p.x*view.scale + view.ox, y: -p.y*view.scale + view.oy }; }
+function s2w(x, y){ return { x: (x - view.ox)/view.scale, y: (view.oy - y)/view.scale }; }
+
+/* ---------- toggles ---------- */
+const T = { grid:true, snap:false, ortho:true, osnap:true };
+
+/* ---------- runtime ---------- */
+let cmd = null;              // active command state machine
+let lastCmdName = null;
+let selection = new Set();   // entity ids
+let mouse = { sx:0, sy:0, inside:false };
+let curPt = {x:0, y:0};      // cursor point after snaps/ortho
+let snapMark = null;         // {p, kind}
+let boxSel = null;           // {x0,y0,x1,y1} screen coords
+let panning = null;
+let spaceHeld = false;
+
+/* ================= helpers ================= */
+const dist = (a,b)=>Math.hypot(a.x-b.x, a.y-b.y);
+const fmt = n => (Math.round(n*100)/100).toString();
+function layerOf(name){ return layers.find(l=>l.name===name) || layers[0]; }
+function deep(o){ return JSON.parse(JSON.stringify(o)); }
+
+function snapshot(){
+  undoStack.push(JSON.stringify(entities));
+  if (undoStack.length > 200) undoStack.shift();
+  redoStack.length = 0;
+}
+function doUndo(){
+  if (!undoStack.length){ log('Nothing to undo','e'); return; }
+  redoStack.push(JSON.stringify(entities));
+  entities = JSON.parse(undoStack.pop());
+  selection.clear(); cancelCmd(true); draw();
+  log('Undo','r');
+}
+function doRedo(){
+  if (!redoStack.length){ log('Nothing to redo','e'); return; }
+  undoStack.push(JSON.stringify(entities));
+  entities = JSON.parse(redoStack.pop());
+  selection.clear(); cancelCmd(true); draw();
+  log('Redo','r');
+}
+
+function log(text, cls){
+  const d = document.createElement('div');
+  if (cls) d.className = cls;
+  d.textContent = text;
+  historyEl.appendChild(d);
+  while (historyEl.children.length > 60) historyEl.removeChild(historyEl.firstChild);
+  historyEl.scrollTop = historyEl.scrollHeight;
+}
+function setPrompt(t){ promptEl.textContent = t; }
+
+/* ================= geometry ================= */
+function ptSegDist(p, a, b){
+  const dx=b.x-a.x, dy=b.y-a.y, L2=dx*dx+dy*dy;
+  if (!L2) return dist(p,a);
+  let t=((p.x-a.x)*dx+(p.y-a.y)*dy)/L2; t=Math.max(0,Math.min(1,t));
+  return Math.hypot(p.x-(a.x+t*dx), p.y-(a.y+t*dy));
+}
+function entHitDist(ent, p){
+  if (ent.type==='line') return ptSegDist(p, {x:ent.x1,y:ent.y1}, {x:ent.x2,y:ent.y2});
+  if (ent.type==='circle') return Math.abs(dist(p,{x:ent.cx,y:ent.cy}) - ent.r);
+  if (ent.type==='pline'){
+    let m=Infinity;
+    for (let i=0;i<ent.pts.length-1;i++) m=Math.min(m, ptSegDist(p, ent.pts[i], ent.pts[i+1]));
+    if (ent.closed && ent.pts.length>2) m=Math.min(m, ptSegDist(p, ent.pts[ent.pts.length-1], ent.pts[0]));
+    return m;
+  }
+  if (ent.type==='text'){
+    const w = ent.str.length * ent.h * 0.62, h = ent.h;
+    if (p.x>=ent.x && p.x<=ent.x+w && p.y>=ent.y && p.y<=ent.y+h) return 0;
+    return Math.min(
+      ptSegDist(p,{x:ent.x,y:ent.y},{x:ent.x+w,y:ent.y}),
+      ptSegDist(p,{x:ent.x,y:ent.y+h},{x:ent.x+w,y:ent.y+h}),
+      ptSegDist(p,{x:ent.x,y:ent.y},{x:ent.x,y:ent.y+h}),
+      ptSegDist(p,{x:ent.x+w,y:ent.y},{x:ent.x+w,y:ent.y+h}));
+  }
+  return Infinity;
+}
+function findEntityAt(p){
+  const tol = 8/view.scale;
+  let best=null, bd=tol;
+  for (const e of entities){ const d=entHitDist(e,p); if (d<=bd){ bd=d; best=e; } }
+  return best;
+}
+function entBBox(e){
+  if (e.type==='line') return [Math.min(e.x1,e.x2),Math.min(e.y1,e.y2),Math.max(e.x1,e.x2),Math.max(e.y1,e.y2)];
+  if (e.type==='circle') return [e.cx-e.r,e.cy-e.r,e.cx+e.r,e.cy+e.r];
+  if (e.type==='pline'){
+    let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+    for(const p of e.pts){x0=Math.min(x0,p.x);y0=Math.min(y0,p.y);x1=Math.max(x1,p.x);y1=Math.max(y1,p.y);}
+    return [x0,y0,x1,y1];
+  }
+  if (e.type==='text'){ const w=e.str.length*e.h*0.62; return [e.x,e.y,e.x+w,e.y+e.h]; }
+  return [0,0,0,0];
+}
+function entInWindow(e, r, crossing){ // r = [x0,y0,x1,y1] world
+  const b = entBBox(e);
+  const inside = b[0]>=r[0]&&b[1]>=r[1]&&b[2]<=r[2]&&b[3]<=r[3];
+  if (!crossing) return inside;
+  const overlap = !(b[2]<r[0]||b[0]>r[2]||b[3]<r[1]||b[1]>r[3]);
+  return overlap;
+}
+
+/* ================= object snap ================= */
+function snapCandidates(){
+  const out=[];
+  for (const e of entities){
+    if (e.type==='line'){
+      out.push({p:{x:e.x1,y:e.y1},k:'end'}, {p:{x:e.x2,y:e.y2},k:'end'},
+               {p:{x:(e.x1+e.x2)/2,y:(e.y1+e.y2)/2},k:'mid'});
+    } else if (e.type==='circle'){
+      out.push({p:{x:e.cx,y:e.cy},k:'cen'});
+      out.push({p:{x:e.cx+e.r,y:e.cy},k:'quad'},{p:{x:e.cx-e.r,y:e.cy},k:'quad'},
+               {p:{x:e.cx,y:e.cy+e.r},k:'quad'},{p:{x:e.cx,y:e.cy-e.r},k:'quad'});
+    } else if (e.type==='pline'){
+      const n=e.pts.length;
+      for (let i=0;i<n;i++){
+        out.push({p:e.pts[i],k:'end'});
+        if (i<n-1) out.push({p:{x:(e.pts[i].x+e.pts[i+1].x)/2,y:(e.pts[i].y+e.pts[i+1].y)/2},k:'mid'});
+      }
+      if (e.closed && n>2) out.push({p:{x:(e.pts[n-1].x+e.pts[0].x)/2,y:(e.pts[n-1].y+e.pts[0].y)/2},k:'mid'});
+    } else if (e.type==='text'){
+      out.push({p:{x:e.x,y:e.y},k:'end'});
+    }
+  }
+  return out;
+}
+function applyModifiers(rawW){
+  snapMark = null;
+  let p = {x:rawW.x, y:rawW.y};
+  if (T.osnap){
+    const tol = 11/view.scale;
+    let best=null, bd=tol;
+    for (const c of snapCandidates()){
+      const d = dist(c.p, rawW);
+      if (d < bd){ bd=d; best=c; }
+    }
+    if (best){ snapMark = best; return {x:best.p.x, y:best.p.y}; }
+  }
+  const base = rubberBase();
+  if (T.ortho && base){
+    if (Math.abs(p.x-base.x) >= Math.abs(p.y-base.y)) p = {x:p.x, y:base.y};
+    else p = {x:base.x, y:p.y};
+  }
+  if (T.snap){
+    const s = gridStep();
+    p = {x:Math.round(p.x/s)*s, y:Math.round(p.y/s)*s};
+  }
+  return p;
+}
+function rubberBase(){
+  if (!cmd) return null;
+  if (cmd.name==='LINE' && cmd.base) return cmd.base;
+  if (cmd.name==='PLINE' && cmd.pts.length) return cmd.pts[cmd.pts.length-1];
+  if (cmd.name==='RECTANG' && cmd.p1) return cmd.p1;
+  if (cmd.name==='CIRCLE' && cmd.center) return cmd.center;
+  if ((cmd.name==='MOVE'||cmd.name==='COPY') && cmd.step==='dest') return cmd.base;
+  if (cmd.name==='ROTATE' && cmd.step==='angle') return cmd.base;
+  if (cmd.name==='SCALE' && cmd.step==='factor') return cmd.base;
+  if (cmd.name==='DIST' && cmd.p1) return cmd.p1;
+  return null;
+}
+
+/* ================= drawing ================= */
+function gridStep(){
+  const target = 28/view.scale;                 // want ≥28 px between lines
+  const pow = Math.pow(10, Math.floor(Math.log10(target)));
+  for (const m of [1,2,5,10]) if (m*pow >= target) return m*pow;
+  return 10*pow;
+}
+function draw(){
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = '#131519'; ctx.fillRect(0,0,W,H);
+
+  const tl = s2w(0,0), br = s2w(W,H);
+  // grid
+  if (T.grid){
+    const s = gridStep();
+    const x0 = Math.floor(tl.x/s)*s, x1 = Math.ceil(br.x/s)*s;
+    const y0 = Math.floor(br.y/s)*s, y1 = Math.ceil(tl.y/s)*s;
+    ctx.lineWidth = 1;
+    for (let x=x0;x<=x1;x+=s){
+      const sx = Math.round(x*view.scale + view.ox)+.5;
+      const major = Math.round(x/s) % 5 === 0;
+      ctx.strokeStyle = major ? '#232833' : '#1b1f27';
+      ctx.beginPath(); ctx.moveTo(sx,0); ctx.lineTo(sx,H); ctx.stroke();
+    }
+    for (let y=y0;y<=y1;y+=s){
+      const sy = Math.round(-y*view.scale + view.oy)+.5;
+      const major = Math.round(y/s) % 5 === 0;
+      ctx.strokeStyle = major ? '#232833' : '#1b1f27';
+      ctx.beginPath(); ctx.moveTo(0,sy); ctx.lineTo(W,sy); ctx.stroke();
+    }
+    // axes
+    ctx.strokeStyle = '#31394a';
+    const ax = w2s({x:0,y:0});
+    ctx.beginPath(); ctx.moveTo(Math.round(ax.x)+.5,0); ctx.lineTo(Math.round(ax.x)+.5,H); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,Math.round(ax.y)+.5); ctx.lineTo(W,Math.round(ax.y)+.5); ctx.stroke();
+  }
+
+  // entities
+  for (const e of entities) drawEntity(e, 0, 0, false);
+
+  // move/copy ghost preview
+  if (cmd && (cmd.name==='MOVE'||cmd.name==='COPY') && cmd.step==='dest'){
+    const dx = curPt.x - cmd.base.x, dy = curPt.y - cmd.base.y;
+    ctx.globalAlpha = .45;
+    for (const id of cmd.sel){ const e = entities.find(z=>z.id===id); if (e) drawEntity(e, dx, dy, true); }
+    ctx.globalAlpha = 1;
+  }
+
+  drawRubber();
+
+  // box selection rectangle
+  if (boxSel){
+    const x=Math.min(boxSel.x0,boxSel.x1), y=Math.min(boxSel.y0,boxSel.y1);
+    const w=Math.abs(boxSel.x1-boxSel.x0), h=Math.abs(boxSel.y1-boxSel.y0);
+    const crossing = boxSel.x1 < boxSel.x0;
+    ctx.fillStyle = crossing ? 'rgba(120,220,120,.08)' : 'rgba(80,160,255,.08)';
+    ctx.strokeStyle = crossing ? '#6fce6f' : '#4db8ff';
+    ctx.setLineDash(crossing ? [5,4] : []);
+    ctx.fillRect(x,y,w,h); ctx.strokeRect(x+.5,y+.5,w,h);
+    ctx.setLineDash([]);
+  }
+
+  // osnap marker
+  if (snapMark && mouse.inside){
+    const s = w2s(snapMark.p); const r=6;
+    ctx.strokeStyle = '#ffd75e'; ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    if (snapMark.k==='end'){ ctx.rect(s.x-r,s.y-r,2*r,2*r); }
+    else if (snapMark.k==='mid'){ ctx.moveTo(s.x,s.y-r); ctx.lineTo(s.x-r,s.y+r); ctx.lineTo(s.x+r,s.y+r); ctx.closePath(); }
+    else if (snapMark.k==='cen'){ ctx.arc(s.x,s.y,r,0,Math.PI*2); }
+    else { ctx.moveTo(s.x,s.y-r); ctx.lineTo(s.x+r,s.y); ctx.lineTo(s.x,s.y+r); ctx.lineTo(s.x-r,s.y); ctx.closePath(); }
+    ctx.stroke(); ctx.lineWidth = 1;
+  }
+
+  // crosshair
+  if (mouse.inside){
+    const s = snapMark ? w2s(snapMark.p) : w2s(curPt);
+    ctx.strokeStyle = 'rgba(220,225,235,.55)';
+    ctx.beginPath();
+    ctx.moveTo(0, s.y+.5); ctx.lineTo(W, s.y+.5);
+    ctx.moveTo(s.x+.5, 0); ctx.lineTo(s.x+.5, H);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(220,225,235,.9)';
+    ctx.strokeRect(s.x-4.5, s.y-4.5, 9, 9);
+  }
+}
+function drawEntity(e, dx, dy, ghost){
+  const col = ghost ? '#9fb6c9' : layerOf(e.layer).color;
+  const isSel = !ghost && selection.has(e.id);
+  ctx.strokeStyle = isSel ? '#4db8ff' : col;
+  ctx.fillStyle = ctx.strokeStyle;
+  ctx.lineWidth = isSel ? 1.8 : 1.3;
+  ctx.setLineDash(isSel ? [6,4] : []);
+  ctx.beginPath();
+  if (e.type==='line'){
+    const a=w2s({x:e.x1+dx,y:e.y1+dy}), b=w2s({x:e.x2+dx,y:e.y2+dy});
+    ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+  } else if (e.type==='circle'){
+    const c=w2s({x:e.cx+dx,y:e.cy+dy});
+    ctx.arc(c.x,c.y,e.r*view.scale,0,Math.PI*2); ctx.stroke();
+  } else if (e.type==='pline'){
+    e.pts.forEach((p,i)=>{ const s=w2s({x:p.x+dx,y:p.y+dy}); i?ctx.lineTo(s.x,s.y):ctx.moveTo(s.x,s.y); });
+    if (e.closed) ctx.closePath();
+    ctx.stroke();
+  } else if (e.type==='text'){
+    const s=w2s({x:e.x+dx,y:e.y+dy});
+    ctx.font = `${Math.max(2, e.h*view.scale)}px ${'ui-monospace, monospace'}`;
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText(e.str, s.x, s.y);
+    if (isSel){ const b=entBBox(e); const p0=w2s({x:b[0]+dx,y:b[3]+dy}), p1=w2s({x:b[2]+dx,y:b[1]+dy}); ctx.strokeRect(p0.x,p0.y,p1.x-p0.x,p1.y-p0.y); }
+  }
+  ctx.setLineDash([]); ctx.lineWidth = 1;
+}
+function drawRubber(){
+  if (!cmd || !mouse.inside) return;
+  ctx.strokeStyle = '#7c8698'; ctx.setLineDash([6,5]);
+  ctx.beginPath();
+  const line = (a,b)=>{const A=w2s(a),B=w2s(b);ctx.moveTo(A.x,A.y);ctx.lineTo(B.x,B.y);};
+  if (cmd.name==='LINE' && cmd.base) line(cmd.base, curPt);
+  else if (cmd.name==='PLINE' && cmd.pts.length){
+    cmd.pts.forEach((p,i)=>{const s=w2s(p); i?ctx.lineTo(s.x,s.y):ctx.moveTo(s.x,s.y);});
+    const s=w2s(curPt); ctx.lineTo(s.x,s.y);
+  }
+  else if (cmd.name==='RECTANG' && cmd.p1){
+    const a=w2s(cmd.p1), b=w2s(curPt);
+    ctx.rect(Math.min(a.x,b.x), Math.min(a.y,b.y), Math.abs(b.x-a.x), Math.abs(b.y-a.y));
+  }
+  else if (cmd.name==='CIRCLE' && cmd.center){
+    const c=w2s(cmd.center); ctx.arc(c.x,c.y, dist(cmd.center,curPt)*view.scale, 0, Math.PI*2);
+  }
+  else if (cmd.name==='DIST' && cmd.p1) line(cmd.p1, curPt);
+  else if (cmd.name==='ROTATE' && cmd.step==='angle') line(cmd.base, curPt);
+  ctx.stroke(); ctx.setLineDash([]);
+}
+
+/* ================= commands ================= */
+const ALIASES = {
+  L:'LINE', LINE:'LINE', PL:'PLINE', PLINE:'PLINE', REC:'RECTANG', RECT:'RECTANG', RECTANG:'RECTANG', RECTANGLE:'RECTANG',
+  C:'CIRCLE', CIRCLE:'CIRCLE', T:'TEXT', TEXT:'TEXT', DT:'TEXT',
+  M:'MOVE', MOVE:'MOVE', CO:'COPY', CP:'COPY', COPY:'COPY', RO:'ROTATE', ROTATE:'ROTATE', SC:'SCALE', SCALE:'SCALE',
+  O:'OFFSET', OFFSET:'OFFSET', E:'ERASE', ERASE:'ERASE', DEL:'ERASE',
+  DI:'DIST', DIST:'DIST', Z:'ZOOM', ZOOM:'ZOOM', ZOOMEXT:'ZOOMEXT',
+  U:'UNDO', UNDO:'UNDO', REDO:'REDO', ORTHO:'TOGORTHO', OSNAP:'TOGOSNAP', GRID:'TOGGRID', HELP:'HELP', '?':'HELP'
+};
+const MODIFY = new Set(['MOVE','COPY','ROTATE','SCALE','ERASE']);
+
+function startCommand(raw){
+  const name = ALIASES[raw.toUpperCase()];
+  if (!name){ log(`Unknown command: ${raw}  (type ? for help)`, 'e'); return; }
+  // instant commands
+  if (name==='UNDO'){ doUndo(); return; }
+  if (name==='REDO'){ doRedo(); return; }
+  if (name==='ZOOMEXT'){ zoomExtents(); return; }
+  if (name==='TOGORTHO'){ setTog('ortho'); return; }
+  if (name==='TOGOSNAP'){ setTog('osnap'); return; }
+  if (name==='TOGGRID'){ setTog('grid'); return; }
+  if (name==='HELP'){ toggleHelp(); return; }
+
+  cancelCmd(true);
+  lastCmdName = raw.toUpperCase();
+  cmd = { name, step:0, pts:[], sel:[] };
+  log(`Command: ${name}`, 'p');
+
+  if (name==='LINE'){ cmd.base=null; setPrompt('LINE — Specify first point:'); }
+  else if (name==='PLINE') setPrompt('PLINE — Specify first point:');
+  else if (name==='RECTANG') setPrompt('RECTANG — Specify first corner:');
+  else if (name==='CIRCLE') setPrompt('CIRCLE — Specify center point:');
+  else if (name==='TEXT'){ cmd.step='point'; setPrompt('TEXT — Specify insertion point:'); }
+  else if (name==='DIST') setPrompt('DIST — Specify first point:');
+  else if (name==='ZOOM') setPrompt('ZOOM — [E]xtents / [A]ll:');
+  else if (name==='OFFSET'){ cmd.step='dist'; setPrompt('OFFSET — Specify offset distance:'); }
+  else if (MODIFY.has(name)){
+    if (selection.size){ cmd.sel=[...selection]; afterSelect(); }
+    else { cmd.step='select'; setPrompt(`${name} — Select objects (click or drag box), Enter when done:`); }
+  }
+  draw();
+}
+function afterSelect(){
+  const n = cmd.sel.length;
+  if (!n){ log('Nothing selected.', 'e'); cancelCmd(); return; }
+  log(`${n} object${n>1?'s':''} selected.`);
+  if (cmd.name==='ERASE'){
+    snapshot();
+    entities = entities.filter(e=>!cmd.sel.includes(e.id));
+    selection.clear();
+    log(`Erased ${n}.`, 'r'); endCmd();
+    return;
+  }
+  cmd.step='base';
+  setPrompt(`${cmd.name} — Specify base point:`);
+}
+function endCmd(){ cmd=null; setPrompt('Command:'); draw(); }
+function cancelCmd(silent){
+  if (cmd && !silent) log('*Cancel*');
+  cmd=null; setPrompt('Command:'); draw();
+}
+
+function onPoint(p){
+  if (!cmd) return;
+  const n = cmd.name;
+  if (n==='LINE'){
+    if (!cmd.base){ cmd.base=p; setPrompt('LINE — Specify next point:'); }
+    else {
+      snapshot();
+      entities.push({id:idSeq++, type:'line', x1:cmd.base.x, y1:cmd.base.y, x2:p.x, y2:p.y, layer:currentLayer});
+      cmd.base=p;
+    }
+  }
+  else if (n==='PLINE'){
+    cmd.pts.push(p);
+    setPrompt('PLINE — Specify next point [C to close, Enter to end]:');
+  }
+  else if (n==='RECTANG'){
+    if (!cmd.p1){ cmd.p1=p; setPrompt('RECTANG — Specify other corner:'); }
+    else {
+      snapshot();
+      entities.push({id:idSeq++, type:'pline', closed:true, layer:currentLayer,
+        pts:[{x:cmd.p1.x,y:cmd.p1.y},{x:p.x,y:cmd.p1.y},{x:p.x,y:p.y},{x:cmd.p1.x,y:p.y}]});
+      endCmd(); return;
+    }
+  }
+  else if (n==='CIRCLE'){
+    if (!cmd.center){ cmd.center=p; setPrompt('CIRCLE — Specify radius (click or type):'); }
+    else { makeCircle(dist(cmd.center,p)); return; }
+  }
+  else if (n==='TEXT' && cmd.step==='point'){
+    cmd.pt=p; cmd.step='height';
+    setPrompt('TEXT — Specify height <2.5>:');
+  }
+  else if (n==='DIST'){
+    if (!cmd.p1){ cmd.p1=p; setPrompt('DIST — Specify second point:'); }
+    else {
+      const dx=p.x-cmd.p1.x, dy=p.y-cmd.p1.y;
+      const ang=(Math.atan2(dy,dx)*180/Math.PI+360)%360;
+      log(`Distance = ${fmt(Math.hypot(dx,dy))},  ΔX = ${fmt(dx)},  ΔY = ${fmt(dy)},  Angle = ${fmt(ang)}°`, 'r');
+      endCmd(); return;
+    }
+  }
+  else if ((n==='MOVE'||n==='COPY') ){
+    if (cmd.step==='base'){ cmd.base=p; cmd.step='dest'; setPrompt(`${n} — Specify second point:`); }
+    else if (cmd.step==='dest'){
+      const dx=p.x-cmd.base.x, dy=p.y-cmd.base.y;
+      snapshot();
+      if (n==='MOVE'){ translateIds(cmd.sel, dx, dy); log(`Moved ${cmd.sel.length}.`, 'r'); endCmd(); return; }
+      else {
+        const clones = cmd.sel.map(id=>{ const e=deep(entities.find(z=>z.id===id)); e.id=idSeq++; return e; });
+        clones.forEach(e=>translateEnt(e,dx,dy));
+        entities.push(...clones);
+        log(`Copied ${clones.length}.`, 'r');
+        setPrompt('COPY — Specify second point (Enter to end):');
+      }
+    }
+  }
+  else if (n==='ROTATE'){
+    if (cmd.step==='base'){ cmd.base=p; cmd.step='angle'; setPrompt('ROTATE — Specify rotation angle (type degrees or click):'); }
+    else if (cmd.step==='angle'){
+      const ang = Math.atan2(p.y-cmd.base.y, p.x-cmd.base.x);
+      applyRotate(ang); return;
+    }
+  }
+  else if (n==='SCALE'){
+    if (cmd.step==='base'){ cmd.base=p; cmd.step='factor'; setPrompt('SCALE — Specify scale factor (type a number):'); }
+    else log('Type a numeric scale factor (e.g. 2 or 0.5).', 'e');
+  }
+  else if (n==='OFFSET'){
+    if (cmd.step==='pick'){
+      const e = findEntityAt(p);
+      if (!e){ log('No object there.', 'e'); return; }
+      if (e.type!=='line' && e.type!=='circle'){ log('Offset supports lines and circles in this version.', 'e'); return; }
+      cmd.target=e; cmd.step='side';
+      setPrompt('OFFSET — Specify point on side to offset:');
+    }
+    else if (cmd.step==='side'){
+      offsetEntity(cmd.target, cmd.dist, p);
+      cmd.step='pick'; cmd.target=null;
+      setPrompt('OFFSET — Select object to offset (Enter to end):');
+    }
+  }
+  draw();
+}
+
+function makeCircle(r){
+  if (!(r>0)){ log('Radius must be positive.', 'e'); return; }
+  snapshot();
+  entities.push({id:idSeq++, type:'circle', cx:cmd.center.x, cy:cmd.center.y, r, layer:currentLayer});
+  endCmd();
+}
+function translateEnt(e,dx,dy){
+  if (e.type==='line'){ e.x1+=dx;e.y1+=dy;e.x2+=dx;e.y2+=dy; }
+  else if (e.type==='circle'){ e.cx+=dx;e.cy+=dy; }
+  else if (e.type==='pline'){ e.pts.forEach(p=>{p.x+=dx;p.y+=dy;}); }
+  else if (e.type==='text'){ e.x+=dx;e.y+=dy; }
+}
+function translateIds(ids,dx,dy){ ids.forEach(id=>{const e=entities.find(z=>z.id===id); if(e)translateEnt(e,dx,dy);}); }
+function rotPt(p,b,c,s){ const x=p.x-b.x,y=p.y-b.y; return {x:b.x+x*c-y*s, y:b.y+x*s+y*c}; }
+function applyRotate(ang){
+  const c=Math.cos(ang), s=Math.sin(ang);
+  snapshot();
+  for (const id of cmd.sel){
+    const e=entities.find(z=>z.id===id); if(!e) continue;
+    if (e.type==='line'){ const a=rotPt({x:e.x1,y:e.y1},cmd.base,c,s), b=rotPt({x:e.x2,y:e.y2},cmd.base,c,s); e.x1=a.x;e.y1=a.y;e.x2=b.x;e.y2=b.y; }
+    else if (e.type==='circle'){ const p=rotPt({x:e.cx,y:e.cy},cmd.base,c,s); e.cx=p.x;e.cy=p.y; }
+    else if (e.type==='pline'){ e.pts=e.pts.map(p=>rotPt(p,cmd.base,c,s)); }
+    else if (e.type==='text'){ const p=rotPt({x:e.x,y:e.y},cmd.base,c,s); e.x=p.x;e.y=p.y; }
+  }
+  log(`Rotated ${cmd.sel.length} by ${fmt(ang*180/Math.PI)}°.`, 'r');
+  endCmd();
+}
+function applyScale(f){
+  if (!(f>0)){ log('Factor must be positive.', 'e'); return; }
+  snapshot();
+  const b=cmd.base;
+  const sp=p=>({x:b.x+(p.x-b.x)*f, y:b.y+(p.y-b.y)*f});
+  for (const id of cmd.sel){
+    const e=entities.find(z=>z.id===id); if(!e) continue;
+    if (e.type==='line'){ const a=sp({x:e.x1,y:e.y1}), q=sp({x:e.x2,y:e.y2}); e.x1=a.x;e.y1=a.y;e.x2=q.x;e.y2=q.y; }
+    else if (e.type==='circle'){ const p=sp({x:e.cx,y:e.cy}); e.cx=p.x;e.cy=p.y;e.r*=f; }
+    else if (e.type==='pline'){ e.pts=e.pts.map(sp); }
+    else if (e.type==='text'){ const p=sp({x:e.x,y:e.y}); e.x=p.x;e.y=p.y;e.h*=f; }
+  }
+  log(`Scaled ${cmd.sel.length} by ${f}.`, 'r');
+  endCmd();
+}
+function offsetEntity(e, d, side){
+  snapshot();
+  if (e.type==='circle'){
+    const inside = dist(side,{x:e.cx,y:e.cy}) < e.r;
+    const r = inside ? e.r-d : e.r+d;
+    if (r<=0){ log('Offset would collapse the circle.', 'e'); undoStack.pop(); return; }
+    entities.push({id:idSeq++, type:'circle', cx:e.cx, cy:e.cy, r, layer:e.layer});
+  } else {
+    const dx=e.x2-e.x1, dy=e.y2-e.y1, L=Math.hypot(dx,dy);
+    if (!L){ log('Zero-length line.', 'e'); undoStack.pop(); return; }
+    let nx=-dy/L, ny=dx/L;
+    const s=Math.sign((side.x-e.x1)*nx + (side.y-e.y1)*ny) || 1;
+    nx*=s*d; ny*=s*d;
+    entities.push({id:idSeq++, type:'line', x1:e.x1+nx, y1:e.y1+ny, x2:e.x2+nx, y2:e.y2+ny, layer:e.layer});
+  }
+  log('Offset created.', 'r');
+}
+
+/* ---------- typed input during a command ---------- */
+function parsePoint(text){
+  const t = text.trim();
+  const base = rubberBase();
+  let m;
+  if ((m = t.match(/^@\s*(-?[\d.]+)\s*<\s*(-?[\d.]+)$/))){
+    if (!base) return null;
+    const d=parseFloat(m[1]), a=parseFloat(m[2])*Math.PI/180;
+    return {x:base.x+d*Math.cos(a), y:base.y+d*Math.sin(a)};
+  }
+  if ((m = t.match(/^@\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)$/))){
+    if (!base) return null;
+    return {x:base.x+parseFloat(m[1]), y:base.y+parseFloat(m[2])};
+  }
+  if ((m = t.match(/^(-?[\d.]+)\s*,\s*(-?[\d.]+)$/)))
+    return {x:parseFloat(m[1]), y:parseFloat(m[2])};
+  if ((m = t.match(/^(-?[\d.]+)$/))){
+    const d = parseFloat(m[1]);
+    if (base){ // direct distance along cursor direction
+      const L = dist(base, curPt);
+      if (L < 1e-9) return null;
+      return {x:base.x+(curPt.x-base.x)/L*d, y:base.y+(curPt.y-base.y)/L*d};
+    }
+    return null;
+  }
+  return null;
+}
+
+function handleEnter(text){
+  text = text.trim();
+  // no command running → text is a command name (or repeat last)
+  if (!cmd){
+    if (!text){ if (lastCmdName) startCommand(lastCmdName); return; }
+    startCommand(text); return;
+  }
+  const n = cmd.name;
+
+  // --- special text-mode steps ---
+  if (n==='TEXT' && cmd.step==='height'){
+    const h = text ? parseFloat(text) : 2.5;
+    if (!(h>0)){ log('Height must be a positive number.', 'e'); return; }
+    cmd.h=h; cmd.step='string'; setPrompt('TEXT — Enter text:');
+    return;
+  }
+  if (n==='TEXT' && cmd.step==='string'){
+    if (!text){ cancelCmd(); return; }
+    snapshot();
+    entities.push({id:idSeq++, type:'text', x:cmd.pt.x, y:cmd.pt.y, h:cmd.h, str:text, layer:currentLayer});
+    endCmd(); return;
+  }
+  if (n==='ZOOM'){
+    const c = text.toUpperCase();
+    if (c==='E'||c==='A'||c==='') zoomExtents();
+    else log('Zoom option not available — use E (extents).', 'e');
+    endCmd(); return;
+  }
+  if (n==='OFFSET' && cmd.step==='dist'){
+    const d = parseFloat(text);
+    if (!(d>0)){ log('Enter a positive distance, e.g. 10', 'e'); return; }
+    cmd.dist=d; cmd.step='pick';
+    setPrompt('OFFSET — Select object to offset (line or circle):');
+    return;
+  }
+  if (n==='ROTATE' && cmd.step==='angle' && text){
+    const a = parseFloat(text);
+    if (isNaN(a)){ log('Enter an angle in degrees.', 'e'); return; }
+    applyRotate(a*Math.PI/180); return;
+  }
+  if (n==='SCALE' && cmd.step==='factor'){
+    if (!text) return;
+    applyScale(parseFloat(text)); return;
+  }
+  if (n==='CIRCLE' && cmd.center && text){
+    const r=parseFloat(text);
+    if (isNaN(r)){ log('Enter a radius number or click.', 'e'); return; }
+    makeCircle(r); return;
+  }
+  if (n==='PLINE' && text.toUpperCase()==='C'){
+    finishPline(true); return;
+  }
+
+  // --- empty Enter: confirm / finish ---
+  if (!text){
+    if (cmd.step==='select'){ afterSelect(); return; }
+    if (n==='PLINE'){ finishPline(false); return; }
+    if (n==='LINE' || n==='OFFSET' || (n==='COPY'&&cmd.step==='dest')){ endCmd(); return; }
+    cancelCmd(); return;
+  }
+
+  // --- typed coordinates ---
+  const p = parsePoint(text);
+  if (p){ onPoint(p); draw(); return; }
+  log(`Can't interpret "${text}" here.`, 'e');
+}
+function finishPline(close){
+  if (cmd.pts.length<2){ cancelCmd(); return; }
+  snapshot();
+  entities.push({id:idSeq++, type:'pline', closed:!!close && cmd.pts.length>2, pts:cmd.pts, layer:currentLayer});
+  endCmd();
+}
+
+/* ================= selection ================= */
+function clickSelect(p, additive){
+  const e = findEntityAt(p);
+  if (!e){ if(!additive) selection.clear(); return; }
+  if (selection.has(e.id) && additive) selection.delete(e.id);
+  else selection.add(e.id);
+}
+function boxSelect(r, crossing){
+  const w0 = s2w(Math.min(r.x0,r.x1), Math.max(r.y0,r.y1));
+  const w1 = s2w(Math.max(r.x0,r.x1), Math.min(r.y0,r.y1));
+  const rect=[w0.x,w0.y,w1.x,w1.y];
+  for (const e of entities) if (entInWindow(e, rect, crossing)) selection.add(e.id);
+}
+
+/* ================= view ops ================= */
+function zoomExtents(){
+  if (!entities.length){ view.scale=4; view.ox=W/2; view.oy=H/2; draw(); return; }
+  let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+  for (const e of entities){ const b=entBBox(e); x0=Math.min(x0,b[0]);y0=Math.min(y0,b[1]);x1=Math.max(x1,b[2]);y1=Math.max(y1,b[3]); }
+  const pad=40;
+  const sx=(W-2*pad)/Math.max(1e-6,(x1-x0)), sy=(H-2*pad)/Math.max(1e-6,(y1-y0));
+  view.scale=Math.min(sx,sy,200);
+  const cx=(x0+x1)/2, cy=(y0+y1)/2;
+  view.ox = W/2 - cx*view.scale;
+  view.oy = H/2 + cy*view.scale;
+  draw();
+  log('Zoom extents.', 'r');
+}
+
+/* ================= events ================= */
+function resize(){
+  DPR = window.devicePixelRatio || 1;
+  const r = cv.getBoundingClientRect();
+  W=r.width; H=r.height;
+  cv.width = Math.round(W*DPR); cv.height = Math.round(H*DPR);
+  draw();
+}
+window.addEventListener('resize', resize);
+
+cv.addEventListener('mousemove', ev=>{
+  const r=cv.getBoundingClientRect();
+  mouse.sx=ev.clientX-r.left; mouse.sy=ev.clientY-r.top; mouse.inside=true;
+  if (panning){
+    view.ox += mouse.sx-panning.x; view.oy += mouse.sy-panning.y;
+    panning={x:mouse.sx,y:mouse.sy};
+  }
+  if (boxSel){ boxSel.x1=mouse.sx; boxSel.y1=mouse.sy; }
+  curPt = applyModifiers(s2w(mouse.sx, mouse.sy));
+  coordRead.textContent = `${fmt(curPt.x)}, ${fmt(curPt.y)}` + (T.ortho?'  ORTHO':'') ;
+  draw();
+});
+cv.addEventListener('mouseleave', ()=>{ mouse.inside=false; draw(); });
+
+cv.addEventListener('mousedown', ev=>{
+  cmdInput.focus();
+  if (ev.button===1 || (ev.button===0 && spaceHeld)){
+    panning={x:mouse.sx,y:mouse.sy}; ev.preventDefault(); return;
+  }
+  if (ev.button!==0) return;
+  const needsPoint = cmd && cmd.step!=='select' && cmd.step!=='dist' && cmd.step!=='height' && cmd.step!=='string' && cmd.step!=='factor';
+  if (cmd && cmd.name==='OFFSET' && (cmd.step==='pick')){ onPoint(s2w(mouse.sx,mouse.sy)); return; }
+  if (needsPoint && cmd.name!=='ZOOM'){ onPoint(curPt); return; }
+  // selection (idle, or inside a command's select step)
+  boxSel={x0:mouse.sx,y0:mouse.sy,x1:mouse.sx,y1:mouse.sy, shift:ev.shiftKey};
+});
+window.addEventListener('mouseup', ev=>{
+  if (ev.button===1 || panning){ panning=null; }
+  if (ev.button===0 && boxSel){
+    const moved = Math.abs(boxSel.x1-boxSel.x0)>4 || Math.abs(boxSel.y1-boxSel.y0)>4;
+    if (moved) boxSelect(boxSel, boxSel.x1<boxSel.x0);
+    else clickSelect(s2w(boxSel.x0,boxSel.y0), true);
+    boxSel=null;
+    if (cmd && cmd.step==='select'){
+      setPrompt(`${cmd.name} — ${selection.size} selected. Add more, or Enter to continue:`);
+      cmd.sel=[...selection];
+    }
+    draw();
+  }
+});
+cv.addEventListener('wheel', ev=>{
+  ev.preventDefault();
+  const f = ev.deltaY<0 ? 1.15 : 1/1.15;
+  const wp = s2w(mouse.sx, mouse.sy);
+  view.scale = Math.min(2000, Math.max(0.001, view.scale*f));
+  view.ox = mouse.sx - wp.x*view.scale;
+  view.oy = mouse.sy + wp.y*view.scale;
+  draw();
+}, {passive:false});
+cv.addEventListener('contextmenu', ev=>{
+  ev.preventDefault();
+  handleEnter(cmdInput.value); cmdInput.value='';
+});
+
+cmdInput.addEventListener('keydown', ev=>{
+  const typingText = cmd && cmd.step==='string';        // spaces allowed inside TEXT strings
+  if (ev.key==='Enter' || (ev.key===' ' && !typingText)){
+    ev.preventDefault();
+    handleEnter(cmdInput.value); cmdInput.value='';
+  }
+});
+window.addEventListener('keydown', ev=>{
+  if (ev.key==='F8'){ ev.preventDefault(); setTog('ortho'); return; }
+  if (ev.key==='F3'){ ev.preventDefault(); setTog('osnap'); return; }
+  if (ev.key==='F7'){ ev.preventDefault(); setTog('grid'); return; }
+  if (ev.key==='F9'){ ev.preventDefault(); setTog('snap'); return; }
+  if (ev.key==='Escape'){
+    if (boxSel){ boxSel=null; draw(); return; }
+    if (cmd) cancelCmd();
+    else { selection.clear(); draw(); }
+    cmdInput.value=''; return;
+  }
+  if ((ev.key==='Delete'||ev.key==='Backspace') && !cmd && document.activeElement===cmdInput && !cmdInput.value && selection.size){
+    ev.preventDefault();
+    snapshot();
+    entities = entities.filter(e=>!selection.has(e.id));
+    log(`Erased ${selection.size}.`, 'r');
+    selection.clear(); draw(); return;
+  }
+  if (ev.key===' ' && document.activeElement!==cmdInput){ spaceHeld=true; }
+  if (ev.ctrlKey && ev.key.toLowerCase()==='z'){ ev.preventDefault(); ev.shiftKey?doRedo():doUndo(); return; }
+  if (document.activeElement!==cmdInput && !ev.ctrlKey && !ev.metaKey && ev.key.length===1) cmdInput.focus();
+});
+window.addEventListener('keyup', ev=>{ if (ev.key===' ') spaceHeld=false; });
+
+/* ================= toggles / UI ================= */
+function setTog(k){
+  T[k]=!T[k];
+  const map={grid:'tGrid',snap:'tSnap',ortho:'tOrtho',osnap:'tOsnap'};
+  document.getElementById(map[k]).classList.toggle('on', T[k]);
+  log(`${k.toUpperCase()} ${T[k]?'on':'off'}`);
+  draw();
+}
+['grid','snap','ortho','osnap'].forEach(k=>{
+  const map={grid:'tGrid',snap:'tSnap',ortho:'tOrtho',osnap:'tOsnap'};
+  document.getElementById(map[k]).addEventListener('click', ()=>setTog(k));
+});
+document.querySelectorAll('#topbar .btn[data-cmd]').forEach(b=>{
+  b.addEventListener('click', ()=>{ startCommand(b.dataset.cmd); cmdInput.focus(); });
+});
+document.getElementById('btnUndo').addEventListener('click', doUndo);
+document.getElementById('btnHelp').addEventListener('click', ()=>toggleHelp());
+function toggleHelp(force){
+  const h=document.getElementById('help');
+  const show = force!==undefined?force:h.style.display!=='block';
+  h.style.display = show?'block':'none';
+}
+
+/* layers */
+const layerSel=document.getElementById('layerSel');
+const layerColor=document.getElementById('layerColor');
+function refreshLayers(){
+  layerSel.innerHTML='';
+  for (const l of layers){
+    const o=document.createElement('option'); o.value=l.name; o.textContent=l.name;
+    layerSel.appendChild(o);
+  }
+  layerSel.value=currentLayer;
+  layerColor.value=layerOf(currentLayer).color;
+}
+layerSel.addEventListener('change', ()=>{ currentLayer=layerSel.value; layerColor.value=layerOf(currentLayer).color; cmdInput.focus(); });
+layerColor.addEventListener('input', ()=>{ layerOf(currentLayer).color=layerColor.value; draw(); });
+document.getElementById('btnAddLayer').addEventListener('click', ()=>{
+  const name=prompt('New layer name:');
+  if (!name||layers.some(l=>l.name===name)) return;
+  layers.push({name, color:'#a9e04f'});
+  currentLayer=name; refreshLayers(); draw();
+});
+
+/* ================= save / open / DXF ================= */
+function download(name, data, mime){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([data],{type:mime}));
+  a.download=name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+}
+document.getElementById('btnSave').addEventListener('click', ()=>{
+  download('drawing.json', JSON.stringify({layers, entities, idSeq}, null, 1), 'application/json');
+  log('Saved drawing.json', 'r');
+});
+document.getElementById('btnOpen').addEventListener('click', ()=>document.getElementById('fileIn').click());
+document.getElementById('fileIn').addEventListener('change', ev=>{
+  const f=ev.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const d=JSON.parse(r.result);
+      snapshot();
+      layers=d.layers||layers; entities=d.entities||[]; idSeq=d.idSeq||entities.length+1;
+      currentLayer=layers[0].name; refreshLayers(); selection.clear(); zoomExtents();
+      log(`Opened ${f.name} (${entities.length} objects).`, 'r');
+    }catch(e){ log('Could not read that file.', 'e'); }
+  };
+  r.readAsText(f);
+  ev.target.value='';
+});
+
+function dxfExport(){
+  const L=[];
+  const push=(...a)=>L.push(...a);
+  push('0','SECTION','2','HEADER','9','$ACADVER','1','AC1009','0','ENDSEC');
+  push('0','SECTION','2','TABLES','0','TABLE','2','LAYER','70',String(layers.length));
+  for (const l of layers) push('0','LAYER','2',l.name,'70','0','62','7','6','CONTINUOUS');
+  push('0','ENDTAB','0','ENDSEC');
+  push('0','SECTION','2','ENTITIES');
+  for (const e of entities){
+    if (e.type==='line')
+      push('0','LINE','8',e.layer,'10',e.x1,'20',e.y1,'30','0','11',e.x2,'21',e.y2,'31','0');
+    else if (e.type==='circle')
+      push('0','CIRCLE','8',e.layer,'10',e.cx,'20',e.cy,'30','0','40',e.r);
+    else if (e.type==='pline'){
+      push('0','POLYLINE','8',e.layer,'66','1','70', e.closed?'1':'0');
+      for (const p of e.pts) push('0','VERTEX','8',e.layer,'10',p.x,'20',p.y,'30','0');
+      push('0','SEQEND');
+    }
+    else if (e.type==='text')
+      push('0','TEXT','8',e.layer,'10',e.x,'20',e.y,'30','0','40',e.h,'1',e.str);
+  }
+  push('0','ENDSEC','0','EOF');
+  download('drawing.dxf', L.join('\n'), 'application/dxf');
+  log('Exported drawing.dxf — opens in AutoCAD, LibreCAD, QCAD…', 'r');
+}
+document.getElementById('btnDxf').addEventListener('click', dxfExport);
+
+/* ================= boot ================= */
+function boot(){
+  resize();
+  view.ox = W*0.5; view.oy = H*0.6;
+  refreshLayers();
+  log('MiniCAD ready. Type a command — L (line), REC, C (circle)… or press ? for help.', 'r');
+  log('Right-click = Enter · F8 ortho · F3 osnap · wheel zoom · middle-drag pan');
+  cmdInput.focus();
+  draw();
+}
+boot();
+</script>
+</body>
+</html>

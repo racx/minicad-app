@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MiniCAD — 2D drafting</title>
+<style>
+  :root{
+    --bg:#131519; --panel:#1c1f25; --panel2:#22262e; --line:#2e333d;
+    --text:#d8dbe2; --dim:#8b93a1; --accent:#43d6b5; --warn:#f2b950;
+    --sel:#4db8ff; --mono:ui-monospace,'Cascadia Mono','SF Mono',Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,'Segoe UI',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:13px}
+  #app{display:flex;flex-direction:column;height:100%}
+
+  /* ---------- top bar ---------- */
+  #topbar{display:flex;align-items:center;gap:6px;padding:6px 10px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+  #logo{font-family:var(--mono);font-weight:700;letter-spacing:.06em;color:var(--accent);margin-right:8px;user-select:none}
+  #logo span{color:var(--dim);font-weight:400}
+  .btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:4px 9px;border-radius:5px;cursor:pointer;font-size:12px;font-family:var(--mono)}
+  .btn:hover{border-color:var(--accent);color:var(--accent)}
+  .btn:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+  .btn kbd{color:var(--dim);margin-left:4px;font-size:10px}
+  .sep{width:1px;height:20px;background:var(--line);margin:0 4px}
+  #layerBox{display:flex;align-items:center;gap:5px;margin-left:auto}
+  select,input[type=color]{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:5px;padding:3px 6px;font-size:12px}
+  input[type=color]{padding:1px;width:26px;height:24px;cursor:pointer}
+
+  /* ---------- canvas ---------- */
+  #stage{position:relative;flex:1;min-height:0}
+  #cv{position:absolute;inset:0;width:100%;height:100%;cursor:none;display:block}
+  #coordRead{position:absolute;left:10px;bottom:8px;font-family:var(--mono);font-size:12px;color:var(--dim);pointer-events:none;background:rgba(19,21,25,.7);padding:2px 6px;border-radius:4px}
+
+  /* ---------- help ---------- */
+  #help{position:absolute;top:10px;right:10px;width:320px;max-height:calc(100% - 20px);overflow:auto;background:rgba(28,31,37,.97);border:1px solid var(--line);border-radius:8px;padding:14px 16px;display:none;z-index:5}
+  #help h2{font-size:13px;color:var(--accent);margin-bottom:8px;font-family:var(--mono)}
+  #help h3{font-size:11px;color:var(--dim);margin:10px 0 4px;text-transform:uppercase;letter-spacing:.08em}
+  #help table{width:100%;border-collapse:collapse}
+  #help td{padding:2px 4px;font-size:12px;vertical-align:top}
+  #help td:first-child{font-family:var(--mono);color:var(--warn);white-space:nowrap;width:86px}
+  #help .close{position:absolute;top:8px;right:10px;cursor:pointer;color:var(--dim)}
+
+  /* ---------- command area ---------- */
+  #cmdArea{background:var(--panel);border-top:1px solid var(--line);padding:4px 10px 8px;font-family:var(--mono)}
+  #history{height:54px;overflow-y:auto;font-size:12px;color:var(--dim);padding:2px 4px;white-space:pre-wrap}
+  #history .p{color:var(--text)}
+  #history .r{color:var(--accent)}
+  #history .e{color:#ef7b7b}
+  #cmdRow{display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:5px 10px}
+  #prompt{color:var(--warn);white-space:nowrap;font-size:13px}
+  #cmdInput{flex:1;background:transparent;border:none;outline:none;color:var(--text);font-family:var(--mono);font-size:13px}
+  #statusRow{display:flex;gap:6px;margin-top:6px;align-items:center}
+  .tog{font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--line);color:var(--dim);cursor:pointer;user-select:none;font-family:var(--mono)}
+  .tog.on{color:var(--accent);border-color:var(--accent)}
+  #statusRow .spacer{flex:1}
+  #hint{font-size:11px;color:var(--dim)}
+  @media (max-width:760px){ .btn kbd{display:none} #history{height:38px} }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="topbar">
+    <div id="logo">MINI<span>CAD</span></div>
+    <button class="btn" data-cmd="LINE">Line<kbd>L</kbd></button>
+    <button class="btn" data-cmd="PLINE">Pline<kbd>PL</kbd></button>
+    <button class="btn" data-cmd="RECTANG">Rect<kbd>REC</kbd></button>
+    <button class="btn" data-cmd="CIRCLE">Circle<kbd>C</kbd></button>
+    <button class="btn" data-cmd="TEXT">Text<kbd>T</kbd></button>
+    <button class="btn" data-cmd="DIM">Dim<kbd>DIM</kbd></button>
+    <div class="sep"></div>
+    <button class="btn" data-cmd="MOVE">Move<kbd>M</kbd></button>
+    <button class="btn" data-cmd="COPY">Copy<kbd>CO</kbd></button>
+    <button class="btn" data-cmd="ROTATE">Rotate<kbd>RO</kbd></button>
+    <button class="btn" data-cmd="MIRROR">Mirror<kbd>MI</kbd></button>
+    <button class="btn" data-cmd="STRETCH">Stretch<kbd>S</kbd></button>
+    <button class="btn" data-cmd="OFFSET">Offset<kbd>O</kbd></button>
+    <button class="btn" data-cmd="TRIM">Trim<kbd>TR</kbd></button>
+    <button class="btn" data-cmd="EXTEND">Extend<kbd>EX</kbd></button>
+    <button class="btn" data-cmd="FILLET">Fillet<kbd>F</kbd></button>
+    <button class="btn" data-cmd="ERASE">Erase<kbd>E</kbd></button>
+    <div class="sep"></div>
+    <button class="btn" data-cmd="ZOOMEXT">Zoom Ext<kbd>Z E</kbd></button>
+    <button class="btn" id="btnUndo">Undo<kbd>U</kbd></button>
+    <button class="btn" id="btnDxf">Export DXF</button>
+    <button class="btn" id="btnSave">Save</button>
+    <button class="btn" id="btnOpen">Open</button>
+    <input type="file" id="fileIn" accept=".json" style="display:none">
+    <button class="btn" id="btnHelp">?</button>
+    <div id="layerBox">
+      <label style="color:var(--dim);font-size:11px">LAYER</label>
+      <select id="layerSel"></select>
+      <input type="color" id="layerColor" title="Layer color">
+      <button class="btn" id="btnAddLayer" title="New layer">+</button>
+    </div>
+  </div>
+
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div id="coordRead">0.00, 0.00</div>
+    <div id="help">
+      <span class="close" id="helpClose">✕</span>
+      <h2>Commands &amp; shortcuts</h2>
+      <h3>Draw</h3>
+      <table>
+        <tr><td>L / LINE</td><td>Line (chained; Enter to end)</td></tr>
+        <tr><td>PL / PLINE</td><td>Polyline — type <b>C</b> to close</td></tr>
+        <tr><td>REC</td><td>Rectangle by two corners</td></tr>
+        <tr><td>C / CIRCLE</td><td>Circle — center, then radius (click or type)</td></tr>
+        <tr><td>T / TEXT</td><td>Text — point, height, string</td></tr>
+        <tr><td>DIM / DLI</td><td>Dimension — two points, then place the line (value updates live)</td></tr>
+        <tr><td>DIMTXT</td><td>Dimension text size — number, or A = automatic; applies to selected dims + future ones</td></tr>
+      </table>
+      <h3>Modify</h3>
+      <table>
+        <tr><td>M / MOVE</td><td>Move selection: base point → destination</td></tr>
+        <tr><td>CO / COPY</td><td>Copy (multiple; Enter to end)</td></tr>
+        <tr><td>RO / ROTATE</td><td>Rotate: base point, angle (type ° or click)</td></tr>
+        <tr><td>SC / SCALE</td><td>Scale: base point, factor</td></tr>
+        <tr><td>O / OFFSET</td><td>Offset lines &amp; circles: distance → object → side</td></tr>
+        <tr><td>TR / TRIM</td><td>Trim to cutting edges (empty Enter = all objects are edges)</td></tr>
+        <tr><td>EX / EXTEND</td><td>Extend to boundary edges (empty Enter = all objects)</td></tr>
+        <tr><td>F / FILLET</td><td>Fillet two lines — radius 0 = sharp corner, &gt;0 = rounded</td></tr>
+        <tr><td>MI / MIRROR</td><td>Mirror across a two-point line (asks to erase source)</td></tr>
+        <tr><td>S / STRETCH</td><td>Crossing box → endpoints inside move, rest stays put</td></tr>
+        <tr><td>Grips</td><td>Drag the blue squares on a selected object to reshape it</td></tr>
+        <tr><td>E / ERASE</td><td>Erase selection (or Delete key)</td></tr>
+        <tr><td>Drag selected</td><td>Move objects directly (Esc while dragging = abort)</td></tr>
+        <tr><td>U</td><td>Undo &nbsp;·&nbsp; REDO to redo</td></tr>
+      </table>
+      <h3>Inspect / view</h3>
+      <table>
+        <tr><td>DI / DIST</td><td>Measure between two points</td></tr>
+        <tr><td>Z → E</td><td>Zoom extents (A = all)</td></tr>
+        <tr><td>Wheel</td><td>Zoom at cursor</td></tr>
+        <tr><td>Middle-drag</td><td>Pan (or hold Space + drag)</td></tr>
+      </table>
+      <h3>Point entry (like AutoCAD)</h3>
+      <table>
+        <tr><td>10,20</td><td>Absolute coordinates</td></tr>
+        <tr><td>@5,0</td><td>Relative to last point</td></tr>
+        <tr><td>@3&lt;45</td><td>Relative polar: distance &lt; angle</td></tr>
+        <tr><td>250</td><td>Direct distance along cursor direction</td></tr>
+      </table>
+      <h3>Toggles &amp; keys</h3>
+      <table>
+        <tr><td>F8</td><td>ORTHO</td></tr>
+        <tr><td>F3</td><td>OSNAP (endpoint ▪ midpoint △ center ○ quadrant ◇ intersection ✕ perpendicular ⊥)</td></tr>
+        <tr><td>F7 / F9</td><td>Grid / grid snap</td></tr>
+        <tr><td>Right-click</td><td>= Enter (confirm / repeat last command)</td></tr>
+        <tr><td>Esc</td><td>Cancel command / clear selection</td></tr>
+        <tr><td>Drag →</td><td>Window select (fully inside)</td></tr>
+        <tr><td>Drag ←</td><td>Crossing select (touching)</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div id="cmdArea">
+    <div id="history"></div>
+    <div id="cmdRow">
+      <span id="prompt">Command:</span>
+      <input id="cmdInput" autocomplete="off" spellcheck="false" aria-label="Command input">
+    </div>
+    <div id="statusRow">
+      <span class="tog" id="tGrid">GRID</span>
+      <span class="tog" id="tSnap">SNAP</span>
+      <span class="tog on" id="tOrtho">ORTHO</span>
+      <span class="tog on" id="tOsnap">OSNAP</span>
+      <span class="spacer"></span>
+      <span id="hint">Type a command (L, C, REC…) or press ? — units are whatever you want them to be (mm, cm, m)</span>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
