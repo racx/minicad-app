@@ -133,6 +133,45 @@ export function perpFoot(base, e){
   return out;
 }
 
+// Tangent points on circle/arc e for a line drawn from `base` (TAN osnap).
+export function tangentPts(base, e){
+  if (e.type!=='circle' && e.type!=='arc') return [];
+  const dx=base.x-e.cx, dy=base.y-e.cy, d=Math.hypot(dx,dy);
+  if (d<=e.r+EPS) return [];                    // base inside or on the circle: no tangent
+  const phi=Math.atan2(dy,dx), alpha=Math.acos(e.r/d);
+  const out=[];
+  for (const s of [1,-1]){
+    const th=phi+s*alpha;
+    const q={x:e.cx+e.r*Math.cos(th), y:e.cy+e.r*Math.sin(th)};
+    if (onCurve(e,q)) out.push(q);
+  }
+  return out;
+}
+
+// Closest point ON entity e to p (NEA osnap). Null for text/dim.
+export function nearestOnEnt(e, p){
+  const segs=segsOf(e);
+  if (segs){
+    let best=null, bd=Infinity;
+    for (const [a,b] of segs){
+      const dx=b.x-a.x, dy=b.y-a.y, L2=dx*dx+dy*dy;
+      let t=L2 ? ((p.x-a.x)*dx+(p.y-a.y)*dy)/L2 : 0;
+      t=Math.max(0, Math.min(1, t));
+      const q={x:a.x+t*dx, y:a.y+t*dy};
+      const d=Math.hypot(p.x-q.x, p.y-q.y);
+      if (d<bd){ bd=d; best=q; }
+    }
+    return best;
+  }
+  if (e.type==='circle' || e.type==='arc'){
+    const dx=p.x-e.cx, dy=p.y-e.cy, d=Math.hypot(dx,dy);
+    if (d<EPS) return null;
+    const q={x:e.cx+dx/d*e.r, y:e.cy+dy/d*e.r};
+    return (e.type==='arc' && !onCurve(e,q)) ? null : q;
+  }
+  return null;
+}
+
 // All intersection points between two entities (text has none).
 export function entIntersections(A, B){
   const aS=segsOf(A), bS=segsOf(B);

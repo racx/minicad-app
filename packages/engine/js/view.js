@@ -102,6 +102,8 @@ export function draw(){
     else if (snapMark.k==='cen'){ ctx.arc(s.x,s.y,r,0,Math.PI*2); }
     else if (snapMark.k==='int'){ ctx.moveTo(s.x-r,s.y-r); ctx.lineTo(s.x+r,s.y+r); ctx.moveTo(s.x+r,s.y-r); ctx.lineTo(s.x-r,s.y+r); }
     else if (snapMark.k==='perp'){ ctx.moveTo(s.x-r,s.y+r); ctx.lineTo(s.x+r,s.y+r); ctx.moveTo(s.x,s.y+r); ctx.lineTo(s.x,s.y-r); }
+    else if (snapMark.k==='tan'){ ctx.moveTo(s.x-r,s.y-r); ctx.lineTo(s.x+r,s.y-r); ctx.moveTo(s.x+4,s.y-2); ctx.arc(s.x,s.y-2,4,0,Math.PI*2); }
+    else if (snapMark.k==='nea'){ ctx.moveTo(s.x-r,s.y-r); ctx.lineTo(s.x+r,s.y-r); ctx.lineTo(s.x-r,s.y+r); ctx.lineTo(s.x+r,s.y+r); ctx.closePath(); }
     else { ctx.moveTo(s.x,s.y-r); ctx.lineTo(s.x+r,s.y); ctx.lineTo(s.x,s.y+r); ctx.lineTo(s.x-r,s.y); ctx.closePath(); }
     ctx.stroke(); ctx.lineWidth = 1;
   }

@@ -4,7 +4,7 @@
    ========================================================= */
 import { dist, fmt, deep, rotPt, ptSegDist, TAU, normAng, arcSweep, arcPt, arcFrom3 } from './geometry.js';
 import { clearAutosave } from './io.js';
-import { entIntersections, lineEntT, lineLine, perpFoot } from './intersect.js';
+import { entIntersections, lineEntT, lineLine, perpFoot, tangentPts, nearestOnEnt } from './intersect.js';
 import { entities, setEntities, nextId, layers, currentLayer, undoStack, redoStack, snapshot,
          view, T, cmd, setCmd, lastCmdName, setLastCmdName, selection, curPt, setSnapMark,
          selRect, setSelRect, layerVisible, layerUnlocked } from './state.js';
@@ -54,15 +54,23 @@ export function setTog(k){
 }
 
 /* ---------- snap / ortho / grid modifiers ---------- */
+// Osnap priority, highest first. 'nea' MUST stay last: it only fires when nothing else does.
+export const SNAP_PRIORITY = ['end','int','mid','cen','quad','perp','tan','nea'];
+
 export function applyModifiers(rawW, excludeId){
   setSnapMark(null);
   let p = {x:rawW.x, y:rawW.y};
   if (T.osnap){
     const tol = 11/view.scale;
-    let best=null, bd=tol;
-    const consider = c => { const d = dist(c.p, rawW); if (d < bd){ bd=d; best=c; } };
+    // best candidate per kind; the winner is decided by SNAP_PRIORITY, not raw distance
+    const buckets = {};
+    const consider = c => {
+      const d = dist(c.p, rawW);
+      if (d >= tol) return;
+      if (!buckets[c.k] || d < buckets[c.k].d) buckets[c.k] = {c, d};
+    };
     for (const c of snapCandidates(excludeId)) consider(c);
-    // dynamic snaps near the cursor: intersections between entities, perpendicular from base
+    // dynamic snaps near the cursor
     const nearEnts = entities.filter(e=>{
       if (e.id===excludeId || e.type==='text' || !layerVisible(e.layer)) return false;
       const b = entBBox(e);
@@ -72,7 +80,17 @@ export function applyModifiers(rawW, excludeId){
       for (let j=i+1;j<nearEnts.length;j++)
         for (const q of entIntersections(nearEnts[i], nearEnts[j])) consider({p:q, k:'int'});
     const pbase = rubberBase();
-    if (pbase) for (const e of nearEnts) for (const q of perpFoot(pbase, e)) consider({p:q, k:'perp'});
+    if (pbase) for (const e of nearEnts){
+      for (const q of perpFoot(pbase, e)) consider({p:q, k:'perp'});
+      for (const q of tangentPts(pbase, e)) consider({p:q, k:'tan'});
+    }
+    let best = null;
+    for (const k of SNAP_PRIORITY){
+      if (k==='nea' && !best){                   // lowest priority: computed only if nothing fired
+        for (const e of nearEnts){ const q = nearestOnEnt(e, rawW); if (q) consider({p:q, k:'nea'}); }
+      }
+      if (buckets[k]){ best = buckets[k].c; break; }
+    }
     if (best){ setSnapMark(best); return {x:best.p.x, y:best.p.y}; }
   }
   const base = rubberBase();

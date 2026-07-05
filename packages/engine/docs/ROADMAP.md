@@ -86,9 +86,12 @@ type in `js/entities.js` (verified by grep count). Rotate/scale live in `command
 (applyRotate `:388`, applyScale `:404`) and cover all six. Renderer covers all six
 (`view.js drawEntity`), dim annotative with world-height text.
 
-**Osnap kinds:** `end, mid, cen, quad, int, perp` (static: `entities.js snapCandidates`;
-dynamic int/perp: `commands.js applyModifiers` with bbox prefilter). **Absent:** tangent,
-nearest, node, extension/parallel tracking.
+**Osnap kinds:** `end, int, mid, cen, quad, perp, tan, nea` — winner chosen by the single
+config array `SNAP_PRIORITY` (`js/commands.js`), highest-priority kind within tolerance wins
+(distance breaks ties within a kind). `nea` is computed lazily and only fires when nothing
+else does. Static kinds: `entities.js snapCandidates`; dynamic int/perp/tan:
+`commands.js applyModifiers`; tan/perp require a rubber base point.
+**Absent:** node, extension/parallel tracking.
 
 ## 4. Layers
 
@@ -143,14 +146,18 @@ screenshots), DXF acceptance by third-party CAD (checked with ezdxf ad hoc).
 
 ## 8. Roadmap
 
-### Tier 1 — next up (agreed direction: household floor-plan completeness)
-- **Print / PDF at scale** — print stylesheet or vector PDF export with a chosen scale (1:50).
+> **Product intent (see CLAUDE.md):** MiniCAD is being built toward a SaaS for solo
+> architects — browser-first, DXF-native ("open the DXF a client sent you"). The household
+> tool is the incubator, not the destination. This re-tiers DXF import into Tier 1.
+
+### Tier 1 — next up
+- **Print / PDF at scale** — mm-true SVG sheet renderer + print pipeline (in progress).
+- **DXF import** (LINE/CIRCLE/ARC/LWPOLYLINE/TEXT subset first) — promoted per product intent.
 - **Radius + angular dimensions** (`DIMRAD`, `DIMANG`) on the existing dim entity family.
-- **Tangent + nearest osnap** — the two remaining daily-use markers.
+- ~~Tangent + nearest osnap~~ ✅ shipped (TAN/NEA, priority-ordered — see §3).
 
 ### Tier 2 — wants, not needs
 - **ARRAY** (rectangular/polar copies).
-- **DXF import** (LINE/CIRCLE/ARC/LWPOLYLINE/TEXT subset first).
 - **Layer rename/delete**, per-entity color.
 - **ZOOM window / previous; PAN command.**
 - SCALE by reference length; FILLET for arcs/plines; CHAMFER.
