@@ -5,7 +5,7 @@
 import { dist, fmt, deep, rotPt, ptSegDist, TAU, normAng, arcSweep, arcPt, arcFrom3 } from './geometry.js';
 import { clearAutosave } from './io.js';
 import { entIntersections, lineEntT, lineLine, perpFoot } from './intersect.js';
-import { entities, setEntities, nextId, currentLayer, undoStack, redoStack, snapshot,
+import { entities, setEntities, nextId, layers, currentLayer, undoStack, redoStack, snapshot,
          view, T, cmd, setCmd, lastCmdName, setLastCmdName, selection, curPt, setSnapMark,
          selRect, setSelRect, layerVisible, layerUnlocked } from './state.js';
 import { findEntityAt, entInWindow, entBBox, snapCandidates, translateEnt, translateIds, mirrorEnt } from './entities.js';
