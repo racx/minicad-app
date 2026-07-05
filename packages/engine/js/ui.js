@@ -9,6 +9,8 @@ export const historyEl = document.getElementById('history');
 export const coordRead = document.getElementById('coordRead');
 export const layerSel = document.getElementById('layerSel');
 export const layerColor = document.getElementById('layerColor');
+export const btnLayerOff = document.getElementById('btnLayerOff');
+export const btnLayerLock = document.getElementById('btnLayerLock');
 
 export function log(text, cls){
   const d = document.createElement('div');
@@ -29,9 +31,13 @@ export function toggleHelp(force){
 export function refreshLayers(){
   layerSel.innerHTML='';
   for (const l of layers){
-    const o=document.createElement('option'); o.value=l.name; o.textContent=l.name;
+    const o=document.createElement('option'); o.value=l.name;
+    o.textContent = l.name + (l.off?' ·off':'') + (l.locked?' 🔒':'');
     layerSel.appendChild(o);
   }
   layerSel.value=currentLayer;
-  layerColor.value=layerOf(currentLayer).color;
+  const cur = layerOf(currentLayer);
+  layerColor.value=cur.color;
+  btnLayerOff.textContent = cur.off ? '🚫' : '👁';
+  btnLayerLock.textContent = cur.locked ? '🔒' : '🔓';
 }

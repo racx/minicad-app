@@ -6,12 +6,12 @@ import { entities, setEntities, layers, currentLayer, setCurrentLayer, layerOf, 
          undoStack, view, T, cmd, selection, mouse, curPt, setCurPt, boxSel, setBoxSel,
          setHoverSel, setHotGrip } from './state.js';
 import { findEntityAt, translateIds, entGrips, applyGrip } from './entities.js';
-import { cv, s2w, w2s, draw, resize, W, H } from './view.js';
+import { cv, s2w, w2s, draw, resize, zoomExtents, W, H } from './view.js';
 import { startCommand, handleEnter, cancelCmd, applyModifiers,
-         doUndo, doRedo, setTog, clickSelect, boxSelect, onPoint } from './commands.js';
-import { cmdInput, coordRead, layerSel, layerColor, log, setPrompt,
+         doUndo, doRedo, setTog, clickSelect, boxSelect, onPoint, startEditText } from './commands.js';
+import { cmdInput, coordRead, layerSel, layerColor, btnLayerOff, btnLayerLock, log, setPrompt,
          toggleHelp, refreshLayers } from './ui.js';
-import { saveJSON, openJSON, dxfExport } from './io.js';
+import { saveJSON, openJSON, dxfExport, autosaveTick, restoreAutosave } from './io.js';
 
 let panning = null;
 let spaceHeld = false;
@@ -126,6 +126,11 @@ cv.addEventListener('wheel', ev=>{
   view.oy = mouse.sy + wp.y*view.scale;
   draw();
 }, {passive:false});
+cv.addEventListener('dblclick', ev=>{
+  if (cmd) return;
+  const e = findEntityAt(s2w(mouse.sx, mouse.sy));
+  if (e && e.type==='text'){ startEditText(e); cmdInput.focus(); }
+});
 cv.addEventListener('contextmenu', ev=>{
   ev.preventDefault();
   handleEnter(cmdInput.value); cmdInput.value='';
@@ -186,6 +191,22 @@ document.getElementById('helpClose').addEventListener('click', ()=>toggleHelp(fa
 /* layers */
 layerSel.addEventListener('change', ()=>{ setCurrentLayer(layerSel.value); layerColor.value=layerOf(currentLayer).color; cmdInput.focus(); });
 layerColor.addEventListener('input', ()=>{ layerOf(currentLayer).color=layerColor.value; draw(); });
+btnLayerOff.addEventListener('click', ()=>{
+  const l = layerOf(currentLayer);
+  l.off = !l.off;
+  if (l.off){
+    for (const e of entities) if (e.layer===currentLayer) selection.delete(e.id);
+    log(`Layer "${currentLayer}" hidden — objects on it are invisible and untouchable. Note: you're still drawing on it!`);
+  } else log(`Layer "${currentLayer}" visible again.`, 'r');
+  refreshLayers(); draw();
+});
+btnLayerLock.addEventListener('click', ()=>{
+  const l = layerOf(currentLayer);
+  l.locked = !l.locked;
+  if (l.locked) for (const e of entities) if (e.layer===currentLayer) selection.delete(e.id);
+  log(`Layer "${currentLayer}" ${l.locked?'locked — visible and snappable, but can\'t be selected or changed.':'unlocked.'}`);
+  refreshLayers(); draw();
+});
 document.getElementById('btnAddLayer').addEventListener('click', ()=>{
   const name=prompt('New layer name:');
   if (!name||layers.some(l=>l.name===name)) return;
@@ -207,10 +228,16 @@ document.getElementById('btnDxf').addEventListener('click', dxfExport);
 function boot(){
   resize();
   view.ox = W*0.5; view.oy = H*0.6;
-  refreshLayers();
   log('MiniCAD ready. Type a command — L (line), REC, C (circle)… or press ? for help.', 'r');
   log('Right-click = Enter · F8 ortho · F3 osnap · wheel zoom · middle-drag pan');
+  if (restoreAutosave()){
+    zoomExtents();
+    log(`Restored autosaved drawing (${entities.length} objects) — type NEW to start fresh.`, 'r');
+  }
+  refreshLayers();
   cmdInput.focus();
   draw();
 }
 boot();
+setInterval(autosaveTick, 5000);                         // quiet safety net
+window.addEventListener('beforeunload', autosaveTick);

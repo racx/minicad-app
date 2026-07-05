@@ -35,6 +35,15 @@ export function setupDOM(){
   const winListeners = {};
   globalThis.window = { devicePixelRatio:1, addEventListener(t,f){ (winListeners[t] ||= []).push(f); } };
   globalThis.prompt = ()=>null;
+  if (typeof globalThis.localStorage === 'undefined'){
+    const store = new Map();
+    globalThis.localStorage = {
+      getItem: k => store.has(k) ? store.get(k) : null,
+      setItem: (k,v)=>store.set(k, String(v)),
+      removeItem: k => store.delete(k),
+      clear: ()=>store.clear(),
+    };
+  }
 
   const logs = [];
   document.getElementById('history').appendChild = d => { logs.push(d.textContent); };

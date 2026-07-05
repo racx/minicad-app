@@ -3,7 +3,7 @@
    snap candidates, transforms
    ========================================================= */
 import { dist, ptSegDist, arcPt, arcSweep, angleOnArc, normAng, mirrorPt } from './geometry.js';
-import { entities, view } from './state.js';
+import { entities, view, layerVisible, layerUnlocked } from './state.js';
 
 // text height of a dim: explicit e.h, else automatic (4% of measured length)
 export function dimH(e){ return e.h || dimGeom(e).L*0.04 || 1; }
@@ -54,7 +54,10 @@ export function entHitDist(ent, p){
 export function findEntityAt(p){
   const tol = 8/view.scale;
   let best=null, bd=tol;
-  for (const e of entities){ const d=entHitDist(e,p); if (d<=bd){ bd=d; best=e; } }
+  for (const e of entities){
+    if (!layerVisible(e.layer) || !layerUnlocked(e.layer)) continue;   // hidden/locked: hands off
+    const d=entHitDist(e,p); if (d<=bd){ bd=d; best=e; }
+  }
   return best;
 }
 export function entBBox(e){
@@ -93,6 +96,7 @@ export function snapCandidates(excludeId){
   const out=[];
   for (const e of entities){
     if (e.id===excludeId) continue;              // grip drags don't snap to themselves
+    if (!layerVisible(e.layer)) continue;        // hidden layers don't snap (locked ones do)
     if (e.type==='line'){
       out.push({p:{x:e.x1,y:e.y1},k:'end'}, {p:{x:e.x2,y:e.y2},k:'end'},
                {p:{x:(e.x1+e.x2)/2,y:(e.y1+e.y2)/2},k:'mid'});

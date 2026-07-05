@@ -30,11 +30,12 @@
 <body>
 <main>
   <h1>MINI<span>CAD</span> — watch &amp; learn</h1>
-  <p class="sub">Four little movies, on repeat. Watch each one twice, then copy it in the app. That's the whole lesson.</p>
+  <p class="sub">Eight little movies, on repeat. Watch each one twice, then copy it in the app. That's the whole lesson.</p>
 
   <div class="rule">
-    The only thing to memorize:<br>
-    <b>gap in front of a line → EXTEND</b> &nbsp;·&nbsp; <b>extra bits past a crossing → TRIM</b> &nbsp;·&nbsp; <b>"just make a corner" → FILLET</b>
+    The only things to memorize:<br>
+    <b>gap in front of a line → EXTEND</b> &nbsp;·&nbsp; <b>extra bits past a crossing → TRIM</b> &nbsp;·&nbsp; <b>"just make a corner" → FILLET</b><br>
+    <b>blue square → drag it to reshape</b> &nbsp;·&nbsp; <b>parallel copy → OFFSET</b> &nbsp;·&nbsp; <b>make a room longer → STRETCH</b>
   </div>
 
   <div class="card">
@@ -63,6 +64,34 @@
     <p class="what">Same clicks, but with a radius set: the corner comes out rounded, like a coffee-table edge.</p>
     <canvas id="dFilR" width="1120" height="440"></canvas>
     <p class="keys">type <b>F</b> <kbd>Enter</kbd> then <b>40</b> <kbd>Enter</kbd> &nbsp;→&nbsp; click line 1 &nbsp;→&nbsp; click line 2</p>
+  </div>
+
+  <div class="card">
+    <h2>GRIPS — reshape by dragging the blue squares</h2>
+    <p class="what">Click an object to select it and little blue squares appear. Drag an end square and the line stretches — and it magnetically snaps onto other objects, so connecting walls is effortless.</p>
+    <canvas id="dGrips" width="1120" height="440"></canvas>
+    <p class="keys">click an object &nbsp;→&nbsp; drag a blue square &nbsp;·&nbsp; <kbd>Esc</kbd> mid-drag = abort &nbsp;·&nbsp; <b>U</b> = undo</p>
+  </div>
+
+  <div class="card">
+    <h2>OFFSET — parallel copy (wall thickness in one move)</h2>
+    <p class="what">One rectangle is a room. Offset it inward by the wall thickness and you have both faces of the wall instantly.</p>
+    <canvas id="dOffset" width="1120" height="440"></canvas>
+    <p class="keys">type <b>O</b> <kbd>Enter</kbd> then <b>12</b> <kbd>Enter</kbd> &nbsp;→&nbsp; click the shape &nbsp;→&nbsp; click the INSIDE</p>
+  </div>
+
+  <div class="card">
+    <h2>MIRROR — the other half, for free</h2>
+    <p class="what">Draw half of anything symmetric, then flip a copy across a line. Enter at the end keeps the original.</p>
+    <canvas id="dMirror" width="1120" height="440"></canvas>
+    <p class="keys">select things &nbsp;→&nbsp; <b>MI</b> <kbd>Enter</kbd> &nbsp;→&nbsp; click 2 points of the mirror line &nbsp;→&nbsp; <kbd>Enter</kbd></p>
+  </div>
+
+  <div class="card">
+    <h2>STRETCH — make the room longer without redrawing</h2>
+    <p class="what">The green right-to-left box chooses which corners move. Everything inside the box shifts; everything outside stays nailed down.</p>
+    <canvas id="dStretch" width="1120" height="440"></canvas>
+    <p class="keys">type <b>S</b> <kbd>Enter</kbd> &nbsp;→&nbsp; drag a box right→left over the end &nbsp;→&nbsp; <kbd>Enter</kbd> &nbsp;→&nbsp; click from &nbsp;→&nbsp; click to</p>
   </div>
 
   <p style="color:var(--dim)">Now open the app in the other tab and copy the movie you just watched. If it goes wrong: <span style="font-family:var(--mono);color:var(--sel)">U</span> + Enter, breathe, try again.</p>
@@ -181,6 +210,97 @@ runDemo('dFil0', 8, (ctx,t)=>{
              t<0.40 ? '2 · click line 1 on the side to KEEP' :
              t<0.60 ? '3 · click line 2 on the side to KEEP' :
                       '4 · trim + extend in one move: a corner');
+});
+
+/* ---------- GRIPS ---------- */
+runDemo('dGrips', 8, (ctx,t)=>{
+  const ex = lerp(320, 430, seg(t, 0.50, 0.75));       // the moving end
+  line(ctx, 430,40, 430,190, COL.line);                // target wall
+  line(ctx, 100,120, ex,120, '#4db8ff', 2, [6,4]);     // selected line
+  const grips=[{x:100,y:120},{x:(100+ex)/2,y:120},{x:ex,y:120}];
+  grips.forEach((g,i)=>{
+    ctx.fillStyle = (i===2 && t>0.45 && t<0.80) ? '#ef7b7b' : '#4db8ff';
+    ctx.fillRect(g.x-4, g.y-4, 8, 8);
+  });
+  if (t>0.68 && t<0.92){                               // snap marker on arrival
+    ctx.strokeStyle='#ffd75e'; ctx.lineWidth=1.6;
+    ctx.strokeRect(430-7, 120-7, 14, 14); ctx.lineWidth=1;
+  }
+  const c=cursorPath(t, [[0.08,200,60],[0.32,320,120],[0.50,320,120],[0.75,430,120],[0.95,430,120]]);
+  clickRipple(ctx, 320,120,(t-0.44)/0.08);
+  cursorAt(ctx,c.x,c.y);
+  label(ctx, t<0.32 ? '1 · a selected object shows blue squares — grips' :
+             t<0.50 ? '2 · press and hold the end square' :
+             t<0.78 ? '3 · drag — it snaps onto other objects' :
+                      '4 · stretched and exactly connected');
+});
+
+/* ---------- OFFSET ---------- */
+runDemo('dOffset', 7, (ctx,t)=>{
+  const r={x:160,y:60,w:240,h:120};
+  ctx.strokeStyle=COL.line; ctx.lineWidth=2;
+  ctx.strokeRect(r.x, r.y, r.w, r.h); ctx.lineWidth=1;
+  const k=seg(t, 0.55, 0.70);
+  if (k>0){
+    ctx.strokeStyle=COL.new; ctx.globalAlpha=k; ctx.lineWidth=2.4;
+    ctx.strokeRect(r.x+18, r.y+18, r.w-36, r.h-36);
+    ctx.globalAlpha=1; ctx.lineWidth=1;
+  }
+  const c=cursorPath(t, [[0.06,120,40],[0.28,r.x,120],[0.42,r.x,120],[0.55,280,120],[0.95,280,120]]);
+  clickRipple(ctx, r.x,120,(t-0.30)/0.08);
+  clickRipple(ctx, 280,120,(t-0.53)/0.08);
+  cursorAt(ctx,c.x,c.y);
+  label(ctx, t<0.28 ? '1 · a room outline (one rectangle)' :
+             t<0.44 ? '2 · click the shape…' :
+             t<0.60 ? '3 · …then click the INSIDE' :
+                      '4 · parallel copy — instant wall thickness');
+});
+
+/* ---------- MIRROR ---------- */
+runDemo('dMirror', 7, (ctx,t)=>{
+  const ax=290, mx=x=>2*ax-x;
+  line(ctx, 120,60, 260,60, COL.line); line(ctx, 120,60, 120,180, COL.line); line(ctx, 120,180, 260,180, COL.line);
+  ctx.strokeStyle=COL.line; ctx.beginPath(); ctx.arc(190,120,24,0,Math.PI*2); ctx.stroke();
+  if (t>0.30) line(ctx, ax,40, ax,200, '#7c8698', 1.4, [6,5]);      // mirror axis
+  const k=seg(t, 0.60, 0.78);
+  if (k>0){
+    ctx.globalAlpha=k;
+    line(ctx, mx(120),60, mx(260),60, COL.new, 2.4); line(ctx, mx(120),60, mx(120),180, COL.new, 2.4);
+    line(ctx, mx(120),180, mx(260),180, COL.new, 2.4);
+    ctx.strokeStyle=COL.new; ctx.beginPath(); ctx.arc(mx(190),120,24,0,Math.PI*2); ctx.stroke();
+    ctx.globalAlpha=1;
+  }
+  const c=cursorPath(t, [[0.06,140,40],[0.28,ax,55],[0.42,ax,55],[0.55,ax,195],[0.95,ax,195]]);
+  clickRipple(ctx, ax,55,(t-0.30)/0.08);
+  clickRipple(ctx, ax,195,(t-0.55)/0.08);
+  cursorAt(ctx,c.x,c.y);
+  label(ctx, t<0.28 ? '1 · half of a symmetric plan (selected)' :
+             t<0.55 ? '2 · two clicks define the mirror line' :
+             t<0.78 ? '3 · Enter = keep the original too' :
+                      '4 · the other half, for free');
+});
+
+/* ---------- STRETCH ---------- */
+runDemo('dStretch', 8, (ctx,t)=>{
+  const dx = 80*seg(t, 0.60, 0.80);
+  const R = 360+dx;
+  line(ctx, 120,70, R,70, COL.line); line(ctx, 120,170, R,170, COL.line);
+  line(ctx, 120,70, 120,170, COL.line);
+  line(ctx, R,70, R,170, dx>0?COL.new:COL.line, dx>0?2.4:2);
+  if (t>0.18 && t<0.58){                               // green crossing box grows right→left
+    const bw = 130*seg(t, 0.18, 0.34);
+    ctx.strokeStyle='#6fce6f'; ctx.setLineDash([5,4]);
+    ctx.fillStyle='rgba(120,220,120,.08)';
+    ctx.fillRect(430-bw, 45, bw, 150); ctx.strokeRect(430-bw, 45, bw, 150);
+    ctx.setLineDash([]);
+  }
+  const c=cursorPath(t, [[0.06,430,50],[0.34,300,190],[0.50,320,120],[0.60,320,120],[0.80,400,120],[0.95,400,120]]);
+  clickRipple(ctx, 320,120,(t-0.56)/0.08);
+  cursorAt(ctx,c.x,c.y);
+  label(ctx, t<0.34 ? '1 · drag a green box (right→left) over the end' :
+             t<0.56 ? '2 · Enter, then pick a from-point' :
+             t<0.80 ? '3 · …and a to-point — boxed corners follow' :
+                      '4 · room longer; the left side never moved');
 });
 
 /* ---------- FILLET r>0 ---------- */

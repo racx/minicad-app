@@ -2,18 +2,20 @@
    MiniCAD — command engine: aliases, state machine,
    typed input, snap/ortho modifiers, undo/redo, selection
    ========================================================= */
-import { dist, fmt, deep, rotPt, TAU, normAng, arcSweep, arcPt } from './geometry.js';
+import { dist, fmt, deep, rotPt, ptSegDist, TAU, normAng, arcSweep, arcPt, arcFrom3 } from './geometry.js';
+import { clearAutosave } from './io.js';
 import { entIntersections, lineEntT, lineLine, perpFoot } from './intersect.js';
 import { entities, setEntities, nextId, currentLayer, undoStack, redoStack, snapshot,
          view, T, cmd, setCmd, lastCmdName, setLastCmdName, selection, curPt, setSnapMark,
-         selRect, setSelRect } from './state.js';
+         selRect, setSelRect, layerVisible, layerUnlocked } from './state.js';
 import { findEntityAt, entInWindow, entBBox, snapCandidates, translateEnt, translateIds, mirrorEnt } from './entities.js';
 import { draw, zoomExtents, gridStep, s2w } from './view.js';
-import { log, setPrompt, toggleHelp } from './ui.js';
+import { log, setPrompt, toggleHelp, cmdInput } from './ui.js';
 
 export const ALIASES = {
   L:'LINE', LINE:'LINE', PL:'PLINE', PLINE:'PLINE', REC:'RECTANG', RECT:'RECTANG', RECTANG:'RECTANG', RECTANGLE:'RECTANG',
-  C:'CIRCLE', CIRCLE:'CIRCLE', T:'TEXT', TEXT:'TEXT', DT:'TEXT',
+  C:'CIRCLE', CIRCLE:'CIRCLE', A:'ARC', ARC:'ARC', T:'TEXT', TEXT:'TEXT', DT:'TEXT',
+  CH:'CHLAYER', CHLAYER:'CHLAYER', NEW:'NEW',
   M:'MOVE', MOVE:'MOVE', CO:'COPY', CP:'COPY', COPY:'COPY', RO:'ROTATE', ROTATE:'ROTATE', SC:'SCALE', SCALE:'SCALE',
   O:'OFFSET', OFFSET:'OFFSET', E:'ERASE', ERASE:'ERASE', DEL:'ERASE', TR:'TRIM', TRIM:'TRIM',
   EX:'EXTEND', EXTEND:'EXTEND', F:'FILLET', FILLET:'FILLET',
@@ -62,7 +64,7 @@ export function applyModifiers(rawW, excludeId){
     for (const c of snapCandidates(excludeId)) consider(c);
     // dynamic snaps near the cursor: intersections between entities, perpendicular from base
     const nearEnts = entities.filter(e=>{
-      if (e.id===excludeId || e.type==='text') return false;
+      if (e.id===excludeId || e.type==='text' || !layerVisible(e.layer)) return false;
       const b = entBBox(e);
       return rawW.x>=b[0]-tol && rawW.x<=b[2]+tol && rawW.y>=b[1]-tol && rawW.y<=b[3]+tol;
     });
@@ -88,6 +90,7 @@ export function rubberBase(){
   if (!cmd) return null;
   if (cmd.name==='LINE' && cmd.base) return cmd.base;
   if (cmd.name==='PLINE' && cmd.pts.length) return cmd.pts[cmd.pts.length-1];
+  if (cmd.name==='ARC' && cmd.pts.length===1) return cmd.pts[0];
   if (cmd.name==='RECTANG' && cmd.p1) return cmd.p1;
   if (cmd.name==='CIRCLE' && cmd.center) return cmd.center;
   if ((cmd.name==='MOVE'||cmd.name==='COPY') && cmd.step==='dest') return cmd.base;
@@ -119,6 +122,13 @@ export function startCommand(raw){
   log(`Command: ${name}`, 'p');
 
   if (name==='LINE'){ cmd.base=null; setPrompt('LINE — Specify first point:'); }
+  else if (name==='ARC') setPrompt('ARC — Specify start point:');
+  else if (name==='NEW'){ cmd.step='confirm'; setPrompt('NEW — Start a new drawing? Unsaved work is lost [Y/N] <N>:'); }
+  else if (name==='CHLAYER'){
+    if (!selection.size){ log('Select objects first, then CHLAYER.', 'e'); cancelCmd(true); return; }
+    cmd.step='layer';
+    setPrompt(`CHLAYER — New layer name <${currentLayer}>:`);
+  }
   else if (name==='PLINE') setPrompt('PLINE — Specify first point:');
   else if (name==='RECTANG') setPrompt('RECTANG — Specify first corner:');
   else if (name==='CIRCLE') setPrompt('CIRCLE — Specify center point:');
@@ -208,6 +218,18 @@ export function onPoint(p){
   else if (n==='PLINE'){
     cmd.pts.push(p);
     setPrompt('PLINE — Specify next point [C to close, Enter to end]:');
+  }
+  else if (n==='ARC'){
+    cmd.pts.push(p);
+    if (cmd.pts.length===1) setPrompt('ARC — Specify second point (on the arc):');
+    else if (cmd.pts.length===2) setPrompt('ARC — Specify end point:');
+    else {
+      const a3 = arcFrom3(cmd.pts[0], cmd.pts[1], cmd.pts[2]);
+      if (!a3){ log('Points are in a straight line — no arc through them.', 'e'); cmd.pts.pop(); return; }
+      snapshot();
+      entities.push({id:nextId(), type:'arc', cx:a3.cx, cy:a3.cy, r:a3.r, a0:a3.a0, a1:a3.a1, layer:currentLayer});
+      endCmd(); return;
+    }
   }
   else if (n==='RECTANG'){
     if (!cmd.p1){ cmd.p1=p; setPrompt('RECTANG — Specify other corner:'); }
@@ -331,7 +353,7 @@ export function onPoint(p){
     if (cmd.step==='pick'){
       const e = findEntityAt(p);
       if (!e){ log('No object there.', 'e'); return; }
-      if (e.type!=='line' && e.type!=='circle'){ log('Offset supports lines and circles in this version.', 'e'); return; }
+      if (e.type==='text' || e.type==='dim'){ log('Offset supports lines, circles, arcs and polylines.', 'e'); return; }
       cmd.target=e; cmd.step='side';
       setPrompt('OFFSET — Specify point on side to offset:');
     }
@@ -383,11 +405,16 @@ function applyScale(f){
 }
 function offsetEntity(e, d, side){
   snapshot();
-  if (e.type==='circle'){
+  if (e.type==='circle' || e.type==='arc'){
     const inside = dist(side,{x:e.cx,y:e.cy}) < e.r;
     const r = inside ? e.r-d : e.r+d;
-    if (r<=0){ log('Offset would collapse the circle.', 'e'); undoStack.pop(); return; }
-    entities.push({id:nextId(), type:'circle', cx:e.cx, cy:e.cy, r, layer:e.layer});
+    if (r<=0){ log(`Offset would collapse the ${e.type}.`, 'e'); undoStack.pop(); return; }
+    if (e.type==='circle') entities.push({id:nextId(), type:'circle', cx:e.cx, cy:e.cy, r, layer:e.layer});
+    else entities.push({id:nextId(), type:'arc', cx:e.cx, cy:e.cy, r, a0:e.a0, a1:e.a1, layer:e.layer});
+  } else if (e.type==='pline'){
+    const pts = offsetPlinePts(e, d, side);
+    if (!pts){ log('Offset would collapse the polyline.', 'e'); undoStack.pop(); return; }
+    entities.push({id:nextId(), type:'pline', closed:e.closed, pts, layer:e.layer});
   } else {
     const dx=e.x2-e.x1, dy=e.y2-e.y1, L=Math.hypot(dx,dy);
     if (!L){ log('Zero-length line.', 'e'); undoStack.pop(); return; }
@@ -398,6 +425,41 @@ function offsetEntity(e, d, side){
   }
   log('Offset created.', 'r');
 }
+// offset a polyline: shift each segment sideways, rejoin corners with mitered intersections
+function offsetPlinePts(e, d, side){
+  const pts=e.pts, n=pts.length;
+  const segs=[];
+  for (let i=0;i<n-1;i++) segs.push([pts[i], pts[i+1]]);
+  if (e.closed && n>2) segs.push([pts[n-1], pts[0]]);
+  if (!segs.length) return null;
+  // which side? decided by the segment nearest to the pick point
+  let bi=0, bd=Infinity;
+  segs.forEach((s,i)=>{ const dd=ptSegDist(side, s[0], s[1]); if (dd<bd){ bd=dd; bi=i; } });
+  const [sa,sb]=segs[bi];
+  const sgn = Math.sign((side.x-sa.x)*-(sb.y-sa.y) + (side.y-sa.y)*(sb.x-sa.x)) || 1;
+  // every segment shifted along its left normal by sgn·d
+  const off = segs.map(([a,b])=>{
+    const dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy);
+    if (!L) return null;
+    const nx=-dy/L*sgn*d, ny=dx/L*sgn*d;
+    return {a:{x:a.x+nx, y:a.y+ny}, d:{x:dx, y:dy}};
+  });
+  if (off.some(o=>!o)) return null;
+  const out=[];
+  if (e.closed && n>2){
+    for (let i=0;i<off.length;i++){
+      const prev = off[(i-1+off.length)%off.length];
+      out.push(lineLine(prev.a, prev.d, off[i].a, off[i].d) || {x:off[i].a.x, y:off[i].a.y});
+    }
+  } else {
+    out.push({x:off[0].a.x, y:off[0].a.y});
+    for (let i=1;i<off.length;i++)
+      out.push(lineLine(off[i-1].a, off[i-1].d, off[i].a, off[i].d) || {x:off[i].a.x, y:off[i].a.y});
+    const last=off[off.length-1];
+    out.push({x:last.a.x+last.d.x, y:last.a.y+last.d.y});
+  }
+  return out;
+}
 
 /* ---------- trim ---------- */
 function trimEntity(target, p){
@@ -405,7 +467,7 @@ function trimEntity(target, p){
     log('TRIM supports lines, circles and arcs in this version.', 'e'); return;
   }
   const edges = (cmd.allEdges ? entities : entities.filter(z=>cmd.edges.includes(z.id)))
-                .filter(z=>z.id!==target.id);
+                .filter(z=>z.id!==target.id && layerVisible(z.layer));
   const pts=[];
   for (const z of edges) pts.push(...entIntersections(target, z));
 
@@ -473,7 +535,7 @@ function extendEntity(target, p){
     log('EXTEND supports lines and arcs in this version.', 'e'); return;
   }
   const bounds = (cmd.allEdges ? entities : entities.filter(z=>cmd.edges.includes(z.id)))
-                 .filter(z=>z.id!==target.id);
+                 .filter(z=>z.id!==target.id && layerVisible(z.layer));
   const ok = target.type==='line' ? extendLine(target, p, bounds) : extendArc(target, p, bounds);
   if (!ok){ log('No boundary edge to extend to.', 'e'); return; }
   log('Extended.', 'r');
@@ -654,7 +716,7 @@ export function handleEnter(text){
     const d = parseFloat(text);
     if (!(d>0)){ log('Enter a positive distance, e.g. 10', 'e'); return; }
     cmd.dist=d; cmd.step='pick';
-    setPrompt('OFFSET — Select object to offset (line or circle):');
+    setPrompt('OFFSET — Select object to offset:');
     return;
   }
   if (n==='ROTATE' && cmd.step==='angle' && text){
@@ -673,6 +735,34 @@ export function handleEnter(text){
   }
   if (n==='PLINE' && text.toUpperCase()==='C'){
     finishPline(true); return;
+  }
+  if (n==='NEW' && cmd.step==='confirm'){
+    if (text.toUpperCase()==='Y' || text.toUpperCase()==='YES'){
+      setEntities([]); selection.clear();
+      undoStack.length=0; redoStack.length=0;
+      clearAutosave();
+      log('New drawing.', 'r');
+      endCmd(); return;
+    }
+    cancelCmd(); return;                                 // anything else = keep working
+  }
+  if (n==='CHLAYER' && cmd.step==='layer'){
+    const name = text || currentLayer;
+    if (!layers.some(l=>l.name===name)){
+      log(`No layer "${name}". Layers: ${layers.map(l=>l.name).join(', ')}`, 'e'); return;
+    }
+    snapshot();
+    let moved=0;
+    for (const e of entities) if (selection.has(e.id)){ e.layer=name; moved++; }
+    log(`Moved ${moved} object${moved>1?'s':''} to layer "${name}".`, 'r');
+    endCmd(); return;
+  }
+  if (n==='EDITTEXT' && cmd.step==='string'){
+    if (!text){ cancelCmd(); return; }                   // empty = keep the old text
+    snapshot();
+    cmd.target.str = text;
+    log('Text updated.', 'r');
+    endCmd(); return;
   }
   if (n==='DIMTXT' && cmd.step==='h'){
     if (!text){ endCmd(); return; }                     // Enter = keep current
@@ -731,6 +821,15 @@ function finishPline(close){
   endCmd();
 }
 
+/* ---------- in-place text editing (double-click) ---------- */
+export function startEditText(e){
+  cancelCmd(true);
+  setCmd({name:'EDITTEXT', step:'string', target:e, pts:[], sel:[]});
+  cmdInput.value = e.str;                                // edit in place
+  setPrompt('TEXT — Edit text (Enter to apply, Esc to keep):');
+  log(`Editing text: "${e.str}"`);
+}
+
 /* ---------- selection ---------- */
 export function clickSelect(p, additive){
   const e = findEntityAt(p);
@@ -743,5 +842,6 @@ export function boxSelect(r, crossing){
   const w1 = s2w(Math.max(r.x0,r.x1), Math.min(r.y0,r.y1));
   const rect=[w0.x,w0.y,w1.x,w1.y];
   setSelRect(rect);                               // STRETCH uses the last box drawn
-  for (const e of entities) if (entInWindow(e, rect, crossing)) selection.add(e.id);
+  for (const e of entities)
+    if (layerVisible(e.layer) && layerUnlocked(e.layer) && entInWindow(e, rect, crossing)) selection.add(e.id);
 }

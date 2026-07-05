@@ -1,8 +1,8 @@
 /* =========================================================
    MiniCAD — canvas, view transform, grid, rendering
    ========================================================= */
-import { dist, fmt } from './geometry.js';
-import { entities, view, T, cmd, curPt, snapMark, boxSel, mouse, selection, layerOf, hoverSel, hotGrip } from './state.js';
+import { dist, fmt, arcFrom3 } from './geometry.js';
+import { entities, view, T, cmd, curPt, snapMark, boxSel, mouse, selection, layerOf, layerVisible, hoverSel, hotGrip } from './state.js';
 import { entBBox, entGrips, dimGeom, dimH } from './entities.js';
 import { log } from './ui.js';
 
@@ -52,8 +52,8 @@ export function draw(){
     ctx.beginPath(); ctx.moveTo(0,Math.round(ax.y)+.5); ctx.lineTo(W,Math.round(ax.y)+.5); ctx.stroke();
   }
 
-  // entities
-  for (const e of entities) drawEntity(e, 0, 0, false);
+  // entities (hidden layers skipped)
+  for (const e of entities) if (layerVisible(e.layer)) drawEntity(e, 0, 0, false);
 
   // move/copy ghost preview
   if (cmd && (cmd.name==='MOVE'||cmd.name==='COPY') && cmd.step==='dest'){
@@ -200,6 +200,14 @@ function drawRubber(){
   }
   else if (cmd.name==='CIRCLE' && cmd.center){
     const c=w2s(cmd.center); ctx.arc(c.x,c.y, dist(cmd.center,curPt)*view.scale, 0, Math.PI*2);
+  }
+  else if (cmd.name==='ARC' && cmd.pts.length){
+    if (cmd.pts.length===1) line(cmd.pts[0], curPt);
+    else {
+      const a3 = arcFrom3(cmd.pts[0], cmd.pts[1], curPt);
+      if (a3){ const c=w2s({x:a3.cx,y:a3.cy}); ctx.arc(c.x, c.y, a3.r*view.scale, -a3.a0, -a3.a1, true); }
+      else line(cmd.pts[0], curPt);
+    }
   }
   else if (cmd.name==='DIST' && cmd.p1) line(cmd.p1, curPt);
   else if (cmd.name==='ROTATE' && cmd.step==='angle') line(cmd.base, curPt);

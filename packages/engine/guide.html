@@ -88,7 +88,8 @@
     <tr><td>PL</td><td><b>Polyline.</b> Like Line, but the segments stay together as one object. Type <span class="say">C</span> to close the shape.</td></tr>
     <tr><td>REC</td><td><b>Rectangle.</b> Click two opposite corners.</td></tr>
     <tr><td>C</td><td><b>Circle.</b> Click the center, then click the edge — or type the radius as a number.</td></tr>
-    <tr><td>T</td><td><b>Text.</b> Click a point, type a height (bigger number = bigger letters), type the words.</td></tr>
+    <tr><td>A</td><td><b>Arc.</b> A curve through three clicks: where it starts, somewhere along it, where it ends. For door swings and curved walls.</td></tr>
+    <tr><td>T</td><td><b>Text.</b> Click a point, type a height (bigger number = bigger letters), type the words. Made a typo? <b>Double-click</b> any text later to rewrite it.</td></tr>
     <tr><td>DIM</td><td><b>Dimension.</b> The measuring label: click two points (say, both ends of a wall), then click where the measurement line should sit. The number updates by itself if you later stretch the wall. Numbers too small or too big? Select the dimensions, type <span class="say">DIMTXT</span> and give a height (or <span class="say">A</span> to go back to automatic).</td></tr>
   </table>
 
@@ -100,7 +101,7 @@
     <tr><td>CO</td><td><b>Copy.</b> Same as Move but the original stays. Keeps placing copies until you press Enter.</td></tr>
     <tr><td>RO</td><td><b>Rotate.</b> Pick a pivot point, then type an angle like <span class="say">90</span> or click.</td></tr>
     <tr><td>SC</td><td><b>Scale.</b> Pick a base point, type a factor: <span class="say">2</span> = double, <span class="say">0.5</span> = half.</td></tr>
-    <tr><td>O</td><td><b>Offset.</b> Makes a parallel copy at a set distance — perfect for wall thickness. Type the distance, click the line, click which side.</td></tr>
+    <tr><td>O</td><td><b>Offset.</b> Makes a parallel copy at a set distance — perfect for wall thickness. Type the distance, click the object, click which side. Works on whole rectangles too: offset a room inward by 12 and you have both faces of the wall in one move.</td></tr>
     <tr><td>TR</td><td><b>Trim.</b> Cuts pieces off where things cross. Select the "knives" and press Enter (or just press Enter right away = everything is a knife), then click the parts you want gone.</td></tr>
     <tr><td>EX</td><td><b>Extend.</b> The opposite of Trim — grows a line until it reaches another one. Press Enter first (= anything can be the wall it grows toward), then click near the <i>end</i> of the line you want to stretch.</td></tr>
     <tr><td>F</td><td><b>Fillet.</b> Joins two lines into a neat corner — even if they don't touch yet. It first asks for a radius: press Enter for a sharp corner (radius 0), or type something like <span class="say">10</span> for a rounded one. Then click the two lines, on the sides you want to <i>keep</i>. It remembers the radius for next time.</td></tr>
@@ -145,10 +146,12 @@
 
   <h2>Layers (colored pens)</h2>
   <p>Think of layers as different colored pens: <i>walls</i>, <i>furniture</i>, <i>annot</i> (notes/labels). The dropdown at the top-right picks which pen you're drawing with; the color swatch changes its color; <b>+</b> adds a new one. Keeping walls and furniture on separate layers keeps a plan readable.</p>
+  <p>The <b>👁</b> button hides the chosen layer (great for seeing the bare walls without furniture), and <b>🔒</b> locks it — still visible and snappable, but click-proof, so you can't nudge the walls by accident while arranging chairs. Drew something on the wrong layer? Select it and type <span class="say">CH</span> to move it.</p>
 
   <h2>Saving your work</h2>
   <table>
-    <tr><td>Save</td><td>Downloads <code>drawing.json</code> — this is <b>your file</b>, reopen it with the Open button. Save often; closing the browser tab does <i>not</i> keep your drawing.</td></tr>
+    <tr><td>Save</td><td>Downloads <code>drawing.json</code> — this is <b>your file</b>, reopen it with the Open button.</td></tr>
+    <tr><td>Autosave</td><td>The app quietly saves your work in the browser every few seconds. Close the tab, reopen — your drawing comes back on its own. Type <span class="say">NEW</span> for a fresh sheet. (Still press Save for a real file you can keep or share.)</td></tr>
     <tr><td>Open</td><td>Loads a previously saved <code>drawing.json</code></td></tr>
     <tr><td>Export DXF</td><td>Makes a <code>.dxf</code> file that opens in AutoCAD, LibreCAD, or any professional CAD program — for when you need to send your plan to an architect or a kitchen company.</td></tr>
   </table>
@@ -167,7 +170,8 @@
   <h2>Cheat sheet</h2>
   <table>
     <tr><th>Keys</th><th>Meaning</th></tr>
-    <tr><td>L · PL · REC · C · T</td><td>Line · Polyline · Rectangle · Circle · Text</td></tr>
+    <tr><td>L · PL · REC · C · A · T</td><td>Line · Polyline · Rectangle · Circle · Arc · Text</td></tr>
+    <tr><td>NEW · CH</td><td>Fresh drawing · move selection to another layer</td></tr>
     <tr><td>M · CO · RO · SC · O · TR · EX · F · MI · S · E</td><td>Move · Copy · Rotate · Scale · Offset · Trim · Extend · Fillet · Mirror · Stretch · Erase</td></tr>
     <tr><td>DIM</td><td>Measurement label (two points + where to put it)</td></tr>
     <tr><td>U · DI · Z E</td><td>Undo · Measure · Zoom to fit</td></tr>

@@ -34,12 +34,41 @@ export function openJSON(f){
   r.readAsText(f);
 }
 
+/* ---------- autosave (localStorage) ---------- */
+const AUTOSAVE_KEY = 'minicad.autosave';
+let lastAutosave = '';
+
+export function autosaveTick(){
+  if (typeof localStorage === 'undefined') return;
+  const data = JSON.stringify({layers, entities, idSeq:getIdSeq()});
+  if (data !== lastAutosave){
+    try{ localStorage.setItem(AUTOSAVE_KEY, data); lastAutosave = data; }catch(e){ /* storage full/blocked */ }
+  }
+}
+export function restoreAutosave(){
+  if (typeof localStorage === 'undefined') return false;
+  const raw = localStorage.getItem(AUTOSAVE_KEY);
+  if (!raw) return false;
+  try{
+    const d = JSON.parse(raw);
+    if (!d.entities || !d.entities.length) return false;
+    setLayers(d.layers||layers); setEntities(d.entities); setIdSeq(d.idSeq||d.entities.length+1);
+    setCurrentLayer(layers[0].name);
+    lastAutosave = raw;
+    return true;
+  }catch(e){ return false; }
+}
+export function clearAutosave(){
+  if (typeof localStorage !== 'undefined') localStorage.removeItem(AUTOSAVE_KEY);
+  lastAutosave = '';
+}
+
 export function dxfExport(){
   const L=[];
   const push=(...a)=>L.push(...a);
   push('0','SECTION','2','HEADER','9','$ACADVER','1','AC1009','0','ENDSEC');
   push('0','SECTION','2','TABLES','0','TABLE','2','LAYER','70',String(layers.length));
-  for (const l of layers) push('0','LAYER','2',l.name,'70','0','62','7','6','CONTINUOUS');
+  for (const l of layers) push('0','LAYER','2',l.name,'70',l.locked?'4':'0','62',l.off?'-7':'7','6','CONTINUOUS');
   push('0','ENDTAB','0','ENDSEC');
   push('0','SECTION','2','ENTITIES');
   for (const e of entities){

@@ -92,6 +92,8 @@
       <label style="color:var(--dim);font-size:11px">LAYER</label>
       <select id="layerSel"></select>
       <input type="color" id="layerColor" title="Layer color">
+      <button class="btn" id="btnLayerOff" title="Hide/show this layer">👁</button>
+      <button class="btn" id="btnLayerLock" title="Lock/unlock this layer">🔓</button>
       <button class="btn" id="btnAddLayer" title="New layer">+</button>
     </div>
   </div>
@@ -108,6 +110,7 @@
         <tr><td>PL / PLINE</td><td>Polyline — type <b>C</b> to close</td></tr>
         <tr><td>REC</td><td>Rectangle by two corners</td></tr>
         <tr><td>C / CIRCLE</td><td>Circle — center, then radius (click or type)</td></tr>
+        <tr><td>A / ARC</td><td>Arc through three points: start, a point on it, end</td></tr>
         <tr><td>T / TEXT</td><td>Text — point, height, string</td></tr>
         <tr><td>DIM / DLI</td><td>Dimension — two points, then place the line (value updates live)</td></tr>
         <tr><td>DIMTXT</td><td>Dimension text size — number, or A = automatic; applies to selected dims + future ones</td></tr>
@@ -118,13 +121,15 @@
         <tr><td>CO / COPY</td><td>Copy (multiple; Enter to end)</td></tr>
         <tr><td>RO / ROTATE</td><td>Rotate: base point, angle (type ° or click)</td></tr>
         <tr><td>SC / SCALE</td><td>Scale: base point, factor</td></tr>
-        <tr><td>O / OFFSET</td><td>Offset lines &amp; circles: distance → object → side</td></tr>
+        <tr><td>O / OFFSET</td><td>Parallel copy: distance → object → side (lines, circles, arcs, polylines)</td></tr>
         <tr><td>TR / TRIM</td><td>Trim to cutting edges (empty Enter = all objects are edges)</td></tr>
         <tr><td>EX / EXTEND</td><td>Extend to boundary edges (empty Enter = all objects)</td></tr>
         <tr><td>F / FILLET</td><td>Fillet two lines — radius 0 = sharp corner, &gt;0 = rounded</td></tr>
         <tr><td>MI / MIRROR</td><td>Mirror across a two-point line (asks to erase source)</td></tr>
         <tr><td>S / STRETCH</td><td>Crossing box → endpoints inside move, rest stays put</td></tr>
         <tr><td>Grips</td><td>Drag the blue squares on a selected object to reshape it</td></tr>
+        <tr><td>CH / CHLAYER</td><td>Move the selection to another layer</td></tr>
+        <tr><td>Double-click text</td><td>Edit its wording in place</td></tr>
         <tr><td>E / ERASE</td><td>Erase selection (or Delete key)</td></tr>
         <tr><td>Drag selected</td><td>Move objects directly (Esc while dragging = abort)</td></tr>
         <tr><td>U</td><td>Undo &nbsp;·&nbsp; REDO to redo</td></tr>
@@ -150,6 +155,8 @@
         <tr><td>F7 / F9</td><td>Grid / grid snap</td></tr>
         <tr><td>Right-click</td><td>= Enter (confirm / repeat last command)</td></tr>
         <tr><td>Esc</td><td>Cancel command / clear selection</td></tr>
+        <tr><td>NEW</td><td>Start a fresh drawing (asks first)</td></tr>
+        <tr><td>👁 / 🔓</td><td>Hide or lock the current layer (top-right). Autosave runs every 5&nbsp;s.</td></tr>
         <tr><td>Drag →</td><td>Window select (fully inside)</td></tr>
         <tr><td>Drag ←</td><td>Crossing select (touching)</td></tr>
       </table>

@@ -24,6 +24,8 @@ export function setLayers(a){ layers = a; }
 export let currentLayer = '0';
 export function setCurrentLayer(n){ currentLayer = n; }
 export function layerOf(name){ return layers.find(l=>l.name===name) || layers[0]; }
+export function layerVisible(name){ return !layerOf(name).off; }
+export function layerUnlocked(name){ return !layerOf(name).locked; }
 
 export const undoStack = [], redoStack = [];
 export function snapshot(){

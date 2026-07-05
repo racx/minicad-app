@@ -27,3 +27,15 @@ export const normAng = a => ((a % TAU) + TAU) % TAU;
 export function arcSweep(arc){ return normAng(arc.a1 - arc.a0) || TAU; }
 export function arcPt(arc, ang){ return {x:arc.cx + arc.r*Math.cos(ang), y:arc.cy + arc.r*Math.sin(ang)}; }
 export function angleOnArc(arc, ang){ return normAng(ang - arc.a0) <= arcSweep(arc) + 1e-9; }
+// arc through three points (start, on-arc, end) → {cx,cy,r,a0,a1} or null if collinear
+export function arcFrom3(p1, p2, p3){
+  const d = 2*(p1.x*(p2.y-p3.y) + p2.x*(p3.y-p1.y) + p3.x*(p1.y-p2.y));
+  if (Math.abs(d) < 1e-12) return null;
+  const s1=p1.x*p1.x+p1.y*p1.y, s2=p2.x*p2.x+p2.y*p2.y, s3=p3.x*p3.x+p3.y*p3.y;
+  const cx=(s1*(p2.y-p3.y)+s2*(p3.y-p1.y)+s3*(p1.y-p2.y))/d;
+  const cy=(s1*(p3.x-p2.x)+s2*(p1.x-p3.x)+s3*(p2.x-p1.x))/d;
+  const r=Math.hypot(p1.x-cx, p1.y-cy);
+  let a0=Math.atan2(p1.y-cy,p1.x-cx), am=Math.atan2(p2.y-cy,p2.x-cx), a1=Math.atan2(p3.y-cy,p3.x-cx);
+  if (normAng(am-a0) > normAng(a1-a0)) [a0,a1]=[a1,a0];   // middle point picks the direction
+  return {cx, cy, r, a0:normAng(a0), a1:normAng(a1)};
+}
