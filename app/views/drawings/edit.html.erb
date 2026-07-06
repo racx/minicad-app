@@ -1,13 +1,16 @@
 <% content_for :title, "#{@drawing.title} — MiniCAD" %>
 
-<%# The editor entrypoint reads this element, injects the engine UI, and
-    boots the engine (full mount lands in Stage 4). %>
+<%# The editor entrypoint reads this element, injects the engine UI (imported
+    raw from the engine package), boots the engine, and runs the Rails
+    persistence adapter. %>
 <div id="editor-mount"
      data-drawing-id="<%= @drawing.id %>"
      data-drawing-title="<%= @drawing.title %>"
      data-drawing-units="<%= @drawing.units %>"
      data-lock-version="<%= @drawing.lock_version %>"
+     data-updated-at="<%= @drawing.updated_at.iso8601 %>"
      data-autosave-url="<%= autosave_drawing_path(@drawing) %>"
+     data-copy-url="<%= drawings_path %>"
      data-drawings-url="<%= drawings_path %>">
   <script type="application/json" id="drawing-doc"><%= raw ERB::Util.json_escape(@drawing.doc.to_json) %></script>
 </div>

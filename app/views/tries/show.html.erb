@@ -1,0 +1,9 @@
+<% content_for :title, "Try MiniCAD" %>
+
+<%# Anonymous mode: the entrypoint boots the engine with its own localStorage
+    autosave (household behavior) and shows a sign-in nudge instead of the
+    Rails persistence adapter. %>
+<div id="editor-mount"
+     data-anonymous="true"
+     data-sign-in-url="<%= new_user_session_path %>">
+</div>

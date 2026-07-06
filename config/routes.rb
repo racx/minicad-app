@@ -14,6 +14,8 @@ Rails.application.routes.draw do
     root to: "drawings#index", as: :authenticated_root
   end
 
+  get "/try", to: "tries#show", as: :try
+
   resources :drawings, except: [ :new, :show ] do
     member do
       get   :rename
