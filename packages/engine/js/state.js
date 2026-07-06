@@ -34,6 +34,12 @@ export function snapshot(){
   redoStack.length = 0;
 }
 
+/* ---------- units ---------- */
+import { formatLen } from './geometry.js';
+export let units = 'cm';                 // what 1 drawing unit means: mm | cm | m
+export function setUnits(u){ units = u; }
+export function unitFmt(v){ return formatLen(v, units); }
+
 /* ---------- view ---------- */
 export const view = { scale: 4, ox: 0, oy: 0 };  // screen = world*scale + o  (y flipped)
 
@@ -59,3 +65,5 @@ export let hotGrip = null;           // {id, g} — grip currently being dragged
 export function setHotGrip(h){ hotGrip = h; }
 export let selRect = null;           // world rect [x0,y0,x1,y1] of the last selection box (for STRETCH)
 export function setSelRect(r){ selRect = r; }
+export let plotWin = null;           // world rect [x0,y0,x1,y1] of the print window (session-remembered)
+export function setPlotWin(r){ plotWin = r; }

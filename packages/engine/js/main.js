@@ -4,7 +4,8 @@
 import { fmt } from './geometry.js';
 import { entities, setEntities, layers, currentLayer, setCurrentLayer, layerOf, snapshot,
          undoStack, view, T, cmd, selection, mouse, curPt, setCurPt, boxSel, setBoxSel,
-         setHoverSel, setHotGrip } from './state.js';
+         setHoverSel, setHotGrip, units, unitFmt } from './state.js';
+import './plotui.js';                                   // print dialog wiring (self-registers)
 import { findEntityAt, translateIds, entGrips, applyGrip } from './entities.js';
 import { cv, s2w, w2s, draw, resize, zoomExtents, W, H } from './view.js';
 import { startCommand, handleEnter, cancelCmd, applyModifiers,
@@ -61,7 +62,7 @@ cv.addEventListener('mousemove', ev=>{
   }
   const hov = (!cmd && !boxSel && !gripDrag && selection.size) ? findEntityAt(s2w(mouse.sx, mouse.sy)) : null;
   setHoverSel(!!dragging || !!(hov && selection.has(hov.id)));
-  coordRead.textContent = `${fmt(curPt.x)}, ${fmt(curPt.y)}` + (T.ortho?'  ORTHO':'') ;
+  coordRead.textContent = `${unitFmt(curPt.x)}, ${unitFmt(curPt.y)} ${units}` + (T.ortho?'  ORTHO':'') ;
   draw();
 });
 cv.addEventListener('mouseleave', ()=>{ mouse.inside=false; draw(); });
@@ -149,6 +150,9 @@ window.addEventListener('keydown', ev=>{
   if (ev.key==='F3'){ ev.preventDefault(); setTog('osnap'); return; }
   if (ev.key==='F7'){ ev.preventDefault(); setTog('grid'); return; }
   if (ev.key==='F9'){ ev.preventDefault(); setTog('snap'); return; }
+  if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase()==='p'){
+    ev.preventDefault(); startCommand('PLOT'); return;
+  }
   if (ev.key==='Escape'){
     if (gripDrag){                                 // abort grip edit: put things back
       if (gripDrag.moved) setEntities(JSON.parse(undoStack.pop()));

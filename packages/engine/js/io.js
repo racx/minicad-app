@@ -4,7 +4,7 @@
 import { normAng, fmt } from './geometry.js';
 import { dimGeom, dimH } from './entities.js';
 import { entities, setEntities, layers, setLayers, getIdSeq, setIdSeq,
-         setCurrentLayer, snapshot, selection } from './state.js';
+         setCurrentLayer, snapshot, selection, units, setUnits } from './state.js';
 import { zoomExtents } from './view.js';
 import { log, refreshLayers } from './ui.js';
 
@@ -16,7 +16,7 @@ export function download(name, data, mime){
 }
 
 export function saveJSON(){
-  download('drawing.json', JSON.stringify({layers, entities, idSeq:getIdSeq()}, null, 1), 'application/json');
+  download('drawing.json', JSON.stringify({layers, entities, idSeq:getIdSeq(), units}, null, 1), 'application/json');
   log('Saved drawing.json', 'r');
 }
 
@@ -27,6 +27,7 @@ export function openJSON(f){
       const d=JSON.parse(r.result);
       snapshot();
       setLayers(d.layers||layers); setEntities(d.entities||[]); setIdSeq(d.idSeq||entities.length+1);
+      setUnits(d.units||'cm');
       setCurrentLayer(layers[0].name); refreshLayers(); selection.clear(); zoomExtents();
       log(`Opened ${f.name} (${entities.length} objects).`, 'r');
     }catch(e){ log('Could not read that file.', 'e'); }
@@ -40,7 +41,7 @@ let lastAutosave = '';
 
 export function autosaveTick(){
   if (typeof localStorage === 'undefined') return;
-  const data = JSON.stringify({layers, entities, idSeq:getIdSeq()});
+  const data = JSON.stringify({layers, entities, idSeq:getIdSeq(), units});
   if (data !== lastAutosave){
     try{ localStorage.setItem(AUTOSAVE_KEY, data); lastAutosave = data; }catch(e){ /* storage full/blocked */ }
   }
@@ -53,6 +54,7 @@ export function restoreAutosave(){
     const d = JSON.parse(raw);
     if (!d.entities || !d.entities.length) return false;
     setLayers(d.layers||layers); setEntities(d.entities); setIdSeq(d.idSeq||d.entities.length+1);
+    setUnits(d.units||'cm');
     setCurrentLayer(layers[0].name);
     lastAutosave = raw;
     return true;

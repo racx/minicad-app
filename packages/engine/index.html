@@ -42,6 +42,16 @@
   #help td:first-child{font-family:var(--mono);color:var(--warn);white-space:nowrap;width:86px}
   #help .close{position:absolute;top:8px;right:10px;cursor:pointer;color:var(--dim)}
 
+  /* ---------- plot dialog ---------- */
+  #plotDlg{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:340px;background:rgba(28,31,37,.98);border:1px solid var(--line);border-radius:8px;padding:16px 18px;display:none;z-index:6}
+  #plotDlg h2{font-size:13px;color:var(--accent);margin-bottom:12px;font-family:var(--mono)}
+  #plotDlg .row{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+  #plotDlg .row>label:first-child{width:64px;color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+  #plotDlg .row.buttons{justify-content:flex-end;margin-top:14px;margin-bottom:0}
+  #plotDlg input[type=number]{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:5px;padding:3px 6px;font-size:12px}
+  #plotFitLabel{color:var(--warn);font-family:var(--mono);font-size:12px}
+  #plotWinLabel{color:var(--dim);font-family:var(--mono);font-size:12px}
+
   /* ---------- command area ---------- */
   #cmdArea{background:var(--panel);border-top:1px solid var(--line);padding:4px 10px 8px;font-family:var(--mono)}
   #history{height:54px;overflow-y:auto;font-size:12px;color:var(--dim);padding:2px 4px;white-space:pre-wrap}
@@ -83,6 +93,7 @@
     <div class="sep"></div>
     <button class="btn" data-cmd="ZOOMEXT">Zoom Ext<kbd>Z E</kbd></button>
     <button class="btn" id="btnUndo">Undo<kbd>U</kbd></button>
+    <button class="btn" data-cmd="PLOT">Print<kbd>⌘P</kbd></button>
     <button class="btn" id="btnDxf">Export DXF</button>
     <button class="btn" id="btnSave">Save</button>
     <button class="btn" id="btnOpen">Open</button>
@@ -100,6 +111,35 @@
 
   <div id="stage">
     <canvas id="cv"></canvas>
+    <div id="plotDlg">
+      <h2>Print / Plot</h2>
+      <div class="row"><label>Paper</label>
+        <select id="plotPaper"><option>A4</option><option>A3</option><option>Letter</option></select>
+        <select id="plotOrient"><option value="L">landscape</option><option value="P">portrait</option></select>
+      </div>
+      <div class="row"><label>Scale</label>
+        <select id="plotScale">
+          <option value="20">1:20</option><option value="50" selected>1:50</option>
+          <option value="100">1:100</option><option value="200">1:200</option>
+          <option value="custom">custom…</option><option value="fit">fit window</option>
+        </select>
+        <input id="plotCustomN" type="number" min="1" value="50" style="width:64px">
+        <span id="plotFitLabel"></span>
+      </div>
+      <div class="row"><label>Window</label>
+        <button class="btn" id="plotPickWin">Pick window</button>
+        <span id="plotWinLabel">whole drawing</span>
+      </div>
+      <div class="row"><label>Lines</label>
+        <select id="plotWeight"><option value="0.35">0.35 mm</option><option value="0.1">hairline</option></select>
+        <label style="color:var(--dim);font-size:12px"><input type="checkbox" id="plotColors"> layer colors</label>
+      </div>
+      <div class="row buttons">
+        <button class="btn" id="plotTest">Test page</button>
+        <button class="btn" id="plotPrint">Print…</button>
+        <button class="btn" id="plotClose">Close</button>
+      </div>
+    </div>
     <div id="coordRead">0.00, 0.00</div>
     <div id="help">
       <span class="close" id="helpClose">✕</span>

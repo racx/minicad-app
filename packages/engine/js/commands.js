@@ -7,7 +7,8 @@ import { clearAutosave } from './io.js';
 import { entIntersections, lineEntT, lineLine, perpFoot, tangentPts, nearestOnEnt } from './intersect.js';
 import { entities, setEntities, nextId, layers, currentLayer, undoStack, redoStack, snapshot,
          view, T, cmd, setCmd, lastCmdName, setLastCmdName, selection, curPt, setSnapMark,
-         selRect, setSelRect, layerVisible, layerUnlocked } from './state.js';
+         selRect, setSelRect, plotWin, setPlotWin, units, setUnits,
+         layerVisible, layerUnlocked } from './state.js';
 import { findEntityAt, entInWindow, entBBox, snapCandidates, translateEnt, translateIds, mirrorEnt } from './entities.js';
 import { draw, zoomExtents, gridStep, s2w } from './view.js';
 import { log, setPrompt, toggleHelp, cmdInput } from './ui.js';
@@ -22,7 +23,8 @@ export const ALIASES = {
   MI:'MIRROR', MIRROR:'MIRROR', S:'STRETCH', STRETCH:'STRETCH',
   DIM:'DIM', DLI:'DIM', DAL:'DIM', DIMLINEAR:'DIM', DIMTXT:'DIMTXT', DTX:'DIMTXT',
   DI:'DIST', DIST:'DIST', Z:'ZOOM', ZOOM:'ZOOM', ZOOMEXT:'ZOOMEXT',
-  U:'UNDO', UNDO:'UNDO', REDO:'REDO', ORTHO:'TOGORTHO', OSNAP:'TOGOSNAP', GRID:'TOGGRID', HELP:'HELP', '?':'HELP'
+  U:'UNDO', UNDO:'UNDO', REDO:'REDO', ORTHO:'TOGORTHO', OSNAP:'TOGOSNAP', GRID:'TOGGRID', HELP:'HELP', '?':'HELP',
+  UNITS:'UNITS', PLOT:'PLOT', PRINT:'PLOT', PLOTWIN:'PLOTWIN'
 };
 const MODIFY = new Set(['MOVE','COPY','ROTATE','SCALE','ERASE','MIRROR']);
 let filletRadius = 0;   // remembered across FILLET invocations
@@ -43,6 +45,10 @@ export function doRedo(){
   selection.clear(); cancelCmd(true); draw();
   log('Redo','r');
 }
+
+/* ---------- plot dialog hook (UI registers itself; avoids commands→UI import cycle) ---------- */
+let plotOpener = null;
+export function registerPlotDialog(fn){ plotOpener = fn; }
 
 /* ---------- toggles ---------- */
 export function setTog(k){
@@ -135,6 +141,10 @@ export function startCommand(raw){
   if (name==='TOGOSNAP'){ setTog('osnap'); return; }
   if (name==='TOGGRID'){ setTog('grid'); return; }
   if (name==='HELP'){ toggleHelp(); return; }
+  if (name==='PLOT'){
+    if (plotOpener) plotOpener(); else log('Print dialog unavailable.', 'e');
+    return;
+  }
 
   cancelCmd(true);
   setLastCmdName(raw.toUpperCase());
@@ -173,6 +183,8 @@ export function startCommand(raw){
     setPrompt('STRETCH — Select objects with a crossing box, Enter when done:');
   }
   else if (name==='DIM'){ cmd.step='p1'; setPrompt('DIM — Specify first extension line origin:'); }
+  else if (name==='UNITS'){ cmd.step='u'; setPrompt(`UNITS — mm / cm / m <${units}>:`); }
+  else if (name==='PLOTWIN') setPrompt('PLOT — Specify first corner of the print window:');
   else if (name==='DIMTXT'){
     cmd.step='h';
     setPrompt(`DIMTXT — Dimension text height <${dimTextHeight>0?fmt(dimTextHeight):'auto'}> (A = auto):`);
@@ -310,6 +322,18 @@ export function onPoint(p){
       }
       log(`Stretched ${cmd.sel.length}.`, 'r');
       endCmd(); return;
+    }
+  }
+  else if (n==='PLOTWIN'){
+    cmd.pts.push(p);
+    if (cmd.pts.length===1) setPrompt('PLOT — Specify opposite corner:');
+    else {
+      const [a,b]=cmd.pts;
+      setPlotWin([Math.min(a.x,b.x), Math.min(a.y,b.y), Math.max(a.x,b.x), Math.max(a.y,b.y)]);
+      log('Print window set.', 'r');
+      endCmd();
+      if (plotOpener) plotOpener();
+      return;
     }
   }
   else if (n==='DIM'){
@@ -755,6 +779,14 @@ export function handleEnter(text){
   }
   if (n==='PLINE' && text.toUpperCase()==='C'){
     finishPline(true); return;
+  }
+  if (n==='UNITS' && cmd.step==='u'){
+    if (!text){ endCmd(); return; }                      // Enter = keep current
+    const u = text.toLowerCase();
+    if (!['mm','cm','m'].includes(u)){ log('Enter mm, cm or m.', 'e'); return; }
+    setUnits(u);
+    log(`Units: 1 drawing unit = 1 ${u}.`, 'r');
+    endCmd(); return;
   }
   if (n==='NEW' && cmd.step==='confirm'){
     if (text.toUpperCase()==='Y' || text.toUpperCase()==='YES'){

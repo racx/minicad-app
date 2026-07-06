@@ -2,7 +2,7 @@
    MiniCAD — canvas, view transform, grid, rendering
    ========================================================= */
 import { dist, fmt, arcFrom3 } from './geometry.js';
-import { entities, view, T, cmd, curPt, snapMark, boxSel, mouse, selection, layerOf, layerVisible, hoverSel, hotGrip } from './state.js';
+import { entities, view, T, cmd, curPt, snapMark, boxSel, mouse, selection, layerOf, layerVisible, hoverSel, hotGrip, unitFmt } from './state.js';
 import { entBBox, entGrips, dimGeom, dimH } from './entities.js';
 import { log } from './ui.js';
 
@@ -180,7 +180,7 @@ function drawEntity(e, dx, dy, ghost){
     ctx.translate((A.x+B.x)/2, (A.y+B.y)/2); ctx.rotate(angS);
     ctx.font=`${hs}px ui-monospace, monospace`;
     ctx.textAlign='center'; ctx.textBaseline='alphabetic';
-    ctx.fillText(fmt(g.L), 0, -Math.max(2, hs*0.25));
+    ctx.fillText(unitFmt(g.L), 0, -Math.max(2, hs*0.25));
     ctx.restore();
     ctx.textAlign='left';
   }

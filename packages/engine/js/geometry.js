@@ -3,6 +3,12 @@
    ========================================================= */
 export const dist = (a,b)=>Math.hypot(a.x-b.x, a.y-b.y);
 export const fmt = n => (Math.round(n*100)/100).toString();
+// length formatting per drawing unit: mm→integer, cm→0.1, m→0.01
+export function formatLen(v, u){
+  if (u==='mm') return Math.round(v).toString();
+  if (u==='m')  return (Math.round(v*100)/100).toFixed(2);
+  return (Math.round(v*10)/10).toString();                  // cm
+}
 export function deep(o){ return JSON.parse(JSON.stringify(o)); }
 
 export function ptSegDist(p, a, b){
