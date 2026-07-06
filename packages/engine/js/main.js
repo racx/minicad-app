@@ -6,6 +6,7 @@ import { entities, setEntities, layers, currentLayer, setCurrentLayer, layerOf, 
          undoStack, view, T, cmd, selection, mouse, curPt, setCurPt, boxSel, setBoxSel,
          setHoverSel, setHotGrip, units, unitFmt } from './state.js';
 import './plotui.js';                                   // print dialog wiring (self-registers)
+import './osnapui.js';                                  // object-snap dialog wiring (self-registers)
 import { findEntityAt, translateIds, entGrips, applyGrip } from './entities.js';
 import { cv, s2w, w2s, draw, resize, zoomExtents, RULER_PX, W, H } from './view.js';
 import { startCommand, handleEnter, cancelCmd, applyModifiers,

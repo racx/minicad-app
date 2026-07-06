@@ -23,7 +23,8 @@ export const ALIASES = {
   MI:'MIRROR', MIRROR:'MIRROR', S:'STRETCH', STRETCH:'STRETCH',
   DIM:'DIM', DLI:'DIM', DAL:'DIM', DIMLINEAR:'DIM', DIMTXT:'DIMTXT', DTX:'DIMTXT',
   DI:'DIST', DIST:'DIST', Z:'ZOOM', ZOOM:'ZOOM', ZOOMEXT:'ZOOMEXT', P:'PAN', PAN:'PAN',
-  U:'UNDO', UNDO:'UNDO', REDO:'REDO', ORTHO:'TOGORTHO', OSNAP:'TOGOSNAP', GRID:'TOGGRID', HELP:'HELP', '?':'HELP',
+  U:'UNDO', UNDO:'UNDO', REDO:'REDO', ORTHO:'TOGORTHO', GRID:'TOGGRID', HELP:'HELP', '?':'HELP',
+  OSNAP:'OSNAPDLG', OS:'OSNAPDLG',   // AutoCAD-style: typed OSNAP opens the mode picker (F3 = quick toggle)
   UNITS:'UNITS', PLOT:'PLOT', PRINT:'PLOT', PLOTWIN:'PLOTWIN'
 };
 const MODIFY = new Set(['MOVE','COPY','ROTATE','SCALE','ERASE','MIRROR']);
@@ -46,9 +47,11 @@ export function doRedo(){
   log('Redo','r');
 }
 
-/* ---------- plot dialog hook (UI registers itself; avoids commands→UI import cycle) ---------- */
+/* ---------- dialog hooks (UI registers itself; avoids commands→UI import cycles) ---------- */
 let plotOpener = null;
 export function registerPlotDialog(fn){ plotOpener = fn; }
+let osnapOpener = null;
+export function registerOsnapDialog(fn){ osnapOpener = fn; }
 
 /* ---------- toggles ---------- */
 export function setTog(k){
@@ -60,11 +63,49 @@ export function setTog(k){
 }
 
 /* ---------- snap / ortho / grid modifiers ---------- */
-// Osnap priority, highest first. 'xint' = where the rubber line crosses nearby geometry —
-// a fallback suggestion, ranked below perp/tan so it can't shadow them. 'nea'
-// (nearest-on-object) is implemented but OFF by default — always-on nearest makes every
-// hover sticky. Opt in with SNAP_PRIORITY.push('nea'); it must stay last (computed lazily).
-export const SNAP_PRIORITY = ['end','int','mid','cen','quad','perp','tan','xint'];
+// Osnap priority, highest first — the fixed RANKING of every implemented kind.
+// 'xint' = where the rubber line crosses nearby geometry — a fallback suggestion,
+// ranked below perp/tan so it can't shadow them. 'nea' (nearest-on-object) must
+// stay last: it is computed lazily, only when nothing else fired.
+export const SNAP_PRIORITY = ['end','int','mid','cen','quad','perp','tan','xint','nea'];
+// Which kinds actually RUN — configurable via the OSNAP dialog (osnapui.js).
+// 'nea' ships off: always-on nearest makes every hover sticky.
+export const SNAP_DEFAULTS = ['end','int','mid','cen','quad','perp','tan','xint'];
+export const SNAP_ACTIVE = new Set(SNAP_DEFAULTS);
+// Alignment tracking (dashed guides off snap points) — the F11 analog.
+export const SNAP_FLAGS = { tracking: true };
+
+const OSNAP_STORE_KEY = 'minicad.osnap';
+export function setSnapActive(kinds, persist=true){
+  SNAP_ACTIVE.clear();
+  for (const k of kinds) if (SNAP_PRIORITY.includes(k)) SNAP_ACTIVE.add(k);
+  if (persist) saveSnapConfig();
+  draw();
+}
+export function setSnapTracking(on, persist=true){
+  SNAP_FLAGS.tracking = !!on;
+  if (persist) saveSnapConfig();
+  draw();
+}
+function saveSnapConfig(){
+  if (typeof localStorage === 'undefined') return;
+  try{ localStorage.setItem(OSNAP_STORE_KEY,
+    JSON.stringify({modes:[...SNAP_ACTIVE], tracking:SNAP_FLAGS.tracking})); }catch(e){ /* full/blocked */ }
+}
+export function loadSnapConfig(){
+  if (typeof localStorage === 'undefined') return;
+  try{
+    const raw = localStorage.getItem(OSNAP_STORE_KEY);
+    if (!raw) return;
+    const d = JSON.parse(raw);
+    if (Array.isArray(d.modes)){
+      SNAP_ACTIVE.clear();
+      for (const k of d.modes) if (SNAP_PRIORITY.includes(k)) SNAP_ACTIVE.add(k);
+    }
+    if (typeof d.tracking === 'boolean') SNAP_FLAGS.tracking = d.tracking;
+  }catch(e){ /* bad JSON — keep defaults */ }
+}
+loadSnapConfig();
 
 export function applyModifiers(rawW, excludeId){
   setSnapMark(null);
@@ -75,6 +116,7 @@ export function applyModifiers(rawW, excludeId){
     // best candidate per kind; the winner is decided by SNAP_PRIORITY, not raw distance
     const buckets = {};
     const consider = c => {
+      if (!SNAP_ACTIVE.has(c.k)) return;
       const d = dist(c.p, rawW);
       if (d >= tol) return;
       if (!buckets[c.k] || d < buckets[c.k].d) buckets[c.k] = {c, d};
@@ -86,17 +128,18 @@ export function applyModifiers(rawW, excludeId){
       const b = entBBox(e);
       return rawW.x>=b[0]-tol && rawW.x<=b[2]+tol && rawW.y>=b[1]-tol && rawW.y<=b[3]+tol;
     });
-    for (let i=0;i<nearEnts.length;i++)
-      for (let j=i+1;j<nearEnts.length;j++)
-        for (const q of entIntersections(nearEnts[i], nearEnts[j])) consider({p:q, k:'int'});
+    if (SNAP_ACTIVE.has('int'))
+      for (let i=0;i<nearEnts.length;i++)
+        for (let j=i+1;j<nearEnts.length;j++)
+          for (const q of entIntersections(nearEnts[i], nearEnts[j])) consider({p:q, k:'int'});
     const pbase = rubberBase();
     if (pbase) for (const e of nearEnts){
-      for (const q of perpFoot(pbase, e)) consider({p:q, k:'perp'});
-      for (const q of tangentPts(pbase, e)) consider({p:q, k:'tan'});
+      if (SNAP_ACTIVE.has('perp')) for (const q of perpFoot(pbase, e)) consider({p:q, k:'perp'});
+      if (SNAP_ACTIVE.has('tan'))  for (const q of tangentPts(pbase, e)) consider({p:q, k:'tan'});
     }
     // "meet the edge": where the rubber line (extended a touch past the cursor)
     // crosses nearby geometry, suggest that exact point
-    if (pbase){
+    if (pbase && SNAP_ACTIVE.has('xint')){
       const dx=rawW.x-pbase.x, dy=rawW.y-pbase.y, L=Math.hypot(dx,dy);
       if (L>1e-9){
         const rub={type:'line', x1:pbase.x, y1:pbase.y,
@@ -106,7 +149,7 @@ export function applyModifiers(rawW, excludeId){
     }
     let best = null;
     for (const k of SNAP_PRIORITY){
-      if (k==='nea' && !best){                   // lowest priority: computed only if nothing fired
+      if (k==='nea' && !best && SNAP_ACTIVE.has('nea')){ // lowest priority: computed only if nothing fired
         for (const e of nearEnts){ const q = nearestOnEnt(e, rawW); if (q) consider({p:q, k:'nea'}); }
       }
       if (buckets[k]){ best = buckets[k].c; break; }
@@ -114,9 +157,10 @@ export function applyModifiers(rawW, excludeId){
     if (best){ setSnapMark(best); return {x:best.p.x, y:best.p.y}; }
     // alignment tracking: cursor lined up (h/v) with an existing snap point →
     // dashed guide + snap onto the alignment (both axes can engage at once)
-    if (cmd){
+    if (cmd && SNAP_FLAGS.tracking){
       let tx=null, txd=tol, txs=null, ty=null, tyd=tol, tys=null;
       for (const c of snapCandidates(excludeId)){
+        if (!SNAP_ACTIVE.has(c.k)) continue;      // track off active snap points only
         const ddx=Math.abs(c.p.x-rawW.x), ddy=Math.abs(c.p.y-rawW.y);
         if (ddx<txd){ txd=ddx; tx=c.p.x; txs=c.p; }
         if (ddy<tyd){ tyd=ddy; ty=c.p.y; tys=c.p; }
@@ -174,6 +218,10 @@ export function startCommand(raw){
   if (name==='HELP'){ toggleHelp(); return; }
   if (name==='PLOT'){
     if (plotOpener) plotOpener(); else log('Print dialog unavailable.', 'e');
+    return;
+  }
+  if (name==='OSNAPDLG'){
+    if (osnapOpener) osnapOpener(); else log('Object snap picker unavailable.', 'e');
     return;
   }
 

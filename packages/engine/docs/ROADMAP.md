@@ -54,7 +54,8 @@ point steps accept `x,y` / `@dx,dy` / `@d<a` / direct-distance via `parsePoint`
 | ZOOMEXT | `ZOOMEXT` (toolbar) | ✅ Instant. | `:113` |
 | UNDO / REDO | `U` / `REDO`, Ctrl-Z / Ctrl-Shift-Z | ✅ Complete. JSON snapshots, depth capped at 200 (`state.js:31–34`). Cancels active command. | `commands.js:30–44` |
 | NEW | `NEW` | ✅ Complete. Y/N confirm (default N), clears drawing + undo history + autosave. | `:126`, `:739–748` |
-| TOGORTHO/TOGOSNAP/TOGGRID | `ORTHO` `OSNAP` `GRID`, F8/F3/F7 (+F9 snap) | ✅ Instant toggles. | `:114–116`, keys `main.js:150–153` |
+| TOGORTHO/TOGOSNAP/TOGGRID | `ORTHO` `GRID`, F8/F3/F7 (+F9 snap) | ✅ Instant toggles. Typed `OSNAP` now opens the mode picker instead (F3/chip remain the quick toggle). | `:114–116`, keys `main.js:150–153` |
+| OSNAP dialog | `OSNAP` `OS` | ✅ Per-mode snap picker (AutoCAD Drafting Settings analog): checkbox per marker incl. Nearest ⧖ (default off) and Edge crossing, master F3 sync, alignment-tracking toggle, All on/off. Choices persist per browser (`minicad.osnap`). Gating: `SNAP_ACTIVE` set filters candidates before the fixed `SNAP_PRIORITY` ranking. | `commands.js` (SNAP_ACTIVE/setSnapActive/loadSnapConfig), `js/osnapui.js`, markup `index.html#osnapDlg`, suite 20 |
 | HELP | `?` `HELP` | ✅ In-app panel. | `:117` |
 | EDITTEXT | *(no alias — double-click a text)* | ✅ Complete. Prefills input with current string; Enter applies (one snapshot), Esc/empty keeps. | `startEditText commands.js:825`, dblclick `main.js:129–133`, apply `:760–766` |
 
@@ -162,8 +163,8 @@ screenshots), DXF acceptance by third-party CAD (checked with ezdxf ad hoc).
   Chrome + Safari print of an A4-landscape 1:50 sheet (see checklist in session report).
 - **DXF import** (LINE/CIRCLE/ARC/LWPOLYLINE/TEXT subset first) — promoted per product intent.
 - **Radius + angular dimensions** (`DIMRAD`, `DIMANG`) on the existing dim entity family.
-- ~~Tangent + nearest osnap~~ ✅ shipped (TAN default-on; NEA implemented but **opt-in,
-  off by default** — add `'nea'` to `SNAP_PRIORITY` — see §3).
+- ~~Tangent + nearest osnap~~ ✅ shipped (TAN default-on; NEA **off by default** —
+  tick "Nearest ⧖" in the `OSNAP` dialog — see §3).
 
 ### Tier 2 — wants, not needs
 - **ARRAY** (rectangular/polar copies).

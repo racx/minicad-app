@@ -130,6 +130,13 @@
   <p class="marks"><span><b>▪</b> endpoint</span> <span><b>△</b> midpoint</span> <span><b>○</b> center of a circle</span> <span><b>◇</b> quadrant (top/bottom/left/right of a circle)</span> <span><b>✕</b> where two things cross</span> <span><b>⊥</b> perpendicular (square angle onto a line)</span> <span><b>⊼</b> tangent (kisses a circle)</span></p>
   <p>This is how you make walls that <i>actually</i> meet. Trust the yellow marker — if you see it, your click lands exactly there.</p>
   <p>The app also <b>volunteers suggestions while you draw</b>: when your line is about to cross another one, the ✕ marker jumps to the exact crossing point — click and they meet perfectly. And when your cursor lines up with an existing corner, a dashed teal guide appears from that corner; click while the guide shows and you're exactly aligned (two guides at once = you're at the projected corner).</p>
+  <h3>Choosing which snaps run (type <b>OSNAP</b>)</h3>
+  <p>If snapping keeps grabbing points you don't want — say, midpoints while you're chasing endpoints — type <b>OSNAP</b> (or <b>OS</b>) and a small picker opens with a checkbox for every marker. Untick what's in your way; your choices are remembered on this browser. Two extras live there too:</p>
+  <table>
+    <tr><td>⧖ Nearest</td><td>Grab <i>any</i> point along an edge, not just the special ones. Off out of the box (it makes every hover sticky) — tick it when you need it.</td></tr>
+    <tr><td>Alignment tracking</td><td>The dashed teal guides described above. Untick if they distract you.</td></tr>
+  </table>
+  <p>When two snaps are in reach at once, the more specific one wins (endpoint beats midpoint beats center) — zoom in a little if the app grabs the wrong one. <kbd>F3</kbd> still switches all snapping on/off in one hit.</p>
   <h3>Typing coordinates</h3>
   <p>Whenever the app asks for a point, you can type instead of clicking:</p>
   <table>

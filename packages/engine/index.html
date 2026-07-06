@@ -53,6 +53,17 @@
   #plotFitLabel{color:var(--warn);font-family:var(--mono);font-size:12px}
   #plotWinLabel{color:var(--dim);font-family:var(--mono);font-size:12px}
 
+  /* ---------- object snap dialog ---------- */
+  #osnapDlg{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:360px;background:rgba(28,31,37,.98);border:1px solid var(--line);border-radius:8px;padding:16px 18px;display:none;z-index:6}
+  #osnapDlg h2{font-size:13px;color:var(--accent);margin-bottom:12px;font-family:var(--mono)}
+  #osnapDlg .row{display:flex;align-items:center;gap:14px;margin-bottom:10px}
+  #osnapDlg .row.buttons{justify-content:flex-end;margin-top:14px;margin-bottom:0;gap:8px}
+  #osnapDlg label{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text);cursor:pointer;user-select:none}
+  #osnapDlg .modes{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:10px 0;margin-bottom:10px}
+  #osnapDlg .g{font-family:var(--mono);color:var(--warn);width:14px;text-align:center}
+  #osnapDlg .hint{font-size:11px;color:var(--dim)}
+  #osnapDlg kbd{color:var(--dim);font-size:10px}
+
   /* ---------- command area ---------- */
   #cmdArea{background:var(--panel);border-top:1px solid var(--line);padding:4px 10px 8px;font-family:var(--mono)}
   #history{height:54px;overflow-y:auto;font-size:12px;color:var(--dim);padding:2px 4px;white-space:pre-wrap}
@@ -142,6 +153,30 @@
         <button class="btn" id="plotClose">Close</button>
       </div>
     </div>
+    <div id="osnapDlg">
+      <h2>Object snap</h2>
+      <div class="row">
+        <label><input type="checkbox" id="osMaster"> Object snap on <kbd>F3</kbd></label>
+        <label><input type="checkbox" id="osTrack"> Alignment tracking</label>
+      </div>
+      <div class="modes">
+        <label><input type="checkbox" id="osMode_end"><span class="g">▪</span> Endpoint</label>
+        <label><input type="checkbox" id="osMode_int"><span class="g">✕</span> Intersection</label>
+        <label><input type="checkbox" id="osMode_mid"><span class="g">△</span> Midpoint</label>
+        <label><input type="checkbox" id="osMode_perp"><span class="g">⊥</span> Perpendicular</label>
+        <label><input type="checkbox" id="osMode_cen"><span class="g">○</span> Center</label>
+        <label><input type="checkbox" id="osMode_tan"><span class="g">⊼</span> Tangent</label>
+        <label><input type="checkbox" id="osMode_quad"><span class="g">◇</span> Quadrant</label>
+        <label><input type="checkbox" id="osMode_xint"><span class="g">✕</span> Edge crossing</label>
+        <label><input type="checkbox" id="osMode_nea"><span class="g">⧖</span> Nearest</label>
+      </div>
+      <div class="hint">When several fire at once, the higher mode in this order wins: endpoint, intersection, midpoint, center, quadrant, perpendicular, tangent.</div>
+      <div class="row buttons">
+        <button class="btn" id="osAll">All on</button>
+        <button class="btn" id="osNone">All off</button>
+        <button class="btn" id="osClose">Close</button>
+      </div>
+    </div>
     <div id="coordRead">0.00, 0.00</div>
     <div id="help">
       <span class="close" id="helpClose">✕</span>
@@ -194,7 +229,8 @@
       <h3>Toggles &amp; keys</h3>
       <table>
         <tr><td>F8</td><td>ORTHO</td></tr>
-        <tr><td>F3</td><td>OSNAP (endpoint ▪ midpoint △ center ○ quadrant ◇ intersection ✕ perpendicular ⊥ tangent ⊼). Nearest ⧖ exists but is off by default — enable via SNAP_PRIORITY in js/commands.js</td></tr>
+        <tr><td>F3</td><td>OSNAP on/off (endpoint ▪ midpoint △ center ○ quadrant ◇ intersection ✕ perpendicular ⊥ tangent ⊼ nearest ⧖)</td></tr>
+        <tr><td>OSNAP / OS</td><td>Choose which snap modes run — a picker opens with a checkbox per marker (Nearest ⧖ ships off), plus alignment tracking</td></tr>
         <tr><td>F7 / F9</td><td>Grid / grid snap</td></tr>
         <tr><td>Right-click</td><td>= Enter (confirm / repeat last command)</td></tr>
         <tr><td>Esc</td><td>Cancel command / clear selection</td></tr>

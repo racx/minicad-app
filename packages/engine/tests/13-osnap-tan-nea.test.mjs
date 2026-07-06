@@ -10,11 +10,13 @@ S.T.osnap=false; S.T.ortho=false;
 const add=(x1,y1,x2,y2)=>{C.startCommand('L');C.handleEnter(`${x1},${y1}`);C.handleEnter(`${x2},${y2}`);C.handleEnter('');return S.entities[S.entities.length-1];};
 const reset=()=>{S.setEntities([]);S.undoStack.length=0;S.selection.clear();};
 
-/* ===== priority array is the single config; nea NOT in the default ===== */
-check('SNAP_PRIORITY default has 8 kinds incl xint, no nea',
-      Array.isArray(C.SNAP_PRIORITY) && C.SNAP_PRIORITY.length===8 &&
-      !C.SNAP_PRIORITY.includes('nea') &&
+/* ===== SNAP_PRIORITY ranks every kind; SNAP_ACTIVE gates them; nea inactive by default ===== */
+check('SNAP_PRIORITY ranks 9 kinds, nea last',
+      Array.isArray(C.SNAP_PRIORITY) && C.SNAP_PRIORITY.length===9 &&
+      C.SNAP_PRIORITY[8]==='nea' &&
       ['end','int','mid','cen','quad','perp','tan','xint'].every(k=>C.SNAP_PRIORITY.includes(k)));
+check('SNAP_ACTIVE default: 8 kinds on, nea off',
+      C.SNAP_ACTIVE.size===8 && !C.SNAP_ACTIVE.has('nea'));
 
 /* ===== tangentPts math ===== */
 let ts = X.tangentPts({x:100,y:0}, {type:'circle', cx:0, cy:0, r:50});
@@ -56,12 +58,12 @@ reset();
 add(0,0,100,0);
 p = C.applyModifiers({x:37.3, y:0.9});           // mid-span, nothing else within tol
 check('default: bare geometry does not snap', S.snapMark===null && near(p.x,37.3)&&near(p.y,0.9));
-C.SNAP_PRIORITY.push('nea');                     // opt in
+C.SNAP_ACTIVE.add('nea');                        // opt in
 p = C.applyModifiers({x:37.3, y:0.9});
 check('opted-in: NEA fires on bare geometry', S.snapMark && S.snapMark.k==='nea' && near(p.x,37.3)&&near(p.y,0));
 p = C.applyModifiers({x:99, y:1});               // near the endpoint
 check('opted-in: END still beats NEA', S.snapMark && S.snapMark.k==='end' && near(p.x,100)&&near(p.y,0));
-C.SNAP_PRIORITY.pop();                           // back to default for the rest
+C.SNAP_ACTIVE.delete('nea');                     // back to default for the rest
 
 /* ===== priority beats raw distance ===== */
 reset();
@@ -75,10 +77,10 @@ reset();
 S.setCurrentLayer('walls');
 add(0,20,100,20);
 S.layerOf('walls').off = true;
-C.SNAP_PRIORITY.push('nea');
+C.SNAP_ACTIVE.add('nea');
 p = C.applyModifiers({x:50, y:20.5});
 check('NEA (opted in) ignores hidden layers', S.snapMark===null);
-C.SNAP_PRIORITY.pop();
+C.SNAP_ACTIVE.delete('nea');
 S.layerOf('walls').off = false;
 S.setCurrentLayer('0');
 
