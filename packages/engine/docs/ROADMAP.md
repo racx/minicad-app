@@ -1,7 +1,7 @@
 # MiniCAD — Feature Inventory & Roadmap
 
 **Single source of truth** for what exists, how complete it is, and what comes next.
-Evidence-based: every claim below cites `file:line` in the codebase as of commit `e18b090`.
+Evidence-based: every claim below cites `file:line` in the codebase as of commit `536d7c7`.
 Verified against the test suite: `node tests/run.mjs` → **12 suites, 206 checks, all passing** (2026-07-05).
 
 Update this file whenever a feature lands or a decision changes the plan.

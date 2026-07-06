@@ -2,7 +2,7 @@
 
 > **Provenance note (2026-07-05):** this file was requested as a "sync" but was **not
 > present in the repo** and no prior version exists in git history. This is a fresh draft
-> written against the engine at commit `219218d`. Nothing here is implemented yet — see
+> written against the engine at commit `fa9be5e`. Nothing here is implemented yet — see
 > "Implementation status" at the bottom.
 
 ## Purpose
@@ -62,7 +62,7 @@ NEW     CONFIRM                          # explicit keyword instead of Y/N promp
 ZOOM    E
 ```
 
-## Grammar ↔ engine diff (both directions, at commit 219218d)
+## Grammar ↔ engine diff (both directions, at commit fa9be5e)
 
 **In the engine but previously missing from any grammar** (now covered above):
 `DIM, DIMTXT, CHLAYER, STRETCH, ARC, EDITTEXT` ✅ (per Stage-0 instruction), plus
