@@ -1,18 +1,15 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title><%= content_for(:title) || "Minicad App" %></title>
+    <title><%= content_for(:title) || "MiniCAD" %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="application-name" content="Minicad App">
+    <meta name="application-name" content="MiniCAD">
     <meta name="mobile-web-app-capable" content="yes">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
 
     <%= yield :head %>
-
-    <%# Enable PWA manifest for installable apps (make sure to enable in config/routes.rb too!) %>
-    <%#= tag.link rel: "manifest", href: pwa_manifest_path(format: :json) %>
 
     <link rel="icon" href="/icon.png" type="image/png">
     <link rel="icon" href="/icon.svg" type="image/svg+xml">
@@ -23,8 +20,49 @@
     <%= javascript_importmap_tags %>
   </head>
 
-  <body>
-    <main class="container mx-auto mt-28 px-5 flex">
+  <body class="sheet-grid min-h-screen text-ink font-display antialiased">
+    <header class="border-b-2 border-ink bg-sheet">
+      <div class="max-w-5xl mx-auto px-5 h-14 flex items-center justify-between">
+        <%= link_to (user_signed_in? ? drawings_path : root_path), class: "wordmark text-base" do %>
+          MINI<span>CAD</span>
+        <% end %>
+        <% if user_signed_in? %>
+          <div class="flex items-center gap-4">
+            <span class="eyebrow hidden sm:inline"><%= current_user.plan %> plan</span>
+            <div class="flex items-center gap-2">
+              <% if current_user.avatar_url.present? %>
+                <img src="<%= current_user.avatar_url %>" alt="" class="w-7 h-7 border border-rule">
+              <% end %>
+              <span class="font-mono text-xs text-ink-soft"><%= current_user.name %></span>
+            </div>
+            <%= button_to "Sign out", destroy_user_session_path, method: :delete,
+                  class: "font-mono text-xs text-dim hover:text-ink cursor-pointer underline-offset-4 hover:underline" %>
+          </div>
+        <% else %>
+          <div class="flex items-center gap-3">
+            <%= link_to "Try it", try_path, class: "font-mono text-xs text-ink hover:text-teal-deep underline-offset-4 hover:underline" %>
+            <%= link_to "Sign in", new_user_session_path, class: "btn-ghost !py-1.5 !px-3 text-xs" %>
+          </div>
+        <% end %>
+      </div>
+    </header>
+
+    <% if notice %>
+      <div class="max-w-5xl mx-auto px-5 mt-4">
+        <div class="border-l-2 border-teal-deep bg-sheet px-4 py-2 font-mono text-xs text-teal-deep">
+          <%= notice %>
+        </div>
+      </div>
+    <% end %>
+    <% if alert %>
+      <div class="max-w-5xl mx-auto px-5 mt-4">
+        <div class="border-l-2 border-blood bg-sheet px-4 py-2 font-mono text-xs text-blood">
+          <%= alert %>
+        </div>
+      </div>
+    <% end %>
+
+    <main class="max-w-5xl mx-auto px-5 py-10">
       <%= yield %>
     </main>
   </body>

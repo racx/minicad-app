@@ -3,6 +3,7 @@ class DrawingsController < ApplicationController
 
   def index
     @drawings = current_user.drawings.order(updated_at: :desc)
+    @sheet_numbers = sheet_numbers
   end
 
   # Dashboard "New drawing" button (html) and the editor's save-as-copy
@@ -23,12 +24,14 @@ class DrawingsController < ApplicationController
 
   # Inline title edit on the dashboard (turbo frame).
   def rename
+    @sheet_number = sheet_numbers[@drawing.id]
   end
 
   def update
     if @drawing.update(params.expect(drawing: [ :title ]))
-      render partial: "drawing", locals: { drawing: @drawing }
+      render partial: "drawing", locals: { drawing: @drawing, sheet_number: sheet_numbers[@drawing.id] }
     else
+      @sheet_number = sheet_numbers[@drawing.id]
       render :rename, status: :unprocessable_content
     end
   end
@@ -57,6 +60,12 @@ class DrawingsController < ApplicationController
 
   def set_drawing
     @drawing = current_user.drawings.find(params[:id])
+  end
+
+  # Sheet numbers encode creation order, like a real plan set (A-001, A-002…).
+  def sheet_numbers
+    current_user.drawings.order(:created_at).pluck(:id)
+      .each_with_index.to_h { |id, i| [ id, format("A-%03d", i + 1) ] }
   end
 
   def create_params

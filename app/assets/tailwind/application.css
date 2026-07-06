@@ -1,1 +1,90 @@
 @import "tailwindcss";
+
+/* MiniCAD shell — "the paper side of the drafting board".
+   Editor is dark ink + teal (engine CSS, untouched); the shell is cool
+   tracing paper, drafting-ink text, hairline rules, and title-block framing.
+   Type: mono is the product's native voice (commands, coordinates); display
+   headings are the system grotesk set tight and heavy. No webfonts. */
+
+@theme {
+  --color-paper: #f5f7f6;
+  --color-sheet: #fdfefd;
+  --color-ink: #171d1b;
+  --color-ink-soft: #3c4744;
+  --color-dim: #5f6b66;
+  --color-hairline: #d9dfdc;
+  --color-rule: #aab5b0;
+  --color-teal: #0f9b82;
+  --color-teal-deep: #0b7a67;
+  --color-amber: #a8730f;
+  --color-blood: #b3403a;
+
+  --font-mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
+  --font-display: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+@layer components {
+  /* graph-paper sheet background: fine grid, heavier line every 5 cells */
+  .sheet-grid {
+    background-color: var(--color-paper);
+    background-image:
+      linear-gradient(to right, rgb(23 29 27 / 0.045) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(23 29 27 / 0.045) 1px, transparent 1px),
+      linear-gradient(to right, rgb(23 29 27 / 0.09) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(23 29 27 / 0.09) 1px, transparent 1px);
+    background-size: 24px 24px, 24px 24px, 120px 120px, 120px 120px;
+  }
+
+  /* title block: the boxed corner grid of a real plan sheet */
+  .tblock {
+    background: var(--color-sheet);
+    border: 2px solid var(--color-ink);
+    box-shadow: 4px 4px 0 rgb(23 29 27 / 0.12);
+  }
+  .tblock-row { border-top: 1px solid var(--color-hairline); }
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-dim);
+  }
+
+  .btn-ink {
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+    font-family: var(--font-mono); font-size: 13px;
+    background: var(--color-ink); color: var(--color-paper);
+    border: 2px solid var(--color-ink);
+    padding: 0.55rem 1.1rem;
+    cursor: pointer;
+    transition: background 120ms, color 120ms;
+  }
+  .btn-ink:hover { background: var(--color-teal-deep); border-color: var(--color-teal-deep); }
+  .btn-ink:focus-visible { outline: 2px solid var(--color-teal); outline-offset: 2px; }
+
+  .btn-ghost {
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+    font-family: var(--font-mono); font-size: 13px;
+    background: transparent; color: var(--color-ink);
+    border: 1px solid var(--color-rule);
+    padding: 0.55rem 1.1rem;
+    cursor: pointer;
+    transition: border-color 120ms, color 120ms;
+  }
+  .btn-ghost:hover { border-color: var(--color-teal-deep); color: var(--color-teal-deep); }
+  .btn-ghost:focus-visible { outline: 2px solid var(--color-teal); outline-offset: 2px; }
+
+  /* dimension-line divider: |<-------- label -------->| */
+  .dim-line {
+    display: flex; align-items: center; gap: 0.75rem;
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--color-dim);
+  }
+  .dim-line::before, .dim-line::after {
+    content: ""; flex: 1; height: 1px; background: var(--color-rule);
+  }
+
+  .wordmark { font-family: var(--font-mono); font-weight: 700; letter-spacing: 0.06em; color: var(--color-ink); }
+  .wordmark span { color: var(--color-teal-deep); }
+}

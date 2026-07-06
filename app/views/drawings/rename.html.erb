@@ -1,10 +1,20 @@
-<%= turbo_frame_tag @drawing do %>
-  <%= form_with model: @drawing, class: "flex items-center gap-2 px-5 py-3" do |f| %>
-    <%= f.text_field :title, autofocus: true,
-          class: "flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400" %>
-    <%= f.submit "Save",
-          class: "bg-gray-900 hover:bg-gray-700 text-white text-sm px-3 py-1.5 rounded-lg cursor-pointer" %>
-    <%= link_to "Cancel", drawings_path, data: { turbo_frame: "_top" },
-          class: "text-sm text-gray-500 hover:text-gray-800 px-2 py-1" %>
-  <% end %>
+<%= turbo_frame_tag @drawing, class: "block h-full" do %>
+  <article class="tblock flex flex-col h-full !border-teal-deep">
+    <div class="px-4 py-2.5 flex items-baseline justify-between">
+      <span class="eyebrow !text-teal-deep">sheet <%= @sheet_number %></span>
+      <span class="font-mono text-[10px] uppercase tracking-wider text-dim"><%= @drawing.units %></span>
+    </div>
+
+    <%= form_with model: @drawing, class: "tblock-row px-4 pt-3.5 pb-4 flex-1" do |f| %>
+      <label class="eyebrow block mb-1.5" for="drawing_title">rename sheet</label>
+      <%= f.text_field :title, autofocus: true,
+            class: "w-full font-mono text-sm bg-paper border border-rule px-2.5 py-1.5
+                    focus:outline-none focus:border-teal-deep" %>
+      <div class="flex items-center gap-3 mt-3 font-mono text-xs">
+        <%= f.submit "Save name", class: "btn-ink !py-1.5 !px-3 !text-xs" %>
+        <%= link_to "Cancel", drawings_path, data: { turbo_frame: "_top" },
+              class: "text-dim hover:text-ink underline-offset-4 hover:underline" %>
+      </div>
+    <% end %>
+  </article>
 <% end %>

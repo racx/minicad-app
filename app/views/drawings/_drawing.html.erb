@@ -1,20 +1,30 @@
-<%= turbo_frame_tag drawing do %>
-  <div class="flex items-center justify-between px-5 py-4">
-    <div class="min-w-0">
+<%= turbo_frame_tag drawing, class: "block h-full" do %>
+  <article class="tblock flex flex-col h-full">
+    <div class="px-4 py-2.5 flex items-baseline justify-between">
+      <span class="eyebrow !text-teal-deep">sheet <%= sheet_number %></span>
+      <span class="font-mono text-[10px] uppercase tracking-wider text-dim"><%= drawing.units %></span>
+    </div>
+
+    <div class="tblock-row px-4 pt-3.5 pb-4 flex-1 min-w-0">
       <%= link_to drawing.title, edit_drawing_path(drawing), data: { turbo_frame: "_top" },
-            class: "font-medium text-gray-900 hover:underline truncate block" %>
-      <p class="text-xs text-gray-500 mt-0.5">
-        <%= drawing.units %> · updated <%= time_ago_in_words(drawing.updated_at) %> ago
+            class: "block text-lg font-bold tracking-tight leading-snug hover:text-teal-deep truncate" %>
+      <p class="font-mono text-[11px] text-dim mt-1.5">
+        <%= pluralize(drawing.doc["entities"]&.size || 0, "object") %> ·
+        updated <%= time_ago_in_words(drawing.updated_at) %> ago
       </p>
     </div>
-    <div class="flex items-center gap-2 shrink-0 ml-4">
+
+    <div class="tblock-row px-4 py-2.5 flex items-center gap-4 font-mono text-xs">
+      <%= link_to "Open", edit_drawing_path(drawing), data: { turbo_frame: "_top" },
+            class: "text-ink hover:text-teal-deep underline-offset-4 hover:underline" %>
       <%= link_to "Rename", rename_drawing_path(drawing),
-            class: "text-sm text-gray-500 hover:text-gray-800 px-2 py-1" %>
+            class: "text-dim hover:text-ink underline-offset-4 hover:underline" %>
+      <span class="flex-1"></span>
       <%= button_to "Delete", drawing_path(drawing), method: :delete,
             form: { data: { turbo_confirm: "Delete “#{drawing.title}”? This cannot be undone." },
                     class: "inline" },
             data: { turbo_frame: "_top" },
-            class: "text-sm text-red-500 hover:text-red-700 px-2 py-1 cursor-pointer" %>
+            class: "text-dim hover:text-blood cursor-pointer underline-offset-4 hover:underline" %>
     </div>
-  </div>
+  </article>
 <% end %>

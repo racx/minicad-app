@@ -1,38 +1,24 @@
 <% content_for :title, "Drawings — MiniCAD" %>
 
-<div class="w-full max-w-3xl mx-auto">
-  <div class="flex items-center justify-between mb-8">
-    <h1 class="text-2xl font-bold text-gray-900">MiniCAD</h1>
-    <div class="flex items-center gap-3">
-      <% if current_user.avatar_url.present? %>
-        <img src="<%= current_user.avatar_url %>" alt="" class="w-8 h-8 rounded-full">
-      <% end %>
-      <span class="text-sm text-gray-600"><%= current_user.name %></span>
-      <%= button_to "Sign out", destroy_user_session_path, method: :delete,
-            class: "text-sm text-gray-500 hover:text-gray-800 cursor-pointer" %>
-    </div>
+<div class="flex items-end justify-between mb-8">
+  <div>
+    <p class="eyebrow mb-1.5">sheet index</p>
+    <h1 class="text-2xl font-bold tracking-tight">Your drawings</h1>
   </div>
-
-  <% if notice %>
-    <div class="mb-4 bg-green-50 border border-green-200 text-green-800 text-sm px-4 py-3 rounded-lg"><%= notice %></div>
-  <% end %>
-
-  <div class="flex items-center justify-between mb-4">
-    <h2 class="text-lg font-semibold text-gray-800">Your drawings</h2>
-    <%= button_to "New drawing", drawings_path,
-          class: "bg-gray-900 hover:bg-gray-700 text-white text-sm font-medium px-4 py-2 rounded-lg cursor-pointer" %>
-  </div>
-
-  <% if @drawings.any? %>
-    <ul class="divide-y divide-gray-200 bg-white border border-gray-200 rounded-xl">
-      <% @drawings.each do |drawing| %>
-        <li><%= render "drawing", drawing: drawing %></li>
-      <% end %>
-    </ul>
-  <% else %>
-    <div class="text-center bg-white border border-dashed border-gray-300 rounded-xl py-16 text-gray-500">
-      <p class="mb-1 font-medium text-gray-700">No drawings yet</p>
-      <p class="text-sm">Create your first drawing to open the editor.</p>
-    </div>
-  <% end %>
+  <%= button_to "+ New drawing", drawings_path, class: "btn-ink" %>
 </div>
+
+<% if @drawings.any? %>
+  <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+    <% @drawings.each do |drawing| %>
+      <%= render "drawing", drawing: drawing, sheet_number: @sheet_numbers[drawing.id] %>
+    <% end %>
+  </div>
+<% else %>
+  <div class="border-2 border-dashed border-rule bg-sheet/60 px-8 py-16 text-center">
+    <p class="eyebrow mb-2">flat file empty</p>
+    <p class="text-lg font-bold tracking-tight mb-1">A blank sheet is waiting.</p>
+    <p class="text-sm text-dim mb-6">Draw with the same commands as the big desks — L, REC, C — right in the browser.</p>
+    <%= button_to "Start sheet A-001", drawings_path, class: "btn-ink" %>
+  </div>
+<% end %>

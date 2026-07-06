@@ -1,28 +1,58 @@
 <% content_for :title, "Sign in — MiniCAD" %>
 
-<h2 class="text-xl font-bold text-gray-900 mb-1">MiniCAD</h2>
-<p class="text-sm text-gray-500 mb-6">Browser CAD for people with plans.</p>
-
-<% if flash[:alert] %>
-  <div class="mb-4 bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg">
-    <%= flash[:alert] %>
+<div class="tblock">
+  <%# title-block header row %>
+  <div class="flex items-center justify-between px-5 py-3">
+    <span class="wordmark text-sm">MINI<span>CAD</span></span>
+    <span class="eyebrow">sheet A-000 · sign in</span>
   </div>
-<% end %>
 
-<%= button_to user_google_oauth2_omniauth_authorize_path, method: :post,
-      data: { turbo: false },
-      class: "w-full inline-flex items-center justify-center gap-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-800 text-sm font-medium px-4 py-2.5 rounded-lg cursor-pointer" do %>
-  <svg class="w-5 h-5" viewBox="0 0 18 18" aria-hidden="true">
-    <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/>
-    <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/>
-    <path fill="#FBBC05" d="M3.964 10.706A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.038l3.007-2.332z"/>
-    <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.962L3.964 7.294C4.672 5.163 6.656 3.58 9 3.58z"/>
-  </svg>
-  Sign in with Google
-<% end %>
+  <div class="tblock-row px-5 pt-6 pb-7">
+    <h1 class="text-xl font-bold tracking-tight mb-1">Back to the board.</h1>
+    <p class="text-sm text-dim mb-6">Your drawings are where you left them.</p>
 
-<% if Rails.env.local? %>
-  <%= button_to "Sign in as developer", user_developer_omniauth_authorize_path,
-        method: :post, data: { turbo: false },
-        class: "w-full mt-3 inline-flex items-center justify-center text-sm text-gray-500 hover:text-gray-800 px-4 py-2 rounded-lg border border-dashed border-gray-300 cursor-pointer" %>
-<% end %>
+    <% if flash[:alert] %>
+      <div class="mb-5 border border-blood px-3.5 py-2.5 font-mono text-xs text-blood">
+        <%= flash[:alert] %>
+      </div>
+    <% end %>
+
+    <%= button_to user_google_oauth2_omniauth_authorize_path, method: :post,
+          data: { turbo: false }, class: "btn-ink w-full" do %>
+      <svg class="w-4 h-4" viewBox="0 0 18 18" aria-hidden="true">
+        <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/>
+        <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/>
+        <path fill="#FBBC05" d="M3.964 10.706A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.038l3.007-2.332z"/>
+        <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.962L3.964 7.294C4.672 5.163 6.656 3.58 9 3.58z"/>
+      </svg>
+      Sign in with Google
+    <% end %>
+
+    <% if Rails.env.local? %>
+      <%= button_to "Sign in as developer", user_developer_omniauth_authorize_path,
+            method: :post, data: { turbo: false },
+            class: "btn-ghost w-full mt-3 !border-dashed" %>
+    <% end %>
+  </div>
+
+  <%# title-block footer grid: the drafting-sheet corner stamp %>
+  <div class="tblock-row grid grid-cols-3 font-mono text-[10px] uppercase tracking-wider text-dim">
+    <div class="px-5 py-2.5 border-r border-hairline">
+      <span class="block text-[9px]">drawn by</span>
+      <span class="text-ink-soft">you</span>
+    </div>
+    <div class="px-5 py-2.5 border-r border-hairline">
+      <span class="block text-[9px]">scale</span>
+      <span class="text-ink-soft">1:1</span>
+    </div>
+    <div class="px-5 py-2.5">
+      <span class="block text-[9px]">units</span>
+      <span class="text-ink-soft">mm·cm·m</span>
+    </div>
+  </div>
+</div>
+
+<p class="mt-5 text-center">
+  <%= link_to "Or try the editor without an account →", try_path,
+        class: "font-mono text-xs text-dim hover:text-teal-deep underline underline-offset-4" %>
+</p>

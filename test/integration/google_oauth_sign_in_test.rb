@@ -46,13 +46,14 @@ class GoogleOauthSignInTest < ActionDispatch::IntegrationTest
   end
 
   test "unauthenticated visitors are sent to sign in" do
-    get authenticated_root_path
+    get drawings_path
     assert_redirected_to new_user_session_path
   end
 
-  test "root redirects to sign in when logged out" do
+  test "root shows the public landing page when logged out" do
     get "/"
-    assert_redirected_to "/users/sign_in"
+    assert_response :success
+    assert_match "Try the editor", response.body
   end
 
   test "signed-in user sees the placeholder dashboard and can sign out" do
@@ -62,7 +63,7 @@ class GoogleOauthSignInTest < ActionDispatch::IntegrationTest
     assert_match users(:rachad).name, response.body
 
     delete destroy_user_session_path
-    get authenticated_root_path
+    get drawings_path
     assert_redirected_to new_user_session_path
   end
 
