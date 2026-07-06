@@ -62,9 +62,10 @@ point steps accept `x,y` / `@dx,dy` / `@d<a` / direct-distance via `parsePoint`
 
 **EXPLODE: does not exist** — no alias, no handler, no reference. Likewise absent:
 **ARRAY, HATCH, BLOCK/INSERT/WBLOCK, PEDIT, CHAMFER, BREAK, JOIN, LENGTHEN, ELLIPSE,
-SPLINE, POLYGON, DONUT, GROUP, PURGE, PAN** (pan exists as middle-drag/space-drag only,
-not as a command). The only grep hits for these strings are CSS `display:block` and an
-unrelated comment.
+SPLINE, POLYGON, DONUT, GROUP, PURGE.** The only grep hits for these strings are CSS
+`display:block` and an unrelated comment.
+(PAN shipped 2026-07-06: `P`/`PAN` hand tool — left-drag pans, grab cursor,
+Enter/Esc exits — alongside the existing middle-drag/space-drag. Suite 17.)
 
 ---
 
@@ -167,7 +168,7 @@ screenshots), DXF acceptance by third-party CAD (checked with ezdxf ad hoc).
 ### Tier 2 — wants, not needs
 - **ARRAY** (rectangular/polar copies).
 - **Layer rename/delete**, per-entity color.
-- **ZOOM window / previous; PAN command.**
+- **ZOOM window / previous** (PAN command shipped 2026-07-06).
 - SCALE by reference length; FILLET for arcs/plines; CHAMFER.
 
 ### Tier 3 — the big one

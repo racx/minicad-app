@@ -108,8 +108,8 @@ export function draw(){
     ctx.stroke(); ctx.lineWidth = 1;
   }
 
-  // crosshair
-  if (mouse.inside){
+  // crosshair (hidden while the hand tool is active — the OS hand cursor takes over)
+  if (mouse.inside && !(cmd && cmd.name==='PAN')){
     const s = snapMark ? w2s(snapMark.p) : w2s(curPt);
     ctx.strokeStyle = 'rgba(220,225,235,.55)';
     ctx.beginPath();

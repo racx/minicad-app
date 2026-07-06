@@ -63,6 +63,7 @@ cv.addEventListener('mousemove', ev=>{
   const hov = (!cmd && !boxSel && !gripDrag && selection.size) ? findEntityAt(s2w(mouse.sx, mouse.sy)) : null;
   setHoverSel(!!dragging || !!(hov && selection.has(hov.id)));
   coordRead.textContent = `${unitFmt(curPt.x)}, ${unitFmt(curPt.y)} ${units}` + (T.ortho?'  ORTHO':'') ;
+  cv.style.cursor = (cmd && cmd.name==='PAN') ? (panning ? 'grabbing' : 'grab') : 'none';
   draw();
 });
 cv.addEventListener('mouseleave', ()=>{ mouse.inside=false; draw(); });
@@ -73,6 +74,9 @@ cv.addEventListener('mousedown', ev=>{
     panning={x:mouse.sx,y:mouse.sy}; ev.preventDefault(); return;
   }
   if (ev.button!==0) return;
+  if (cmd && cmd.name==='PAN'){                       // hand tool: left-drag pans
+    panning={x:mouse.sx, y:mouse.sy}; return;
+  }
   const needsPoint = cmd && cmd.step!=='select' && cmd.step!=='dist' && cmd.step!=='height' && cmd.step!=='string' && cmd.step!=='factor';
   if (cmd && ((cmd.name==='OFFSET' && cmd.step==='pick') || (cmd.name==='TRIM' && cmd.step==='trim') ||
               (cmd.name==='EXTEND' && cmd.step==='extend') ||

@@ -22,7 +22,7 @@ export const ALIASES = {
   EX:'EXTEND', EXTEND:'EXTEND', F:'FILLET', FILLET:'FILLET',
   MI:'MIRROR', MIRROR:'MIRROR', S:'STRETCH', STRETCH:'STRETCH',
   DIM:'DIM', DLI:'DIM', DAL:'DIM', DIMLINEAR:'DIM', DIMTXT:'DIMTXT', DTX:'DIMTXT',
-  DI:'DIST', DIST:'DIST', Z:'ZOOM', ZOOM:'ZOOM', ZOOMEXT:'ZOOMEXT',
+  DI:'DIST', DIST:'DIST', Z:'ZOOM', ZOOM:'ZOOM', ZOOMEXT:'ZOOMEXT', P:'PAN', PAN:'PAN',
   U:'UNDO', UNDO:'UNDO', REDO:'REDO', ORTHO:'TOGORTHO', OSNAP:'TOGOSNAP', GRID:'TOGGRID', HELP:'HELP', '?':'HELP',
   UNITS:'UNITS', PLOT:'PLOT', PRINT:'PLOT', PLOTWIN:'PLOTWIN'
 };
@@ -185,6 +185,7 @@ export function startCommand(raw){
   else if (name==='DIM'){ cmd.step='p1'; setPrompt('DIM — Specify first extension line origin:'); }
   else if (name==='UNITS'){ cmd.step='u'; setPrompt(`UNITS — mm / cm / m <${units}>:`); }
   else if (name==='PLOTWIN') setPrompt('PLOT — Specify first corner of the print window:');
+  else if (name==='PAN') setPrompt('PAN — drag to move the view, Enter or Esc to exit:');
   else if (name==='DIMTXT'){
     cmd.step='h';
     setPrompt(`DIMTXT — Dimension text height <${dimTextHeight>0?fmt(dimTextHeight):'auto'}> (A = auto):`);
@@ -854,6 +855,7 @@ export function handleEnter(text){
   if (!text){
     if (cmd.step==='select'){ afterSelect(); return; }
     if (n==='PLINE'){ finishPline(false); return; }
+    if (n==='PAN'){ endCmd(); return; }
     if (n==='LINE' || n==='OFFSET' || n==='TRIM' || n==='EXTEND' || (n==='COPY'&&cmd.step==='dest')){
       if (n==='TRIM' || n==='EXTEND') selection.clear();   // edge highlights are command-internal
       endCmd(); return;
