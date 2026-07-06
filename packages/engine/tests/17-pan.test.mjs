@@ -42,4 +42,15 @@ C.startCommand('PAN');
 dom.fireWin('keydown', {key:'Escape'});
 check('Esc exits PAN', S.cmd===null);
 
+/* ✋ toolbar button toggles the mode */
+const btn = dom.els.get('btnPan');
+const click = ()=>btn.listeners.click?.forEach(fn=>fn({preventDefault(){}}));
+click();
+check('✋ click enters PAN', S.cmd && S.cmd.name==='PAN');
+click();
+check('✋ click again exits PAN', S.cmd===null);
+click(); C.startCommand('L');
+check('starting another command leaves PAN cleanly', S.cmd && S.cmd.name==='LINE');
+C.cancelCmd();
+
 finish();

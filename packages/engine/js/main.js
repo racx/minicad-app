@@ -64,6 +64,7 @@ cv.addEventListener('mousemove', ev=>{
   setHoverSel(!!dragging || !!(hov && selection.has(hov.id)));
   coordRead.textContent = `${unitFmt(curPt.x)}, ${unitFmt(curPt.y)} ${units}` + (T.ortho?'  ORTHO':'') ;
   cv.style.cursor = (cmd && cmd.name==='PAN') ? (panning ? 'grabbing' : 'grab') : 'none';
+  syncPanBtn();
   draw();
 });
 cv.addEventListener('mouseleave', ()=>{ mouse.inside=false; draw(); });
@@ -139,6 +140,7 @@ cv.addEventListener('dblclick', ev=>{
 cv.addEventListener('contextmenu', ev=>{
   ev.preventDefault();
   handleEnter(cmdInput.value); cmdInput.value='';
+  syncPanBtn();
 });
 
 /* ================= keyboard ================= */
@@ -147,6 +149,7 @@ cmdInput.addEventListener('keydown', ev=>{
   if (ev.key==='Enter' || (ev.key===' ' && !typingText)){
     ev.preventDefault();
     handleEnter(cmdInput.value); cmdInput.value='';
+    syncPanBtn();
   }
 });
 window.addEventListener('keydown', ev=>{
@@ -169,6 +172,7 @@ window.addEventListener('keydown', ev=>{
     if (boxSel){ setBoxSel(null); draw(); return; }
     if (cmd) cancelCmd();
     else { selection.clear(); draw(); }
+    syncPanBtn();
     cmdInput.value=''; return;
   }
   if ((ev.key==='Delete'||ev.key==='Backspace') && !cmd && document.activeElement===cmdInput && !cmdInput.value && selection.size){
@@ -192,6 +196,15 @@ window.addEventListener('keyup', ev=>{ if (ev.key===' ') spaceHeld=false; });
 document.querySelectorAll('#topbar .btn[data-cmd]').forEach(b=>{
   b.addEventListener('click', ()=>{ startCommand(b.dataset.cmd); cmdInput.focus(); });
 });
+/* pan toggle button: lit while the hand tool is active */
+const btnPan = document.getElementById('btnPan');
+function syncPanBtn(){ btnPan.classList.toggle('on', !!(cmd && cmd.name==='PAN')); }
+btnPan.addEventListener('click', ()=>{
+  if (cmd && cmd.name==='PAN') cancelCmd(true);
+  else startCommand('PAN');
+  syncPanBtn(); cmdInput.focus();
+});
+
 document.getElementById('btnUndo').addEventListener('click', doUndo);
 document.getElementById('btnHelp').addEventListener('click', ()=>toggleHelp());
 document.getElementById('helpClose').addEventListener('click', ()=>toggleHelp(false));

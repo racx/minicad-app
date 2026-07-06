@@ -22,6 +22,7 @@
   .btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:4px 9px;border-radius:5px;cursor:pointer;font-size:12px;font-family:var(--mono)}
   .btn:hover{border-color:var(--accent);color:var(--accent)}
   .btn:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+  .btn.on{color:var(--accent);border-color:var(--accent)}
   .btn kbd{color:var(--dim);margin-left:4px;font-size:10px}
   .sep{width:1px;height:20px;background:var(--line);margin:0 4px}
   #layerBox{display:flex;align-items:center;gap:5px;margin-left:auto}
@@ -91,7 +92,7 @@
     <button class="btn" data-cmd="FILLET">Fillet<kbd>F</kbd></button>
     <button class="btn" data-cmd="ERASE">Erase<kbd>E</kbd></button>
     <div class="sep"></div>
-    <button class="btn" data-cmd="PAN">Pan<kbd>P</kbd></button>
+    <button class="btn" id="btnPan" title="Pan — drag to move the view (P, Esc to exit)">✋</button>
     <button class="btn" data-cmd="ZOOMEXT">Zoom Ext<kbd>Z E</kbd></button>
     <button class="btn" id="btnUndo">Undo<kbd>U</kbd></button>
     <button class="btn" data-cmd="PLOT">Print<kbd>⌘P</kbd></button>
