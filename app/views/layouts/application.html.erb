@@ -62,8 +62,10 @@
       </div>
     <% end %>
 
-    <main class="max-w-5xl mx-auto px-5 py-10">
-      <%= yield %>
-    </main>
+    <% if content_for?(:full_bleed) %>
+      <main><%= yield %></main>
+    <% else %>
+      <main class="max-w-5xl mx-auto px-5 py-10"><%= yield %></main>
+    <% end %>
   </body>
 </html>

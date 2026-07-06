@@ -87,4 +87,35 @@
 
   .wordmark { font-family: var(--font-mono); font-weight: 700; letter-spacing: 0.06em; color: var(--color-ink); }
   .wordmark span { color: var(--color-teal-deep); }
+
+  /* the drafting board: engine palette, engine grid — the hero IS the editor */
+  .board-grid {
+    background-color: #131519;
+    background-image:
+      linear-gradient(to right, #1f242c 1px, transparent 1px),
+      linear-gradient(to bottom, #1f242c 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+  .btn-board {
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+    font-family: var(--font-mono); font-size: 13px;
+    background: #43d6b5; color: #131519;
+    border: 2px solid #43d6b5;
+    padding: 0.55rem 1.1rem;
+    cursor: pointer;
+    transition: background 120ms, border-color 120ms;
+  }
+  .btn-board:hover { background: #6ee3c8; border-color: #6ee3c8; }
+  .btn-board:focus-visible { outline: 2px solid #43d6b5; outline-offset: 2px; }
+  .btn-board-ghost {
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+    font-family: var(--font-mono); font-size: 13px;
+    background: transparent; color: #d8dbe2;
+    border: 1px solid #2e333d;
+    padding: 0.55rem 1.1rem;
+    cursor: pointer;
+    transition: border-color 120ms, color 120ms;
+  }
+  .btn-board-ghost:hover { border-color: #43d6b5; color: #43d6b5; }
+  .btn-board-ghost:focus-visible { outline: 2px solid #43d6b5; outline-offset: 2px; }
 }

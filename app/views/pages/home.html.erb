@@ -1,95 +1,112 @@
 <% content_for :title, "MiniCAD — 2D plans, drawn in your browser" %>
+<% content_for :full_bleed, true %>
 
-<section class="pt-6 pb-12 sm:pt-12">
-  <p class="eyebrow mb-3">browser cad · nothing to install</p>
-  <h1 class="text-4xl sm:text-5xl font-bold tracking-tighter leading-[1.05] max-w-2xl">
-    2D plans, drawn<br>in your browser.
-  </h1>
-  <p class="mt-5 text-base text-ink-soft max-w-xl leading-relaxed">
-    MiniCAD is a small drafting tool for solo architects. The commands you already
-    know — <span class="font-mono text-sm">L</span>, <span class="font-mono text-sm">REC</span>,
-    <span class="font-mono text-sm">TRIM</span>, <span class="font-mono text-sm">FILLET</span> —
-    DXF in and out, and prints that hold their scale.
-  </p>
-  <div class="mt-7 flex flex-wrap items-center gap-3">
-    <%= link_to "Try the editor — no account", try_path, class: "btn-ink" %>
-    <%= link_to "Sign in with Google", new_user_session_path, class: "btn-ghost" %>
-  </div>
-</section>
+<%# ============ the board: hero lives inside the editor's own world ============ %>
+<section class="board-grid relative overflow-hidden">
+  <div class="max-w-5xl mx-auto px-5 pt-14 pb-8 sm:pt-20 relative">
+    <p class="eyebrow !text-[#43d6b5] mb-3">browser cad · nothing to install</p>
+    <h1 class="text-4xl sm:text-5xl font-bold tracking-tighter leading-[1.05] max-w-2xl text-[#d8dbe2]">
+      2D plans, drawn<br>in your browser.
+    </h1>
+    <p class="mt-5 text-base text-[#8b93a1] max-w-xl leading-relaxed">
+      MiniCAD is a small drafting tool for solo architects. The commands you already
+      know — <span class="font-mono text-sm text-[#d8dbe2]">L</span>,
+      <span class="font-mono text-sm text-[#d8dbe2]">REC</span>,
+      <span class="font-mono text-sm text-[#d8dbe2]">TRIM</span>,
+      <span class="font-mono text-sm text-[#d8dbe2]">FILLET</span> —
+      DXF in and out, and prints that hold their scale.
+    </p>
+    <div class="mt-7 flex flex-wrap items-center gap-3">
+      <%= link_to "Try the editor — no account", try_path, class: "btn-board" %>
+      <%= link_to "Sign in with Google", new_user_session_path, class: "btn-board-ghost" %>
+    </div>
 
-<%# honest CSS/SVG mock of the actual editor: dark board, drawn plan, command line %>
-<section class="tblock !p-0 mb-14" aria-hidden="true">
-  <div class="bg-[#131519] relative overflow-hidden">
-    <svg viewBox="0 0 960 340" class="w-full block">
-      <defs>
-        <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
-          <path d="M 24 0 L 0 0 0 24" fill="none" stroke="#1f242c" stroke-width="1"/>
-        </pattern>
-      </defs>
-      <rect width="960" height="340" fill="url(#grid)"/>
-      <!-- a floor plan corner, as the engine draws it -->
+    <%# the plan on the board — same linework the engine draws %>
+    <svg viewBox="0 0 520 380" class="hidden lg:block absolute top-10 right-5 w-[460px]" aria-hidden="true">
       <g stroke="#d8dbe2" stroke-width="1.5" fill="none">
-        <path d="M 240 260 L 240 90 L 560 90 L 560 160"/>
-        <path d="M 252 260 L 252 102 L 560 102"/>
-        <path d="M 560 200 L 560 260 L 400 260"/>
-        <circle cx="480" cy="185" r="34"/>
+        <path d="M 60 320 L 60 90 L 380 90 L 380 170"/>
+        <path d="M 72 320 L 72 102 L 380 102"/>
+        <path d="M 380 220 L 380 320 L 220 320"/>
+        <circle cx="270" cy="200" r="36"/>
       </g>
-      <!-- door swing -->
       <g stroke="#8b93a1" stroke-width="1" fill="none">
-        <path d="M 560 160 A 40 40 0 0 1 600 200"/>
-        <line x1="560" y1="160" x2="560" y2="200" stroke-dasharray="3 3"/>
+        <path d="M 380 170 A 50 50 0 0 1 430 220"/>
+        <line x1="380" y1="170" x2="380" y2="220" stroke-dasharray="3 3"/>
       </g>
-      <!-- dimension line -->
       <g stroke="#43d6b5" stroke-width="1" fill="none">
-        <line x1="240" y1="66" x2="560" y2="66"/>
-        <line x1="240" y1="60" x2="240" y2="84"/>
-        <line x1="560" y1="60" x2="560" y2="84"/>
+        <line x1="60" y1="62" x2="380" y2="62"/>
+        <line x1="60" y1="56" x2="60" y2="80"/>
+        <line x1="380" y1="56" x2="380" y2="80"/>
       </g>
-      <text x="400" y="58" fill="#43d6b5" font-family="ui-monospace,Menlo,monospace" font-size="12" text-anchor="middle">320.00</text>
-      <!-- crosshair -->
+      <text x="220" y="54" fill="#43d6b5" font-family="ui-monospace,Menlo,monospace" font-size="12" text-anchor="middle">320.00</text>
       <g stroke="#4db8ff" stroke-width="1">
-        <line x1="640" y1="228" x2="680" y2="228"/>
-        <line x1="660" y1="208" x2="660" y2="248"/>
-        <rect x="655" y="223" width="10" height="10" fill="none"/>
+        <line x1="440" y1="288" x2="480" y2="288"/>
+        <line x1="460" y1="268" x2="460" y2="308"/>
+        <rect x="455" y="283" width="10" height="10" fill="none"/>
       </g>
     </svg>
-    <div class="border-t border-[#2e333d] bg-[#1c1f25] px-4 py-2.5 font-mono text-xs">
+  </div>
+
+  <%# small-screen plan strip (the absolute svg above is desktop-only) %>
+  <svg viewBox="0 0 520 190" class="lg:hidden block w-full max-w-md mx-auto px-5 mt-2" aria-hidden="true">
+    <g stroke="#d8dbe2" stroke-width="1.5" fill="none">
+      <path d="M 60 170 L 60 50 L 380 50 L 380 96"/>
+      <path d="M 72 170 L 72 62 L 380 62"/>
+      <path d="M 380 122 L 380 170 L 220 170"/>
+      <circle cx="270" cy="112" r="26"/>
+    </g>
+    <g stroke="#43d6b5" stroke-width="1" fill="none">
+      <line x1="60" y1="28" x2="380" y2="28"/>
+      <line x1="60" y1="22" x2="60" y2="40"/>
+      <line x1="380" y1="22" x2="380" y2="40"/>
+    </g>
+    <text x="220" y="20" fill="#43d6b5" font-family="ui-monospace,Menlo,monospace" font-size="12" text-anchor="middle">320.00</text>
+  </svg>
+
+  <%# the board ends the way the editor ends: with the command line %>
+  <div class="border-t border-[#2e333d] bg-[#1c1f25] mt-10">
+    <div class="max-w-5xl mx-auto px-5 py-2.5 font-mono text-xs">
       <span class="text-[#f2b950]">Command:</span>
       <span class="text-[#d8dbe2]"> DIM</span>
-      <span class="text-[#43d6b5] animate-pulse">▍</span>
+      <span class="text-[#43d6b5] animate-pulse motion-reduce:animate-none">▍</span>
     </div>
   </div>
 </section>
 
-<div class="dim-line mb-10">what it does</div>
+<%# ============ the paper: everything below is the sheet ============ %>
+<div class="border-t-2 border-ink">
+  <div class="max-w-5xl mx-auto px-5 py-12">
+    <div class="dim-line mb-10">what it does</div>
 
-<section class="grid gap-5 sm:grid-cols-3 mb-16">
-  <div class="tblock !shadow-none">
-    <div class="px-4 py-2.5"><span class="eyebrow !text-teal-deep">01 · draw</span></div>
-    <div class="tblock-row px-4 py-4">
-      <h2 class="font-bold tracking-tight mb-1.5">Commands you already know</h2>
-      <p class="text-sm text-dim leading-relaxed">Type <span class="font-mono text-xs">L</span> for line,
-        right-click for Enter, <span class="font-mono text-xs">@3&lt;45</span> for polar.
-        Osnap, ortho, grips, undo — the drafting muscle memory works here.</p>
-    </div>
-  </div>
-  <div class="tblock !shadow-none">
-    <div class="px-4 py-2.5"><span class="eyebrow !text-teal-deep">02 · exchange</span></div>
-    <div class="tblock-row px-4 py-4">
-      <h2 class="font-bold tracking-tight mb-1.5">DXF native</h2>
-      <p class="text-sm text-dim leading-relaxed">Export R12 DXF that opens in AutoCAD,
-        LibreCAD and QCAD. Import is on the bench — opening the file a client
-        sent you is the whole point.</p>
-    </div>
-  </div>
-  <div class="tblock !shadow-none">
-    <div class="px-4 py-2.5"><span class="eyebrow !text-teal-deep">03 · print</span></div>
-    <div class="tblock-row px-4 py-4">
-      <h2 class="font-bold tracking-tight mb-1.5">Prints to scale</h2>
-      <p class="text-sm text-dim leading-relaxed">1:50 on A4 means 1:50 on paper —
-        pick paper, scale and window, run the test page, then print the real sheet.</p>
-    </div>
-  </div>
-</section>
+    <section class="grid gap-5 sm:grid-cols-3 mb-16">
+      <div class="tblock !shadow-none">
+        <div class="px-4 py-2.5"><span class="eyebrow !text-teal-deep">01 · draw</span></div>
+        <div class="tblock-row px-4 py-4">
+          <h2 class="font-bold tracking-tight mb-1.5">Commands you already know</h2>
+          <p class="text-sm text-dim leading-relaxed">Type <span class="font-mono text-xs">L</span> for line,
+            right-click for Enter, <span class="font-mono text-xs">@3&lt;45</span> for polar.
+            Osnap, ortho, grips, undo — the drafting muscle memory works here.</p>
+        </div>
+      </div>
+      <div class="tblock !shadow-none">
+        <div class="px-4 py-2.5"><span class="eyebrow !text-teal-deep">02 · exchange</span></div>
+        <div class="tblock-row px-4 py-4">
+          <h2 class="font-bold tracking-tight mb-1.5">DXF native</h2>
+          <p class="text-sm text-dim leading-relaxed">Export R12 DXF that opens in AutoCAD,
+            LibreCAD and QCAD. Import is on the bench — opening the file a client
+            sent you is the whole point.</p>
+        </div>
+      </div>
+      <div class="tblock !shadow-none">
+        <div class="px-4 py-2.5"><span class="eyebrow !text-teal-deep">03 · print</span></div>
+        <div class="tblock-row px-4 py-4">
+          <h2 class="font-bold tracking-tight mb-1.5">Prints to scale</h2>
+          <p class="text-sm text-dim leading-relaxed">1:50 on A4 means 1:50 on paper —
+            pick paper, scale and window, run the test page, then print the real sheet.</p>
+        </div>
+      </div>
+    </section>
 
-<footer class="dim-line pb-10">minicad · drawn in the browser</footer>
+    <footer class="dim-line pb-2">minicad · drawn in the browser</footer>
+  </div>
+</div>
