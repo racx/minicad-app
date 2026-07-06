@@ -8,7 +8,7 @@ import { entIntersections, lineEntT, lineLine, perpFoot, tangentPts, nearestOnEn
 import { entities, setEntities, nextId, layers, currentLayer, undoStack, redoStack, snapshot,
          view, T, cmd, setCmd, lastCmdName, setLastCmdName, selection, curPt, setSnapMark,
          selRect, setSelRect, plotWin, setPlotWin, units, setUnits,
-         layerVisible, layerUnlocked } from './state.js';
+         setTrackGuides, layerVisible, layerUnlocked } from './state.js';
 import { findEntityAt, entInWindow, entBBox, snapCandidates, translateEnt, translateIds, mirrorEnt } from './entities.js';
 import { draw, zoomExtents, gridStep, s2w } from './view.js';
 import { log, setPrompt, toggleHelp, cmdInput } from './ui.js';
@@ -60,13 +60,15 @@ export function setTog(k){
 }
 
 /* ---------- snap / ortho / grid modifiers ---------- */
-// Osnap priority, highest first. 'nea' (nearest-on-object) is implemented but OFF by
-// default — always-on nearest makes every hover sticky. Opt in with SNAP_PRIORITY.push('nea');
-// it must stay last: it is computed lazily and only fires when nothing else does.
-export const SNAP_PRIORITY = ['end','int','mid','cen','quad','perp','tan'];
+// Osnap priority, highest first. 'xint' = where the rubber line crosses nearby geometry —
+// a fallback suggestion, ranked below perp/tan so it can't shadow them. 'nea'
+// (nearest-on-object) is implemented but OFF by default — always-on nearest makes every
+// hover sticky. Opt in with SNAP_PRIORITY.push('nea'); it must stay last (computed lazily).
+export const SNAP_PRIORITY = ['end','int','mid','cen','quad','perp','tan','xint'];
 
 export function applyModifiers(rawW, excludeId){
   setSnapMark(null);
+  setTrackGuides(null);
   let p = {x:rawW.x, y:rawW.y};
   if (T.osnap){
     const tol = 11/view.scale;
@@ -92,6 +94,16 @@ export function applyModifiers(rawW, excludeId){
       for (const q of perpFoot(pbase, e)) consider({p:q, k:'perp'});
       for (const q of tangentPts(pbase, e)) consider({p:q, k:'tan'});
     }
+    // "meet the edge": where the rubber line (extended a touch past the cursor)
+    // crosses nearby geometry, suggest that exact point
+    if (pbase){
+      const dx=rawW.x-pbase.x, dy=rawW.y-pbase.y, L=Math.hypot(dx,dy);
+      if (L>1e-9){
+        const rub={type:'line', x1:pbase.x, y1:pbase.y,
+                   x2:rawW.x+dx/L*tol*2, y2:rawW.y+dy/L*tol*2};
+        for (const e of nearEnts) for (const q of entIntersections(rub, e)) consider({p:q, k:'xint'});
+      }
+    }
     let best = null;
     for (const k of SNAP_PRIORITY){
       if (k==='nea' && !best){                   // lowest priority: computed only if nothing fired
@@ -100,6 +112,25 @@ export function applyModifiers(rawW, excludeId){
       if (buckets[k]){ best = buckets[k].c; break; }
     }
     if (best){ setSnapMark(best); return {x:best.p.x, y:best.p.y}; }
+    // alignment tracking: cursor lined up (h/v) with an existing snap point →
+    // dashed guide + snap onto the alignment (both axes can engage at once)
+    if (cmd){
+      let tx=null, txd=tol, txs=null, ty=null, tyd=tol, tys=null;
+      for (const c of snapCandidates(excludeId)){
+        const ddx=Math.abs(c.p.x-rawW.x), ddy=Math.abs(c.p.y-rawW.y);
+        if (ddx<txd){ txd=ddx; tx=c.p.x; txs=c.p; }
+        if (ddy<tyd){ tyd=ddy; ty=c.p.y; tys=c.p; }
+      }
+      if (tx!==null || ty!==null){
+        const q={x:(tx!==null?tx:rawW.x), y:(ty!==null?ty:rawW.y)};
+        const guides=[];
+        if (txs) guides.push({from:txs, to:q});
+        if (tys) guides.push({from:tys, to:q});
+        setTrackGuides(guides);
+        setSnapMark({p:q, k:'trk'});
+        return q;
+      }
+    }
   }
   const base = rubberBase();
   if (T.ortho && base){

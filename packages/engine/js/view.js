@@ -2,7 +2,7 @@
    MiniCAD — canvas, view transform, grid, rendering
    ========================================================= */
 import { dist, fmt, arcFrom3 } from './geometry.js';
-import { entities, view, T, cmd, curPt, snapMark, boxSel, mouse, selection, layerOf, layerVisible, hoverSel, hotGrip, unitFmt, units } from './state.js';
+import { entities, view, T, cmd, curPt, snapMark, trackGuides, boxSel, mouse, selection, layerOf, layerVisible, hoverSel, hotGrip, unitFmt, units } from './state.js';
 import { entBBox, entGrips, dimGeom, dimH } from './entities.js';
 import { log } from './ui.js';
 
@@ -92,6 +92,17 @@ export function draw(){
     ctx.setLineDash([]);
   }
 
+  // alignment-tracking guides
+  if (trackGuides && mouse.inside){
+    ctx.strokeStyle='rgba(67,214,181,.65)'; ctx.setLineDash([4,4]); ctx.lineWidth=1;
+    for (const g of trackGuides){
+      const A=w2s(g.from), B=w2s(g.to);
+      ctx.beginPath(); ctx.moveTo(A.x,A.y); ctx.lineTo(B.x,B.y); ctx.stroke();
+      ctx.strokeRect(A.x-2.5, A.y-2.5, 5, 5);   // the point you're aligned with
+    }
+    ctx.setLineDash([]);
+  }
+
   // osnap marker
   if (snapMark && mouse.inside){
     const s = w2s(snapMark.p); const r=6;
@@ -100,10 +111,11 @@ export function draw(){
     if (snapMark.k==='end'){ ctx.rect(s.x-r,s.y-r,2*r,2*r); }
     else if (snapMark.k==='mid'){ ctx.moveTo(s.x,s.y-r); ctx.lineTo(s.x-r,s.y+r); ctx.lineTo(s.x+r,s.y+r); ctx.closePath(); }
     else if (snapMark.k==='cen'){ ctx.arc(s.x,s.y,r,0,Math.PI*2); }
-    else if (snapMark.k==='int'){ ctx.moveTo(s.x-r,s.y-r); ctx.lineTo(s.x+r,s.y+r); ctx.moveTo(s.x+r,s.y-r); ctx.lineTo(s.x-r,s.y+r); }
+    else if (snapMark.k==='int' || snapMark.k==='xint'){ ctx.moveTo(s.x-r,s.y-r); ctx.lineTo(s.x+r,s.y+r); ctx.moveTo(s.x+r,s.y-r); ctx.lineTo(s.x-r,s.y+r); }
     else if (snapMark.k==='perp'){ ctx.moveTo(s.x-r,s.y+r); ctx.lineTo(s.x+r,s.y+r); ctx.moveTo(s.x,s.y+r); ctx.lineTo(s.x,s.y-r); }
     else if (snapMark.k==='tan'){ ctx.moveTo(s.x-r,s.y-r); ctx.lineTo(s.x+r,s.y-r); ctx.moveTo(s.x+4,s.y-2); ctx.arc(s.x,s.y-2,4,0,Math.PI*2); }
     else if (snapMark.k==='nea'){ ctx.moveTo(s.x-r,s.y-r); ctx.lineTo(s.x+r,s.y-r); ctx.lineTo(s.x-r,s.y+r); ctx.lineTo(s.x+r,s.y+r); ctx.closePath(); }
+    else if (snapMark.k==='trk'){ ctx.moveTo(s.x-4,s.y); ctx.lineTo(s.x+4,s.y); ctx.moveTo(s.x,s.y-4); ctx.lineTo(s.x,s.y+4); }
     else { ctx.moveTo(s.x,s.y-r); ctx.lineTo(s.x+r,s.y); ctx.lineTo(s.x,s.y+r); ctx.lineTo(s.x-r,s.y); ctx.closePath(); }
     ctx.stroke(); ctx.lineWidth = 1;
   }

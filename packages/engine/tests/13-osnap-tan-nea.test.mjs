@@ -11,10 +11,10 @@ const add=(x1,y1,x2,y2)=>{C.startCommand('L');C.handleEnter(`${x1},${y1}`);C.han
 const reset=()=>{S.setEntities([]);S.undoStack.length=0;S.selection.clear();};
 
 /* ===== priority array is the single config; nea NOT in the default ===== */
-check('SNAP_PRIORITY default has 7 kinds, no nea',
-      Array.isArray(C.SNAP_PRIORITY) && C.SNAP_PRIORITY.length===7 &&
+check('SNAP_PRIORITY default has 8 kinds incl xint, no nea',
+      Array.isArray(C.SNAP_PRIORITY) && C.SNAP_PRIORITY.length===8 &&
       !C.SNAP_PRIORITY.includes('nea') &&
-      ['end','int','mid','cen','quad','perp','tan'].every(k=>C.SNAP_PRIORITY.includes(k)));
+      ['end','int','mid','cen','quad','perp','tan','xint'].every(k=>C.SNAP_PRIORITY.includes(k)));
 
 /* ===== tangentPts math ===== */
 let ts = X.tangentPts({x:100,y:0}, {type:'circle', cx:0, cy:0, r:50});
