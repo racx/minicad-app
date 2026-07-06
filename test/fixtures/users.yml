@@ -1,0 +1,13 @@
+rachad:
+  email: rachad@example.com
+  name: Rachad
+  google_uid: google-uid-rachad
+  plan: beta
+  encrypted_password: <%= Devise::Encryptor.digest(User, "irrelevant-password") %>
+
+guest:
+  email: guest@example.com
+  name: Guest
+  google_uid: google-uid-guest
+  plan: beta
+  encrypted_password: <%= Devise::Encryptor.digest(User, "irrelevant-password") %>

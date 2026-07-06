@@ -64,3 +64,9 @@ end
 
 # Vite-bundled editor entrypoint (engine); shell pages stay on importmap+tailwind
 gem "vite_rails"
+
+# Authentication — Google-only sign-in, mirrored from muse-app
+gem "devise"
+gem "omniauth", "~> 2.1.4"
+gem "omniauth-google-oauth2", "~> 1.2.2"
+gem "dry-initializer" # service objects (BaseService)

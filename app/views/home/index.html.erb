@@ -1,0 +1,18 @@
+<% content_for :title, "MiniCAD" %>
+
+<div class="w-full max-w-2xl mx-auto">
+  <div class="flex items-center justify-between mb-8">
+    <h1 class="text-2xl font-bold text-gray-900">MiniCAD</h1>
+    <div class="flex items-center gap-3">
+      <% if current_user.avatar_url.present? %>
+        <img src="<%= current_user.avatar_url %>" alt="" class="w-8 h-8 rounded-full">
+      <% end %>
+      <span class="text-sm text-gray-600"><%= current_user.name %></span>
+      <%= button_to "Sign out", destroy_user_session_path, method: :delete,
+            class: "text-sm text-gray-500 hover:text-gray-800 cursor-pointer" %>
+    </div>
+  </div>
+
+  <p class="text-gray-600">Signed in on the <span class="font-medium"><%= current_user.plan %></span> plan.
+    Your drawings dashboard lands in Stage 3.</p>
+</div>
