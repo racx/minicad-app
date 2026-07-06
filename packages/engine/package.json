@@ -1,0 +1,10 @@
+{
+  "name": "minicad",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser-based 2D CAD engine. No dependencies, no build step — ES modules served plain.",
+  "scripts": {
+    "test": "node tests/run.mjs"
+  }
+}
