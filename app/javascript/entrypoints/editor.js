@@ -9,7 +9,7 @@
      - per-drawing localStorage crash net, reconciled on boot (newer wins)
    Anonymous /try mode boots the engine with its own localStorage autosave and
    shows a "sign in with Google to save" nudge instead. */
-import engineHtml from 'minicad/index.html?raw'
+import engineHtml from '@minicad/engine/index.html?raw'
 
 const mount = document.getElementById('editor-mount')
 const cfg = mount.dataset
@@ -89,11 +89,11 @@ async function boot() {
 
   // Engine modules touch the DOM at import time — inject first, import after.
   const [state, view, ui] = await Promise.all([
-    import('minicad/js/state.js'),
-    import('minicad/js/view.js'),
-    import('minicad/js/ui.js')
+    import('@minicad/engine/js/state.js'),
+    import('@minicad/engine/js/view.js'),
+    import('@minicad/engine/js/ui.js')
   ])
-  await import('minicad/js/main.js')
+  await import('@minicad/engine/js/main.js')
   engine = { state, view, ui }
 
   if (!anonymous) startAdapter()

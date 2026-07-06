@@ -2,10 +2,10 @@
   "private": true,
   "type": "module",
   "workspaces": [
-    "../minicad"
+    "packages/engine"
   ],
   "scripts": {
-    "test:engine": "npm test --workspace=minicad"
+    "test:engine": "npm test -w packages/engine"
   },
   "devDependencies": {
     "vite": "^8.1.3",

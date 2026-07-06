@@ -1,15 +1,22 @@
 # MiniCAD App — SaaS shell around the MiniCAD engine
 
-Rails 8.1 shell (auth, dashboard, persistence, AI endpoint) around the browser CAD
-engine that lives in `../minicad` (separate repo).
+Monorepo: Rails 8.1 shell (auth, dashboard, persistence, AI endpoint) around the
+browser CAD engine at `packages/engine` (imported with full git history —
+`git log packages/engine` shows it).
 
 ## Working rules
 
 - Stage complete = commit hash quoted. Final message of a work session includes
   `git log --oneline -6`.
 - Docs produced in a session are committed the same session.
-- **Engine code is READ-ONLY in this repo** — the `minicad` npm workspace symlinks
-  `../minicad`; engine changes go to the engine repo, never through this one.
+- **Engine boundary (monorepo):** `packages/engine` imports NOTHING from the app;
+  the app imports the engine ONLY via its package face (`core/index.js` exports);
+  engine changes must keep the engine suite green in isolation
+  (`npm test -w packages/engine`). Editor UI in the app is the DOM adapter's
+  consumer — Tailwind never crosses into `packages/engine`.
+- `packages/engine` stays standalone: its pages (index.html, guide.html,
+  learn.html, serve.py) must keep working from inside the package directory, and
+  its test suite must run with no Rails/app dependency.
 - Stop for review after Stage 2 (auth) and Stage 4 (editor mount).
 - No new gems without asking.
 
@@ -22,8 +29,9 @@ engine that lives in `../minicad` (separate repo).
   - **Vite (vite_rails)** serves exactly ONE entrypoint —
     `app/javascript/entrypoints/editor.js` — which bundles the engine. The editor
     keeps the engine's own CSS untouched; do not Tailwind-ify engine UI.
-- Engine package: npm workspace `minicad` → `../minicad`
-  (`npm test --workspace=minicad` runs its 19+ suites; wired into bin/ci).
+- Engine package: npm workspace `@minicad/engine` at `packages/engine`
+  (`npm test -w packages/engine` runs its 19+ suites; wired into bin/ci —
+  engine failures fail the build).
 - No deploy tooling yet (no Kamal, no SSL config) — but keep the `/up` healthcheck
   and 12-factor ENV discipline so deploy later is config, not surgery.
 
