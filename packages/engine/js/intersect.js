@@ -3,7 +3,7 @@
    seg-seg, seg-circle, circle-circle; plines as segments,
    arcs as angle-filtered circles.
    ========================================================= */
-import { dist, angleOnArc } from './geometry.js';
+import { dist, angleOnArc, plineParts } from './geometry.js';
 
 const EPS = 1e-9;
 
@@ -78,32 +78,36 @@ export function lineLine(a1, d1, a2, d2){
   return {x:a1.x+t*d1.x, y:a1.y+t*d1.y};
 }
 
-/* ---------- entity-level ---------- */
-function segsOf(e){
-  if (e.type==='line') return [[{x:e.x1,y:e.y1},{x:e.x2,y:e.y2}]];
-  if (e.type==='pline'){
-    const s=[];
-    for (let i=0;i<e.pts.length-1;i++) s.push([e.pts[i], e.pts[i+1]]);
-    if (e.closed && e.pts.length>2) s.push([e.pts[e.pts.length-1], e.pts[0]]);
-    return s;
-  }
+/* ---------- entity-level ----------
+   Every entity decomposes into PARTS: straight segments and (pseudo-)arcs.
+   line → 1 seg · circle/arc → 1 curve · pline → its segments, bulged ones as arcs.
+   Text/dim decompose to nothing. This is the single geometry model TRIM/EXTEND/
+   FILLET/osnap queries share, so curved polylines behave like their pieces. */
+function partsOf(e){
+  if (e.type==='line') return [{seg:[{x:e.x1,y:e.y1},{x:e.x2,y:e.y2}]}];
+  if (e.type==='circle') return [{arc:e, full:true}];
+  if (e.type==='arc') return [{arc:e}];
+  if (e.type==='pline')
+    return plineParts(e).map(p=> p.arc ? {arc:p.arc} : {seg:[p.a, p.b]});
   return null;
 }
-function onCurve(e, q){   // circle: always; arc: only within its sweep
-  if (e.type==='arc') return angleOnArc(e, Math.atan2(q.y-e.cy, q.x-e.cx));
-  return true;
+function onPart(part, q){   // full circle: always; arcs: only within their sweep
+  if (part.full || !part.arc) return true;
+  return angleOnArc(part.arc, Math.atan2(q.y-part.arc.cy, q.x-part.arc.cx));
 }
 
 // All t along infinite line a + t·d where it crosses entity e (arc-filtered).
 export function lineEntT(a, d, e){
   const out=[];
-  const segs = segsOf(e);
-  if (segs){
-    for (const s of segs){ const t=lineSegT(a, d, s[0], s[1]); if (t!==null) out.push(t); }
-  } else if (e.type==='circle' || e.type==='arc'){
-    for (const t of lineCircleT(a, d, {x:e.cx,y:e.cy}, e.r)){
-      const q={x:a.x+t*d.x, y:a.y+t*d.y};
-      if (onCurve(e, q)) out.push(t);
+  for (const part of partsOf(e) || []){
+    if (part.seg){
+      const t=lineSegT(a, d, part.seg[0], part.seg[1]);
+      if (t!==null) out.push(t);
+    } else {
+      for (const t of lineCircleT(a, d, {x:part.arc.cx,y:part.arc.cy}, part.arc.r)){
+        const q={x:a.x+t*d.x, y:a.y+t*d.y};
+        if (onPart(part, q)) out.push(t);
+      }
     }
   }
   return out;
@@ -112,80 +116,83 @@ export function lineEntT(a, d, e){
 // Feet of perpendiculars dropped from `base` onto entity e (for PERP osnap).
 export function perpFoot(base, e){
   const out=[];
-  const segs = segsOf(e);
-  if (segs){
-    for (const [a,b] of segs){
+  for (const part of partsOf(e) || []){
+    if (part.seg){
+      const [a,b]=part.seg;
       const dx=b.x-a.x, dy=b.y-a.y, L2=dx*dx+dy*dy;
       if (!L2) continue;
       const t=((base.x-a.x)*dx+(base.y-a.y)*dy)/L2;
       if (t>-EPS && t<1+EPS) out.push({x:a.x+t*dx, y:a.y+t*dy});
-    }
-  } else if (e.type==='circle' || e.type==='arc'){
-    const d=Math.hypot(base.x-e.cx, base.y-e.cy);
-    if (d>EPS){
-      const ux=(base.x-e.cx)/d, uy=(base.y-e.cy)/d;
-      for (const s of [1,-1]){
-        const q={x:e.cx+ux*e.r*s, y:e.cy+uy*e.r*s};
-        if (onCurve(e, q)) out.push(q);
+    } else {
+      const A=part.arc, d=Math.hypot(base.x-A.cx, base.y-A.cy);
+      if (d>EPS){
+        const ux=(base.x-A.cx)/d, uy=(base.y-A.cy)/d;
+        for (const s of [1,-1]){
+          const q={x:A.cx+ux*A.r*s, y:A.cy+uy*A.r*s};
+          if (onPart(part, q)) out.push(q);
+        }
       }
     }
   }
   return out;
 }
 
-// Tangent points on circle/arc e for a line drawn from `base` (TAN osnap).
+// Tangent points on curved parts of e for a line drawn from `base` (TAN osnap).
 export function tangentPts(base, e){
-  if (e.type!=='circle' && e.type!=='arc') return [];
-  const dx=base.x-e.cx, dy=base.y-e.cy, d=Math.hypot(dx,dy);
-  if (d<=e.r+EPS) return [];                    // base inside or on the circle: no tangent
-  const phi=Math.atan2(dy,dx), alpha=Math.acos(e.r/d);
   const out=[];
-  for (const s of [1,-1]){
-    const th=phi+s*alpha;
-    const q={x:e.cx+e.r*Math.cos(th), y:e.cy+e.r*Math.sin(th)};
-    if (onCurve(e,q)) out.push(q);
+  for (const part of partsOf(e) || []){
+    if (!part.arc) continue;
+    const A=part.arc;
+    const dx=base.x-A.cx, dy=base.y-A.cy, d=Math.hypot(dx,dy);
+    if (d<=A.r+EPS) continue;                   // base inside or on the circle: no tangent
+    const phi=Math.atan2(dy,dx), alpha=Math.acos(A.r/d);
+    for (const s of [1,-1]){
+      const th=phi+s*alpha;
+      const q={x:A.cx+A.r*Math.cos(th), y:A.cy+A.r*Math.sin(th)};
+      if (onPart(part, q)) out.push(q);
+    }
   }
   return out;
 }
 
 // Closest point ON entity e to p (NEA osnap). Null for text/dim.
 export function nearestOnEnt(e, p){
-  const segs=segsOf(e);
-  if (segs){
-    let best=null, bd=Infinity;
-    for (const [a,b] of segs){
+  let best=null, bd=Infinity;
+  const take=q=>{ const d=Math.hypot(p.x-q.x, p.y-q.y); if (d<bd){ bd=d; best=q; } };
+  for (const part of partsOf(e) || []){
+    if (part.seg){
+      const [a,b]=part.seg;
       const dx=b.x-a.x, dy=b.y-a.y, L2=dx*dx+dy*dy;
       let t=L2 ? ((p.x-a.x)*dx+(p.y-a.y)*dy)/L2 : 0;
       t=Math.max(0, Math.min(1, t));
-      const q={x:a.x+t*dx, y:a.y+t*dy};
-      const d=Math.hypot(p.x-q.x, p.y-q.y);
-      if (d<bd){ bd=d; best=q; }
+      take({x:a.x+t*dx, y:a.y+t*dy});
+    } else {
+      const A=part.arc;
+      const dx=p.x-A.cx, dy=p.y-A.cy, d=Math.hypot(dx,dy);
+      if (d<EPS) continue;
+      const q={x:A.cx+dx/d*A.r, y:A.cy+dy/d*A.r};
+      if (onPart(part, q)) take(q);
     }
-    return best;
   }
-  if (e.type==='circle' || e.type==='arc'){
-    const dx=p.x-e.cx, dy=p.y-e.cy, d=Math.hypot(dx,dy);
-    if (d<EPS) return null;
-    const q={x:e.cx+dx/d*e.r, y:e.cy+dy/d*e.r};
-    return (e.type==='arc' && !onCurve(e,q)) ? null : q;
-  }
-  return null;
+  return best;
 }
 
 // All intersection points between two entities (text has none).
 export function entIntersections(A, B){
-  const aS=segsOf(A), bS=segsOf(B);
-  const aC=(A.type==='circle'||A.type==='arc')?A:null;
-  const bC=(B.type==='circle'||B.type==='arc')?B:null;
+  const aP=partsOf(A), bP=partsOf(B);
   const out=[];
-  if (aS && bS){
-    for (const s of aS) for (const t of bS){ const q=segSeg(s[0],s[1],t[0],t[1]); if(q) out.push(q); }
-  } else if (aS && bC){
-    for (const s of aS) for (const q of segCircle(s[0],s[1],{x:bC.cx,y:bC.cy},bC.r)) if (onCurve(bC,q)) out.push(q);
-  } else if (aC && bS){
-    for (const s of bS) for (const q of segCircle(s[0],s[1],{x:aC.cx,y:aC.cy},aC.r)) if (onCurve(aC,q)) out.push(q);
-  } else if (aC && bC){
-    for (const q of circleCircle({x:aC.cx,y:aC.cy},aC.r,{x:bC.cx,y:bC.cy},bC.r)) if (onCurve(aC,q)&&onCurve(bC,q)) out.push(q);
+  if (!aP || !bP) return out;
+  for (const pa of aP) for (const pb of bP){
+    if (pa.seg && pb.seg){
+      const q=segSeg(pa.seg[0],pa.seg[1],pb.seg[0],pb.seg[1]); if (q) out.push(q);
+    } else if (pa.seg && pb.arc){
+      for (const q of segCircle(pa.seg[0],pa.seg[1],{x:pb.arc.cx,y:pb.arc.cy},pb.arc.r)) if (onPart(pb,q)) out.push(q);
+    } else if (pa.arc && pb.seg){
+      for (const q of segCircle(pb.seg[0],pb.seg[1],{x:pa.arc.cx,y:pa.arc.cy},pa.arc.r)) if (onPart(pa,q)) out.push(q);
+    } else {
+      for (const q of circleCircle({x:pa.arc.cx,y:pa.arc.cy},pa.arc.r,{x:pb.arc.cx,y:pb.arc.cy},pb.arc.r))
+        if (onPart(pa,q) && onPart(pb,q)) out.push(q);
+    }
   }
   return out;
 }

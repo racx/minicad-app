@@ -83,7 +83,10 @@ export function dxfExport(){
            '50',normAng(e.a0)*180/Math.PI,'51',normAng(e.a1)*180/Math.PI);
     else if (e.type==='pline'){
       push('0','POLYLINE','8',e.layer,'66','1','70', e.closed?'1':'0');
-      for (const p of e.pts) push('0','VERTEX','8',e.layer,'10',p.x,'20',p.y,'30','0');
+      for (const p of e.pts){
+        push('0','VERTEX','8',e.layer,'10',p.x,'20',p.y,'30','0');
+        if (p.bulge) push('42', p.bulge);              // arc segment to the next vertex
+      }
       push('0','SEQEND');
     }
     else if (e.type==='text')

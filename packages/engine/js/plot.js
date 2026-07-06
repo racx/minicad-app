@@ -37,7 +37,7 @@ export function computeFitScale(win, paper, landscape, units){
    buildPlotSVG({entities, layers, settings, filename, date}) → SVG string.
    The SVG's width/height are real millimetres; 1 viewBox unit = 1 mm.
    ========================================================= */
-import { arcPt, arcSweep, formatLen } from './geometry.js';
+import { arcPt, arcSweep, formatLen, plineParts } from './geometry.js';
 import { dimGeom, dimH } from './entities.js';
 
 const f = v => Math.round(v*1000)/1000;
@@ -70,7 +70,16 @@ export function buildPlotSVG({entities, layers=[], settings, filename='drawing',
       out.push(`<path d="M ${X(s0.x)} ${Y(s0.y)} A ${r} ${r} 0 ${large} 0 ${X(s1.x)} ${Y(s1.y)}" ${st}/>`);
     }
     else if (e.type==='pline'){
-      const d = e.pts.map((q,i)=>`${i?'L':'M'} ${X(q.x)} ${Y(q.y)}`).join(' ') + (e.closed?' Z':'');
+      let d = `M ${X(e.pts[0].x)} ${Y(e.pts[0].y)}`;
+      for (const part of plineParts(e)){
+        if (part.arc){
+          const r=f(part.arc.r*mmu);
+          const large = Math.abs(4*Math.atan(part.bulge)) > Math.PI ? 1 : 0;
+          const sweep = part.bulge>0 ? 0 : 1;          // Y flip: world CCW = paper sweep 0
+          d += ` A ${r} ${r} 0 ${large} ${sweep} ${X(part.b.x)} ${Y(part.b.y)}`;
+        } else d += ` L ${X(part.b.x)} ${Y(part.b.y)}`;
+      }
+      if (e.closed) d += ' Z';
       out.push(`<path d="${d}" ${st}/>`);
     }
     else if (e.type==='text'){

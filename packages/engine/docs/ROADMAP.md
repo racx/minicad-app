@@ -20,7 +20,9 @@ point steps accept `x,y` / `@dx,dy` / `@d<a` / direct-distance via `parsePoint`
 | Command | Aliases | Flow & completeness | Evidence |
 |---|---|---|---|
 | LINE | `L` | ✅ Complete. Chained segments, Enter/right-click ends. Typed+clicked coords, ortho/osnap. Snapshot per segment. | prompt `commands.js:124`, points `:210`, snapshot `:213` |
-| PLINE | `PL` | ✅ Complete. `C` closes (`:736`), Enter finishes open (`:804`); <2 pts cancels. One snapshot for whole pline. | `:132`, `:218`, finishPline `:818–822` |
+| PLINE | `PL` | ✅ Complete, now with ARC SEGMENTS: `A` switches to arc mode (tangent-continuation arc by endpoint; 3-point flow when the arc is the first segment), `L` back to straight, `C` closes, Enter finishes. Vertices carry DXF-style `bulge` (tan θ/4, +CCW). Render, rubber preview, hit/bbox/snaps (mid = apex, cen), apex grips, transforms (mirror negates bulge), SVG plot `A` paths and DXF group 42 all honor it. | PLINE modes `commands.js` (onPoint/handleEnter PLINE), bulge math `geometry.js` (bulgeApex/bulgeArc/tangentBulge/bulgeFrom3/plineParts), parts model `intersect.js`, suite 21 |
+| JOIN | `J` `JOIN` `PEDIT` | ✅ Merges touching lines, arcs and open polylines into polylines (arcs become bulged segments; loops auto-close). Ends must meet exactly. One snapshot. | `commands.js` performJoin/strandOf/reverseStrand, suite 21 |
+| EXPLODE | `X` `EXPLODE` | ✅ Breaks polylines (incl. rectangles) into line/arc entities — the escape hatch TRIM/EXTEND/OFFSET point at for curved plines. | `commands.js` performExplode, suite 21 |
 | RECTANG | `REC` `RECT` `RECTANGLE` | ✅ Complete. Two corners → closed pline. Typed+clicked. One snapshot. | `:133`, `:234` |
 | CIRCLE | `C` | ✅ Complete. Center + radius (click **or** typed number `:731`). One snapshot. | `:134`, `:243`, makeCircle `:369` |
 | ARC | `A` | ✅ Complete. 3-point (start / on-arc / end), live curved preview, collinear third point refused and re-promptable. One snapshot. | `:125`, `:222–233`, math `geometry.js` `arcFrom3`, preview `view.js` (drawRubber ARC branch) |
@@ -162,6 +164,9 @@ screenshots), DXF acceptance by third-party CAD (checked with ezdxf ad hoc).
   **Pending human verification:** physical ruler check of the calibration page and a
   Chrome + Safari print of an A4-landscape 1:50 sheet (see checklist in session report).
 - **DXF import** (LINE/CIRCLE/ARC/LWPOLYLINE/TEXT subset first) — promoted per product intent.
+  LWPOLYLINE bulge now has a native home (pline arc segments, shipped 2026-07-06).
+- **OFFSET for curved polylines** (arc segments offset to r±d, joint recompute) — the current
+  refusal points users at EXPLODE → offset → JOIN.
 - **Radius + angular dimensions** (`DIMRAD`, `DIMANG`) on the existing dim entity family.
 - ~~Tangent + nearest osnap~~ ✅ shipped (TAN default-on; NEA **off by default** —
   tick "Nearest ⧖" in the `OSNAP` dialog — see §3).

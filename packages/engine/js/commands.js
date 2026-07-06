@@ -2,7 +2,8 @@
    MiniCAD — command engine: aliases, state machine,
    typed input, snap/ortho modifiers, undo/redo, selection
    ========================================================= */
-import { dist, fmt, deep, rotPt, ptSegDist, TAU, normAng, arcSweep, arcPt, arcFrom3 } from './geometry.js';
+import { dist, fmt, deep, rotPt, ptSegDist, TAU, normAng, arcSweep, arcPt, arcFrom3,
+         tangentBulge, bulgeFrom3, plineEndTangent, plineParts, plineCurved } from './geometry.js';
 import { clearAutosave } from './io.js';
 import { entIntersections, lineEntT, lineLine, perpFoot, tangentPts, nearestOnEnt } from './intersect.js';
 import { entities, setEntities, nextId, layers, currentLayer, undoStack, redoStack, snapshot,
@@ -21,13 +22,14 @@ export const ALIASES = {
   O:'OFFSET', OFFSET:'OFFSET', E:'ERASE', ERASE:'ERASE', DEL:'ERASE', TR:'TRIM', TRIM:'TRIM',
   EX:'EXTEND', EXTEND:'EXTEND', F:'FILLET', FILLET:'FILLET',
   MI:'MIRROR', MIRROR:'MIRROR', S:'STRETCH', STRETCH:'STRETCH',
+  J:'JOIN', JOIN:'JOIN', PEDIT:'JOIN', X:'EXPLODE', EXPLODE:'EXPLODE',
   DIM:'DIM', DLI:'DIM', DAL:'DIM', DIMLINEAR:'DIM', DIMTXT:'DIMTXT', DTX:'DIMTXT',
   DI:'DIST', DIST:'DIST', Z:'ZOOM', ZOOM:'ZOOM', ZOOMEXT:'ZOOMEXT', P:'PAN', PAN:'PAN',
   U:'UNDO', UNDO:'UNDO', REDO:'REDO', ORTHO:'TOGORTHO', GRID:'TOGGRID', HELP:'HELP', '?':'HELP',
   OSNAP:'OSNAPDLG', OS:'OSNAPDLG',   // AutoCAD-style: typed OSNAP opens the mode picker (F3 = quick toggle)
   UNITS:'UNITS', PLOT:'PLOT', PRINT:'PLOT', PLOTWIN:'PLOTWIN'
 };
-const MODIFY = new Set(['MOVE','COPY','ROTATE','SCALE','ERASE','MIRROR']);
+const MODIFY = new Set(['MOVE','COPY','ROTATE','SCALE','ERASE','MIRROR','JOIN','EXPLODE']);
 let filletRadius = 0;   // remembered across FILLET invocations
 let dimTextHeight = 0;  // remembered dim text height; 0 = automatic (4% of length)
 
@@ -238,7 +240,7 @@ export function startCommand(raw){
     cmd.step='layer';
     setPrompt(`CHLAYER — New layer name <${currentLayer}>:`);
   }
-  else if (name==='PLINE') setPrompt('PLINE — Specify first point:');
+  else if (name==='PLINE'){ cmd.plMode='line'; cmd.arcMid=null; setPrompt('PLINE — Specify first point:'); }
   else if (name==='RECTANG') setPrompt('RECTANG — Specify first corner:');
   else if (name==='CIRCLE') setPrompt('CIRCLE — Specify center point:');
   else if (name==='TEXT'){ cmd.step='point'; setPrompt('TEXT — Specify insertion point:'); }
@@ -289,6 +291,8 @@ export function afterSelect(){
   const n = cmd.sel.length;
   if (!n){ log('Nothing selected.', 'e'); cancelCmd(); return; }
   log(`${n} object${n>1?'s':''} selected.`);
+  if (cmd.name==='JOIN'){ performJoin(cmd.sel); return; }
+  if (cmd.name==='EXPLODE'){ performExplode(cmd.sel); return; }
   if (cmd.name==='ERASE'){
     snapshot();
     setEntities(entities.filter(e=>!cmd.sel.includes(e.id)));
@@ -328,8 +332,33 @@ export function onPoint(p){
     }
   }
   else if (n==='PLINE'){
-    cmd.pts.push(p);
-    setPrompt('PLINE — Specify next point [C to close, Enter to end]:');
+    if (cmd.plMode==='arc' && cmd.pts.length){
+      const last = cmd.pts[cmd.pts.length-1];
+      if (cmd.arcMid){                              // 3-point arc (no tangent to continue from)
+        const bl = bulgeFrom3(last, cmd.arcMid, p);
+        if (bl) last.bulge = bl;
+        cmd.arcMid = null;
+        cmd.pts.push(p);
+        setPrompt('PLINE arc — Specify arc end point [L = straight, C to close]:');
+      } else {
+        const t = plineEndTangent(cmd.pts);
+        if (!t){                                    // arc as first segment: need a point on it
+          cmd.arcMid = p;
+          setPrompt('PLINE arc — Specify the arc end point:');
+        } else {                                    // tangent continuation: endpoint is enough
+          const bl = tangentBulge(last, t, p);
+          if (!isFinite(bl) || Math.abs(bl) > 1e6){
+            log("Can't reach that point with a tangent arc — pick a point more to the side.", 'e'); return;
+          }
+          if (Math.abs(bl) > 1e-9) last.bulge = bl;
+          cmd.pts.push(p);
+          setPrompt('PLINE arc — Specify arc end point [L = straight, C to close]:');
+        }
+      }
+    } else {
+      cmd.pts.push(p);
+      setPrompt('PLINE — Specify next point [A = arc, C to close, Enter to end]:');
+    }
   }
   else if (n==='ARC'){
     cmd.pts.push(p);
@@ -504,7 +533,7 @@ function applyRotate(ang){
     if (e.type==='line'){ const a=rotPt({x:e.x1,y:e.y1},cmd.base,c,s), b=rotPt({x:e.x2,y:e.y2},cmd.base,c,s); e.x1=a.x;e.y1=a.y;e.x2=b.x;e.y2=b.y; }
     else if (e.type==='circle'){ const p=rotPt({x:e.cx,y:e.cy},cmd.base,c,s); e.cx=p.x;e.cy=p.y; }
     else if (e.type==='arc'){ const p=rotPt({x:e.cx,y:e.cy},cmd.base,c,s); e.cx=p.x;e.cy=p.y; e.a0=normAng(e.a0+ang); e.a1=normAng(e.a1+ang); }
-    else if (e.type==='pline'){ e.pts=e.pts.map(p=>rotPt(p,cmd.base,c,s)); }
+    else if (e.type==='pline'){ e.pts=e.pts.map(p=>{ const q=rotPt(p,cmd.base,c,s); return p.bulge?{...q,bulge:p.bulge}:q; }); }
     else if (e.type==='text'){ const p=rotPt({x:e.x,y:e.y},cmd.base,c,s); e.x=p.x;e.y=p.y; }
     else if (e.type==='dim'){ const a=rotPt({x:e.x1,y:e.y1},cmd.base,c,s), b=rotPt({x:e.x2,y:e.y2},cmd.base,c,s); e.x1=a.x;e.y1=a.y;e.x2=b.x;e.y2=b.y; }
   }
@@ -520,7 +549,7 @@ function applyScale(f){
     const e=entities.find(z=>z.id===id); if(!e) continue;
     if (e.type==='line'){ const a=sp({x:e.x1,y:e.y1}), q=sp({x:e.x2,y:e.y2}); e.x1=a.x;e.y1=a.y;e.x2=q.x;e.y2=q.y; }
     else if (e.type==='circle' || e.type==='arc'){ const p=sp({x:e.cx,y:e.cy}); e.cx=p.x;e.cy=p.y;e.r*=f; }
-    else if (e.type==='pline'){ e.pts=e.pts.map(sp); }
+    else if (e.type==='pline'){ e.pts=e.pts.map(p=>{ const q=sp(p); return p.bulge?{...q,bulge:p.bulge}:q; }); }
     else if (e.type==='text'){ const p=sp({x:e.x,y:e.y}); e.x=p.x;e.y=p.y;e.h*=f; }
     else if (e.type==='dim'){ const a=sp({x:e.x1,y:e.y1}), q=sp({x:e.x2,y:e.y2}); e.x1=a.x;e.y1=a.y;e.x2=q.x;e.y2=q.y;e.off*=f; if (e.h) e.h*=f; }
   }
@@ -536,6 +565,10 @@ function offsetEntity(e, d, side){
     if (e.type==='circle') entities.push({id:nextId(), type:'circle', cx:e.cx, cy:e.cy, r, layer:e.layer});
     else entities.push({id:nextId(), type:'arc', cx:e.cx, cy:e.cy, r, a0:e.a0, a1:e.a1, layer:e.layer});
   } else if (e.type==='pline'){
+    if (plineCurved(e)){
+      log('OFFSET does not handle curved polylines yet — EXPLODE it, offset the pieces, then JOIN them back.', 'e');
+      undoStack.pop(); return;
+    }
     const pts = offsetPlinePts(e, d, side);
     if (!pts){ log('Offset would collapse the polyline.', 'e'); undoStack.pop(); return; }
     entities.push({id:nextId(), type:'pline', closed:e.closed, pts, layer:e.layer});
@@ -588,7 +621,7 @@ function offsetPlinePts(e, d, side){
 /* ---------- trim ---------- */
 function trimEntity(target, p){
   if (target.type!=='line' && target.type!=='circle' && target.type!=='arc'){
-    log('TRIM supports lines, circles and arcs in this version.', 'e'); return;
+    log('TRIM supports lines, circles and arcs — EXPLODE a polyline to trim its pieces.', 'e'); return;
   }
   const edges = (cmd.allEdges ? entities : entities.filter(z=>cmd.edges.includes(z.id)))
                 .filter(z=>z.id!==target.id && layerVisible(z.layer));
@@ -656,7 +689,7 @@ function trimArc(t, p, pts){
 /* ---------- extend ---------- */
 function extendEntity(target, p){
   if (target.type!=='line' && target.type!=='arc'){
-    log('EXTEND supports lines and arcs in this version.', 'e'); return;
+    log('EXTEND supports lines and arcs — EXPLODE a polyline to extend its pieces.', 'e'); return;
   }
   const bounds = (cmd.allEdges ? entities : entities.filter(z=>cmd.edges.includes(z.id)))
                  .filter(z=>z.id!==target.id && layerVisible(z.layer));
@@ -727,6 +760,114 @@ function stretchEnt(e, r, dx, dy){   // move vertices inside r; null r = move ev
   }
   else if (e.type==='circle' || e.type==='arc'){ if (inR({x:e.cx,y:e.cy})){ e.cx+=dx; e.cy+=dy; } }
   else if (e.type==='text'){ if (inR({x:e.x,y:e.y})){ e.x+=dx; e.y+=dy; } }
+}
+
+/* ---------- join / explode ---------- */
+const JTOL = 1e-6;
+const samePt = (a,b)=>Math.abs(a.x-b.x)<=JTOL && Math.abs(a.y-b.y)<=JTOL;
+// entity → open strand of pline-style points (bulge on the leading vertex), or null
+function strandOf(e){
+  if (e.type==='line') return [{x:e.x1,y:e.y1},{x:e.x2,y:e.y2}];
+  if (e.type==='arc'){
+    const p0=arcPt(e,e.a0), p1=arcPt(e,e.a1);
+    return [{x:p0.x, y:p0.y, bulge:Math.tan(arcSweep(e)/4)}, {x:p1.x, y:p1.y}];
+  }
+  if (e.type==='pline' && !e.closed) return e.pts.map(p=>({...p}));
+  return null;
+}
+function reverseStrand(pts){
+  const n=pts.length, out=[];
+  for (let i=n-1;i>=0;i--){
+    const q={x:pts[i].x, y:pts[i].y};
+    if (i>0 && pts[i-1].bulge) q.bulge = -pts[i-1].bulge;  // segment bulge moves to its new lead vertex
+    out.push(q);
+  }
+  return out;
+}
+function performJoin(ids){
+  const pool=[];
+  for (const id of ids){
+    const e=entities.find(z=>z.id===id); if (!e) continue;
+    const pts=strandOf(e);
+    if (pts) pool.push({e, pts});
+  }
+  if (pool.length<2){
+    log('JOIN needs two or more touching lines, arcs or open polylines.', 'e');
+    endCmd(); return;
+  }
+  const used=new Set(), chains=[];
+  for (let i=0;i<pool.length;i++){
+    if (used.has(i)) continue;
+    used.add(i);
+    let chain=pool[i].pts.map(p=>({...p}));
+    const members=[pool[i].e];
+    const attach=(pts)=>{
+      if (!samePt(chain[chain.length-1], pts[0])) return false;
+      const last=chain[chain.length-1];
+      if (pts[0].bulge) last.bulge=pts[0].bulge; else delete last.bulge;
+      chain=chain.concat(pts.slice(1).map(p=>({...p})));
+      return true;
+    };
+    let grew=true;
+    while (grew){
+      grew=false;
+      for (let j=0;j<pool.length;j++){
+        if (used.has(j)) continue;
+        const pts=pool[j].pts;
+        let ok = attach(pts) || attach(reverseStrand(pts));
+        if (!ok){                                    // try the other end of the chain
+          chain=reverseStrand(chain);
+          ok = attach(pts) || attach(reverseStrand(pts));
+          if (!ok) chain=reverseStrand(chain);       // restore
+        }
+        if (ok){ used.add(j); members.push(pool[j].e); grew=true; }
+      }
+    }
+    let closed=false;
+    if (chain.length>3 && samePt(chain[0], chain[chain.length-1])){
+      chain.pop(); closed=true;                      // last vertex's bulge now spans the closing segment
+    }
+    chains.push({pts:chain, members, closed});
+  }
+  const merged = chains.filter(c=>c.members.length>1);
+  if (!merged.length){
+    log('Nothing joined — ends must meet exactly (draw with osnap ▪ so they do).', 'e');
+    endCmd(); return;
+  }
+  snapshot();
+  const consumed=new Set(merged.flatMap(c=>c.members.map(e=>e.id)));
+  setEntities(entities.filter(e=>!consumed.has(e.id)));
+  for (const c of merged)
+    entities.push({id:nextId(), type:'pline', closed:c.closed, pts:c.pts, layer:c.members[0].layer});
+  selection.clear();
+  const total=merged.reduce((n,c)=>n+c.members.length,0);
+  log(`Joined ${total} objects into ${merged.length} polyline${merged.length>1?'s':''}${merged.some(c=>c.closed)?' (closed)':''}.`, 'r');
+  endCmd();
+}
+function performExplode(ids){
+  const born=[], consumed=new Set();
+  let plines=0, skipped=0;
+  for (const id of ids){
+    const e=entities.find(z=>z.id===id); if (!e) continue;
+    if (e.type!=='pline'){ skipped++; continue; }
+    plines++; consumed.add(e.id);
+    for (const part of plineParts(e)){
+      if (part.arc)
+        born.push({id:nextId(), type:'arc', cx:part.arc.cx, cy:part.arc.cy, r:part.arc.r,
+                   a0:part.arc.a0, a1:part.arc.a1, layer:e.layer});
+      else if (!samePt(part.a, part.b))
+        born.push({id:nextId(), type:'line', x1:part.a.x, y1:part.a.y, x2:part.b.x, y2:part.b.y, layer:e.layer});
+    }
+  }
+  if (!plines){
+    log('EXPLODE breaks polylines (rectangles too) into lines and arcs — select one.', 'e');
+    endCmd(); return;
+  }
+  snapshot();
+  setEntities(entities.filter(e=>!consumed.has(e.id)).concat(born));
+  selection.clear();
+  log(`Exploded ${plines} polyline${plines>1?'s':''} into ${born.length} objects${skipped?` (${skipped} skipped)`:''}.`, 'r');
+  endCmd();
 }
 
 /* ---------- fillet ---------- */
@@ -856,6 +997,19 @@ export function handleEnter(text){
     const r=parseFloat(text);
     if (isNaN(r)){ log('Enter a radius number or click.', 'e'); return; }
     makeCircle(r); return;
+  }
+  if (n==='PLINE' && (text.toUpperCase()==='A' || text.toUpperCase()==='ARC')){
+    if (!cmd.pts.length){ log('Pick the first point, then switch to arcs.', 'e'); return; }
+    cmd.plMode='arc'; cmd.arcMid=null;
+    const t = plineEndTangent(cmd.pts);
+    setPrompt(t ? 'PLINE arc — Specify arc end point [L = straight, C to close]:'
+                : 'PLINE arc — Specify a point ON the arc:');
+    draw(); return;
+  }
+  if (n==='PLINE' && (text.toUpperCase()==='L' || text.toUpperCase()==='LINE')){
+    cmd.plMode='line'; cmd.arcMid=null;
+    setPrompt('PLINE — Specify next point [A = arc, C to close, Enter to end]:');
+    draw(); return;
   }
   if (n==='PLINE' && text.toUpperCase()==='C'){
     finishPline(true); return;

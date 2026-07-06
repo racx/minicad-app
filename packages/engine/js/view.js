@@ -1,7 +1,7 @@
 /* =========================================================
    MiniCAD — canvas, view transform, grid, rendering
    ========================================================= */
-import { dist, fmt, arcFrom3 } from './geometry.js';
+import { dist, fmt, arcFrom3, bulgeArc, tangentBulge, bulgeFrom3, plineEndTangent } from './geometry.js';
 import { entities, view, T, cmd, curPt, snapMark, trackGuides, boxSel, mouse, selection, layerOf, layerVisible, hoverSel, hotGrip, unitFmt, units } from './state.js';
 import { entBBox, entGrips, dimGeom, dimH } from './entities.js';
 import { log } from './ui.js';
@@ -220,8 +220,7 @@ function drawEntity(e, dx, dy, ghost){
     const c=w2s({x:e.cx+dx,y:e.cy+dy});
     ctx.arc(c.x,c.y,e.r*view.scale, -e.a0, -e.a1, true); ctx.stroke();   // screen y flipped → CCW world = anticlockwise
   } else if (e.type==='pline'){
-    e.pts.forEach((p,i)=>{ const s=w2s({x:p.x+dx,y:p.y+dy}); i?ctx.lineTo(s.x,s.y):ctx.moveTo(s.x,s.y); });
-    if (e.closed) ctx.closePath();
+    tracePline(e.pts, e.closed, dx, dy);
     ctx.stroke();
   } else if (e.type==='text'){
     const s=w2s({x:e.x+dx,y:e.y+dy});
@@ -256,6 +255,22 @@ function drawEntity(e, dx, dy, ghost){
   }
   ctx.setLineDash([]); ctx.lineWidth = 1;
 }
+// walk a pline path honoring bulge (arc) segments; assumes beginPath() was called
+function tracePline(pts, closed, dx, dy){
+  if (!pts.length) return;
+  const first=w2s({x:pts[0].x+dx, y:pts[0].y+dy});
+  ctx.moveTo(first.x, first.y);
+  const walk=(a,b)=>{
+    const bl=a.bulge||0;
+    const A = bl ? bulgeArc(a,b,bl) : null;
+    if (!A){ const s=w2s({x:b.x+dx, y:b.y+dy}); ctx.lineTo(s.x, s.y); return; }
+    const c=w2s({x:A.cx+dx, y:A.cy+dy});
+    const angA=Math.atan2(a.y-A.cy, a.x-A.cx), angB=Math.atan2(b.y-A.cy, b.x-A.cx);
+    ctx.arc(c.x, c.y, A.r*view.scale, -angA, -angB, bl>0);   // screen y flip: world CCW = anticlockwise
+  };
+  for (let i=0;i<pts.length-1;i++) walk(pts[i], pts[i+1]);
+  if (closed && pts.length>2) walk(pts[pts.length-1], pts[0]);
+}
 function drawRubber(){
   if (!cmd || !mouse.inside) return;
   ctx.strokeStyle = '#7c8698'; ctx.setLineDash([6,5]);
@@ -263,8 +278,14 @@ function drawRubber(){
   const line = (a,b)=>{const A=w2s(a),B=w2s(b);ctx.moveTo(A.x,A.y);ctx.lineTo(B.x,B.y);};
   if (cmd.name==='LINE' && cmd.base) line(cmd.base, curPt);
   else if (cmd.name==='PLINE' && cmd.pts.length){
-    cmd.pts.forEach((p,i)=>{const s=w2s(p); i?ctx.lineTo(s.x,s.y):ctx.moveTo(s.x,s.y);});
-    const s=w2s(curPt); ctx.lineTo(s.x,s.y);
+    const pts = cmd.pts.map(p=>({...p}));
+    const last = pts[pts.length-1];
+    if (cmd.plMode==='arc'){                       // live arc preview: 3-point or tangent
+      if (cmd.arcMid) last.bulge = bulgeFrom3(last, cmd.arcMid, curPt);
+      else { const t = plineEndTangent(pts); last.bulge = t ? tangentBulge(last, t, curPt) : 0; }
+    }
+    pts.push({x:curPt.x, y:curPt.y});
+    tracePline(pts, false, 0, 0);
   }
   else if (cmd.name==='RECTANG' && cmd.p1){
     const a=w2s(cmd.p1), b=w2s(curPt);

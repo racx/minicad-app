@@ -101,6 +101,8 @@
     <button class="btn" data-cmd="TRIM">Trim<kbd>TR</kbd></button>
     <button class="btn" data-cmd="EXTEND">Extend<kbd>EX</kbd></button>
     <button class="btn" data-cmd="FILLET">Fillet<kbd>F</kbd></button>
+    <button class="btn" data-cmd="JOIN">Join<kbd>J</kbd></button>
+    <button class="btn" data-cmd="EXPLODE">Explode<kbd>X</kbd></button>
     <button class="btn" data-cmd="ERASE">Erase<kbd>E</kbd></button>
     <div class="sep"></div>
     <button class="btn" id="btnPan" title="Pan — drag to move the view (P, Esc to exit)">✋</button>
@@ -184,7 +186,7 @@
       <h3>Draw</h3>
       <table>
         <tr><td>L / LINE</td><td>Line (chained; Enter to end)</td></tr>
-        <tr><td>PL / PLINE</td><td>Polyline — type <b>C</b> to close</td></tr>
+        <tr><td>PL / PLINE</td><td>Polyline — <b>A</b> = arc segments, <b>L</b> = back to straight, <b>C</b> to close</td></tr>
         <tr><td>REC</td><td>Rectangle by two corners</td></tr>
         <tr><td>C / CIRCLE</td><td>Circle — center, then radius (click or type)</td></tr>
         <tr><td>A / ARC</td><td>Arc through three points: start, a point on it, end</td></tr>
@@ -203,6 +205,8 @@
         <tr><td>EX / EXTEND</td><td>Extend to boundary edges (empty Enter = all objects)</td></tr>
         <tr><td>F / FILLET</td><td>Fillet two lines — radius 0 = sharp corner, &gt;0 = rounded</td></tr>
         <tr><td>MI / MIRROR</td><td>Mirror across a two-point line (asks to erase source)</td></tr>
+        <tr><td>J / JOIN</td><td>Merge touching lines, arcs and polylines into one polyline (PEDIT works too)</td></tr>
+        <tr><td>X / EXPLODE</td><td>Break a polyline (rectangles too) into its lines and arcs</td></tr>
         <tr><td>S / STRETCH</td><td>Crossing box → endpoints inside move, rest stays put</td></tr>
         <tr><td>Grips</td><td>Drag the blue squares on a selected object to reshape it</td></tr>
         <tr><td>CH / CHLAYER</td><td>Move the selection to another layer</td></tr>

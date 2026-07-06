@@ -2,7 +2,8 @@
    MiniCAD — entity operations: hit-testing, bboxes,
    snap candidates, transforms
    ========================================================= */
-import { dist, ptSegDist, arcPt, arcSweep, angleOnArc, normAng, mirrorPt } from './geometry.js';
+import { dist, ptSegDist, arcPt, arcSweep, angleOnArc, normAng, mirrorPt,
+         plineParts, bulgeApex, bulgeFromApex } from './geometry.js';
 import { entities, view, layerVisible, layerUnlocked } from './state.js';
 
 // text height of a dim: explicit e.h, else automatic (4% of measured length)
@@ -36,8 +37,14 @@ export function entHitDist(ent, p){
   }
   if (ent.type==='pline'){
     let m=Infinity;
-    for (let i=0;i<ent.pts.length-1;i++) m=Math.min(m, ptSegDist(p, ent.pts[i], ent.pts[i+1]));
-    if (ent.closed && ent.pts.length>2) m=Math.min(m, ptSegDist(p, ent.pts[ent.pts.length-1], ent.pts[0]));
+    for (const part of plineParts(ent)){
+      if (part.arc){
+        const A=part.arc;
+        m = Math.min(m, angleOnArc(A, Math.atan2(p.y-A.cy, p.x-A.cx))
+          ? Math.abs(dist(p,{x:A.cx,y:A.cy}) - A.r)
+          : Math.min(dist(p, part.a), dist(p, part.b)));
+      } else m = Math.min(m, ptSegDist(p, part.a, part.b));
+    }
     return m;
   }
   if (ent.type==='text'){
@@ -72,7 +79,11 @@ export function entBBox(e){
   }
   if (e.type==='pline'){
     let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
-    for(const p of e.pts){x0=Math.min(x0,p.x);y0=Math.min(y0,p.y);x1=Math.max(x1,p.x);y1=Math.max(y1,p.y);}
+    const eat=p=>{x0=Math.min(x0,p.x);y0=Math.min(y0,p.y);x1=Math.max(x1,p.x);y1=Math.max(y1,p.y);};
+    for(const p of e.pts) eat(p);
+    for (const part of plineParts(e)) if (part.arc)          // arc segments can bow past their vertices
+      for (const q of [0, Math.PI/2, Math.PI, 3*Math.PI/2])
+        if (angleOnArc(part.arc, q)) eat(arcPt(part.arc, q));
     return [x0,y0,x1,y1];
   }
   if (e.type==='text'){ const w=e.str.length*e.h*0.62; return [e.x,e.y,e.x+w,e.y+e.h]; }
@@ -109,12 +120,12 @@ export function snapCandidates(excludeId){
                {p:arcPt(e, e.a0 + arcSweep(e)/2),k:'mid'},
                {p:{x:e.cx,y:e.cy},k:'cen'});
     } else if (e.type==='pline'){
-      const n=e.pts.length;
-      for (let i=0;i<n;i++){
-        out.push({p:e.pts[i],k:'end'});
-        if (i<n-1) out.push({p:{x:(e.pts[i].x+e.pts[i+1].x)/2,y:(e.pts[i].y+e.pts[i+1].y)/2},k:'mid'});
+      for (const p of e.pts) out.push({p:{x:p.x,y:p.y},k:'end'});
+      for (const part of plineParts(e)){
+        out.push({p: part.arc ? bulgeApex(part.a, part.b, part.bulge)
+                              : {x:(part.a.x+part.b.x)/2, y:(part.a.y+part.b.y)/2}, k:'mid'});
+        if (part.arc) out.push({p:{x:part.arc.cx, y:part.arc.cy}, k:'cen'});
       }
-      if (e.closed && n>2) out.push({p:{x:(e.pts[n-1].x+e.pts[0].x)/2,y:(e.pts[n-1].y+e.pts[0].y)/2},k:'mid'});
     } else if (e.type==='text'){
       out.push({p:{x:e.x,y:e.y},k:'end'});
     } else if (e.type==='dim'){
@@ -141,7 +152,13 @@ export function entGrips(e){
     const m = arcPt(e, e.a0 + arcSweep(e)/2);
     return [{...arcPt(e,e.a0), g:'a0'}, {x:m.x, y:m.y, g:'rad'}, {...arcPt(e,e.a1), g:'a1'}];
   }
-  if (e.type==='pline') return e.pts.map((p,i)=>({x:p.x, y:p.y, g:'v'+i}));
+  if (e.type==='pline'){
+    const out = e.pts.map((p,i)=>({x:p.x, y:p.y, g:'v'+i}));
+    plineParts(e).forEach((part,i)=>{                 // arc segments: apex grip reshapes the bulge
+      if (part.arc){ const q=bulgeApex(part.a, part.b, part.bulge); out.push({x:q.x, y:q.y, g:'b'+i}); }
+    });
+    return out;
+  }
   if (e.type==='text') return [{x:e.x, y:e.y, g:'ins'}];
   if (e.type==='dim'){
     const g=dimGeom(e);
@@ -168,7 +185,14 @@ export function applyGrip(e, g, p){
   }
   else if (e.type==='pline'){
     const i = +g.slice(1);
-    if (e.pts[i]){ e.pts[i].x=p.x; e.pts[i].y=p.y; }
+    if (g[0]==='v'){ if (e.pts[i]){ e.pts[i].x=p.x; e.pts[i].y=p.y; } }
+    else if (g[0]==='b'){                             // apex grip: recompute the segment's bulge
+      const part = plineParts(e)[i];
+      if (part){
+        const bl = bulgeFromApex(part.a, part.b, p);
+        if (Math.abs(bl) < 1e-9) delete part.a.bulge; else part.a.bulge = bl;
+      }
+    }
   }
   else if (e.type==='text'){ e.x=p.x; e.y=p.y; }
   else if (e.type==='dim'){
@@ -204,7 +228,8 @@ export function mirrorEnt(e, a, b){
     const na0=normAng(2*phi - e.a1), na1=normAng(2*phi - e.a0);   // reflect + swap keeps CCW
     e.cx=c.x; e.cy=c.y; e.a0=na0; e.a1=na1;
   }
-  else if (e.type==='pline'){ e.pts=e.pts.map(p=>mirrorPt(p,a,b)); }
+  else if (e.type==='pline'){ e.pts=e.pts.map(p=>{ const q=mirrorPt(p,a,b);
+    return p.bulge ? {x:q.x, y:q.y, bulge:-p.bulge} : q; }); }   // reflection flips arc direction
   else if (e.type==='text'){ const p=mirrorPt({x:e.x,y:e.y},a,b); e.x=p.x; e.y=p.y; }  // like MIRRTEXT=0: stays readable
   else if (e.type==='dim'){
     const g=dimGeom(e);
