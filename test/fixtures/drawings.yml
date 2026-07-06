@@ -1,0 +1,17 @@
+plan_a:
+  user: rachad
+  title: Plan A
+  doc: { layers: [], entities: [], idSeq: 1, units: cm }
+  units: cm
+
+plan_b:
+  user: rachad
+  title: Plan B
+  doc: {}
+  units: mm
+
+guest_plan:
+  user: guest
+  title: Guest's plan
+  doc: {}
+  units: m

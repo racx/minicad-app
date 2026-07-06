@@ -11,7 +11,14 @@ Rails.application.routes.draw do
   end
 
   authenticated :user do
-    root to: "home#index", as: :authenticated_root
+    root to: "drawings#index", as: :authenticated_root
+  end
+
+  resources :drawings, except: [ :new, :show ] do
+    member do
+      get   :rename
+      patch :autosave
+    end
   end
 
   root to: redirect("/users/sign_in")
