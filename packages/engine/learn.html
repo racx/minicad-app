@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MiniCAD — Watch &amp; Learn</title>
+<style>
+  :root{
+    --bg:#131519; --panel:#1c1f25; --line:#2e333d; --text:#d8dbe2; --dim:#8b93a1;
+    --accent:#43d6b5; --warn:#f2b950; --sel:#4db8ff;
+    --mono:ui-monospace,'Cascadia Mono','SF Mono',Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:15px;line-height:1.5}
+  main{max-width:780px;margin:0 auto;padding:28px 20px 70px}
+  h1{font-family:var(--mono);color:var(--accent);font-size:24px;margin:0 0 4px}
+  h1 span{color:var(--dim);font-weight:400}
+  .sub{color:var(--dim);margin:0 0 24px}
+  .rule{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 16px;margin:0 0 26px;font-size:15px}
+  .rule b{color:var(--warn)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px 14px;margin:0 0 26px}
+  .card h2{margin:0 0 2px;font-size:17px;color:var(--warn)}
+  .card .what{color:var(--dim);margin:0 0 10px;font-size:14px}
+  canvas{display:block;width:100%;max-width:560px;background:#0f1114;border:1px solid var(--line);border-radius:6px;margin:0 auto}
+  .keys{font-family:var(--mono);font-size:13px;color:var(--text);background:#22262e;border:1px solid var(--line);border-radius:6px;padding:8px 12px;margin:12px 0 0;text-align:center}
+  .keys b{color:var(--accent);font-weight:400}
+  kbd{background:#2a2f38;border:1px solid #3a4150;border-radius:4px;padding:0 6px;color:var(--warn)}
+</style>
+</head>
+<body>
+<main>
+  <h1>MINI<span>CAD</span> — watch &amp; learn</h1>
+  <p class="sub">Eight little movies, on repeat. Watch each one twice, then copy it in the app. That's the whole lesson.</p>
+
+  <div class="rule">
+    The only things to memorize:<br>
+    <b>gap in front of a line → EXTEND</b> &nbsp;·&nbsp; <b>extra bits past a crossing → TRIM</b> &nbsp;·&nbsp; <b>"just make a corner" → FILLET</b><br>
+    <b>blue square → drag it to reshape</b> &nbsp;·&nbsp; <b>parallel copy → OFFSET</b> &nbsp;·&nbsp; <b>make a room longer → STRETCH</b>
+  </div>
+
+  <div class="card">
+    <h2>TRIM — cut off the extra legs</h2>
+    <p class="what">Two lines cross. The yellow cursor clicks the pieces that shouldn't exist — and they're gone. What's left is a corner.</p>
+    <canvas id="dTrim" width="1120" height="440"></canvas>
+    <p class="keys">type <b>TR</b> <kbd>Enter</kbd> <kbd>Enter</kbd> &nbsp;→&nbsp; click each piece you want GONE &nbsp;→&nbsp; <kbd>Enter</kbd></p>
+  </div>
+
+  <div class="card">
+    <h2>EXTEND — grow a line until it lands</h2>
+    <p class="what">A line hangs in the air with a gap below it. Click near its dangling tip, and it grows until it touches the other line.</p>
+    <canvas id="dExt" width="1120" height="440"></canvas>
+    <p class="keys">type <b>EX</b> <kbd>Enter</kbd> <kbd>Enter</kbd> &nbsp;→&nbsp; click near the TIP that should grow &nbsp;→&nbsp; <kbd>Enter</kbd></p>
+  </div>
+
+  <div class="card">
+    <h2>FILLET, radius 0 — "make these two meet"</h2>
+    <p class="what">One line overshoots, the other is too short. Click each line on the side you want to KEEP — fillet trims one and stretches the other into a perfect corner. One command, no thinking.</p>
+    <canvas id="dFil0" width="1120" height="440"></canvas>
+    <p class="keys">type <b>F</b> <kbd>Enter</kbd> <kbd>Enter</kbd> &nbsp;→&nbsp; click line 1 (keep side) &nbsp;→&nbsp; click line 2 (keep side)</p>
+  </div>
+
+  <div class="card">
+    <h2>FILLET with a radius — the rounded corner</h2>
+    <p class="what">Same clicks, but with a radius set: the corner comes out rounded, like a coffee-table edge.</p>
+    <canvas id="dFilR" width="1120" height="440"></canvas>
+    <p class="keys">type <b>F</b> <kbd>Enter</kbd> then <b>40</b> <kbd>Enter</kbd> &nbsp;→&nbsp; click line 1 &nbsp;→&nbsp; click line 2</p>
+  </div>
+
+  <div class="card">
+    <h2>GRIPS — reshape by dragging the blue squares</h2>
+    <p class="what">Click an object to select it and little blue squares appear. Drag an end square and the line stretches — and it magnetically snaps onto other objects, so connecting walls is effortless.</p>
+    <canvas id="dGrips" width="1120" height="440"></canvas>
+    <p class="keys">click an object &nbsp;→&nbsp; drag a blue square &nbsp;·&nbsp; <kbd>Esc</kbd> mid-drag = abort &nbsp;·&nbsp; <b>U</b> = undo</p>
+  </div>
+
+  <div class="card">
+    <h2>OFFSET — parallel copy (wall thickness in one move)</h2>
+    <p class="what">One rectangle is a room. Offset it inward by the wall thickness and you have both faces of the wall instantly.</p>
+    <canvas id="dOffset" width="1120" height="440"></canvas>
+    <p class="keys">type <b>O</b> <kbd>Enter</kbd> then <b>12</b> <kbd>Enter</kbd> &nbsp;→&nbsp; click the shape &nbsp;→&nbsp; click the INSIDE</p>
+  </div>
+
+  <div class="card">
+    <h2>MIRROR — the other half, for free</h2>
+    <p class="what">Draw half of anything symmetric, then flip a copy across a line. Enter at the end keeps the original.</p>
+    <canvas id="dMirror" width="1120" height="440"></canvas>
+    <p class="keys">select things &nbsp;→&nbsp; <b>MI</b> <kbd>Enter</kbd> &nbsp;→&nbsp; click 2 points of the mirror line &nbsp;→&nbsp; <kbd>Enter</kbd></p>
+  </div>
+
+  <div class="card">
+    <h2>STRETCH — make the room longer without redrawing</h2>
+    <p class="what">The green right-to-left box chooses which corners move. Everything inside the box shifts; everything outside stays nailed down.</p>
+    <canvas id="dStretch" width="1120" height="440"></canvas>
+    <p class="keys">type <b>S</b> <kbd>Enter</kbd> &nbsp;→&nbsp; drag a box right→left over the end &nbsp;→&nbsp; <kbd>Enter</kbd> &nbsp;→&nbsp; click from &nbsp;→&nbsp; click to</p>
+  </div>
+
+  <div class="card">
+    <h2>PRINT TO SCALE — paper that measures true</h2>
+    <p class="what">No movie needed — it's a dialog. The idea: at 1:50, every 50&nbsp;cm of your drawing becomes exactly 1&nbsp;cm of paper, so a builder can measure your plan with a ruler. The one rule: in the browser's print dialog, keep scale at <b>100%</b> — never "fit to page".</p>
+    <p class="keys">type <b>UNITS</b> <kbd>Enter</kbd> cm <kbd>Enter</kbd> &nbsp;→&nbsp; <b>⌘P</b> &nbsp;→&nbsp; paper + 1:50 + pick window &nbsp;→&nbsp; Print… &nbsp;·&nbsp; first time: press <b>Test page</b> and measure the 100&nbsp;mm bar</p>
+  </div>
+
+  <p style="color:var(--dim)">Now open the app in the other tab and copy the movie you just watched. If it goes wrong: <span style="font-family:var(--mono);color:var(--sel)">U</span> + Enter, breathe, try again.</p>
+</main>
+
+<script>
+'use strict';
+/* tiny animation rig: each demo is drawFn(ctx, t) with t looping 0→1 */
+const COL = {line:'#d8dbe2', dim:'#566073', doomed:'#ef7b7b', new:'#43d6b5', cursor:'#f2b950', label:'#8b93a1'};
+
+const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+const ease = t=>{ t=clamp(t,0,1); return t*t*(3-2*t); };
+const seg = (t,a,b)=>ease((t-a)/(b-a));            // 0 before a → 1 after b
+const lerp = (a,b,t)=>a+(b-a)*t;
+
+function runDemo(id, seconds, drawFn){
+  const cv = document.getElementById(id), ctx = cv.getContext('2d');
+  function frame(now){
+    const t = (now/1000 % seconds)/seconds;
+    ctx.setTransform(2,0,0,2,0,0);                  // canvas is 2× for retina
+    ctx.clearRect(0,0,560,220);
+    drawFn(ctx, t);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+}
+function line(ctx,x1,y1,x2,y2,color,width,dash){
+  ctx.strokeStyle=color; ctx.lineWidth=width||2; ctx.setLineDash(dash||[]);
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); ctx.setLineDash([]);
+}
+function cursorAt(ctx,x,y){
+  ctx.strokeStyle=COL.cursor; ctx.lineWidth=1.4;
+  ctx.beginPath();
+  ctx.moveTo(x-16,y); ctx.lineTo(x-6,y); ctx.moveTo(x+6,y); ctx.lineTo(x+16,y);
+  ctx.moveTo(x,y-16); ctx.lineTo(x,y-6); ctx.moveTo(x,y+6); ctx.lineTo(x,y+16);
+  ctx.stroke();
+  ctx.strokeRect(x-5,y-5,10,10);
+}
+function clickRipple(ctx,x,y,k){                    // k 0→1 while clicking
+  if (k<=0 || k>=1) return;
+  ctx.strokeStyle=COL.cursor; ctx.globalAlpha=1-k; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.arc(x,y,6+k*16,0,Math.PI*2); ctx.stroke();
+  ctx.globalAlpha=1;
+}
+function label(ctx,text){
+  ctx.fillStyle=COL.label; ctx.font='13px ui-monospace,monospace';
+  ctx.fillText(text, 14, 22);
+}
+// cursor that visits waypoints [ [t,x,y], ... ] — returns current pos
+function cursorPath(t, pts){
+  if (t<=pts[0][0]) return {x:pts[0][1], y:pts[0][2]};
+  for (let i=0;i<pts.length-1;i++){
+    const a=pts[i], b=pts[i+1];
+    if (t<=b[0]){ const k=ease((t-a[0])/(b[0]-a[0])); return {x:lerp(a[1],b[1],k), y:lerp(a[2],b[2],k)}; }
+  }
+  const z=pts[pts.length-1]; return {x:z[1], y:z[2]};
+}
+
+/* ---------- TRIM ---------- */
+runDemo('dTrim', 8, (ctx,t)=>{
+  const cross={x:340,y:120};
+  const gone1 = t>0.42, gone2 = t>0.72;            // right leg, then top leg
+  // surviving pieces
+  line(ctx, 80,120, cross.x,120, COL.line);        // left leg (kept)
+  line(ctx, 340,120+0, 340,200, COL.line);         // bottom leg (kept)
+  // doomed pieces: normal → red dashed after click starts → gone
+  if (!gone1) line(ctx, cross.x,120, 500,120, t>0.32?COL.doomed:COL.line, 2, t>0.32?[6,5]:[]);
+  if (!gone2) line(ctx, 340,40, 340,120, t>0.62?COL.doomed:COL.line, 2, t>0.62?[6,5]:[]);
+  const c = cursorPath(t, [[0.10,140,60],[0.30,430,120],[0.55,430,120],[0.60,340,70],[0.95,340,70]]);
+  clickRipple(ctx, 430,120, (t-0.36)/0.08);
+  clickRipple(ctx, 340,70,  (t-0.66)/0.08);
+  cursorAt(ctx, c.x, c.y);
+  label(ctx, t<0.30 ? '1 · two lines cross — four "legs"' :
+             t<0.45 ? '2 · click the leg you don\'t want' :
+             t<0.72 ? '3 · gone. click the next one' :
+                      '4 · what\'s left: a clean corner');
+});
+
+/* ---------- EXTEND ---------- */
+runDemo('dExt', 7, (ctx,t)=>{
+  const wallY=180, lx=280, tipStart=105;
+  const grow = seg(t, 0.45, 0.62);
+  const tipY = lerp(tipStart, wallY, grow);
+  line(ctx, 80,wallY, 500,wallY, COL.line);                       // the wall
+  line(ctx, lx,40, lx,tipStart, COL.line);                        // original part
+  if (grow>0) line(ctx, lx,tipStart, lx,tipY, COL.new, 2.4);      // the grown part (green)
+  if (t>0.62 && t<0.9){                                           // landing flash
+    ctx.strokeStyle=COL.new; ctx.globalAlpha = 1-seg(t,0.62,0.9);
+    ctx.strokeRect(lx-7, wallY-7, 14, 14); ctx.globalAlpha=1;
+  }
+  const c = cursorPath(t, [[0.08,120,70],[0.32,lx+2,tipStart-6],[0.95,lx+2,tipStart-6]]);
+  clickRipple(ctx, lx,tipStart-4, (t-0.38)/0.08);
+  cursorAt(ctx, c.x, c.y);
+  label(ctx, t<0.32 ? '1 · a line hangs in the air — gap below' :
+             t<0.45 ? '2 · click near the dangling TIP' :
+             t<0.65 ? '3 · it grows along its direction…' :
+                      '4 · …and lands exactly on the wall');
+});
+
+/* ---------- FILLET r=0 ---------- */
+runDemo('dFil0', 8, (ctx,t)=>{
+  const corner={x:360,y:150};
+  const fix = seg(t, 0.60, 0.75);
+  const hx2 = lerp(500, corner.x, fix);            // horizontal overshoot retracts
+  const vy2 = lerp(105, corner.y, fix);            // vertical too-short grows
+  line(ctx, 60,150, corner.x,150, COL.line);                       // kept part of H
+  if (fix<1) line(ctx, corner.x,150, hx2,150, t>0.30?COL.doomed:COL.line, 2, t>0.30?[6,5]:[]);
+  line(ctx, 360,45, 360,105, COL.line);                            // original V
+  if (fix>0) line(ctx, 360,105, 360,vy2, COL.new, 2.4);            // grown part of V
+  if (t>0.78){ ctx.fillStyle=COL.new; ctx.beginPath(); ctx.arc(corner.x,corner.y,4,0,Math.PI*2); ctx.fill(); }
+  const c = cursorPath(t, [[0.06,120,80],[0.24,180,150],[0.38,180,150],[0.52,360,70],[0.95,360,70]]);
+  clickRipple(ctx, 180,150, (t-0.26)/0.08);
+  clickRipple(ctx, 360,70,  (t-0.54)/0.08);
+  cursorAt(ctx, c.x, c.y);
+  label(ctx, t<0.24 ? '1 · one overshoots, one falls short' :
+             t<0.40 ? '2 · click line 1 on the side to KEEP' :
+             t<0.60 ? '3 · click line 2 on the side to KEEP' :
+                      '4 · trim + extend in one move: a corner');
+});
+
+/* ---------- GRIPS ---------- */
+runDemo('dGrips', 8, (ctx,t)=>{
+  const ex = lerp(320, 430, seg(t, 0.50, 0.75));       // the moving end
+  line(ctx, 430,40, 430,190, COL.line);                // target wall
+  line(ctx, 100,120, ex,120, '#4db8ff', 2, [6,4]);     // selected line
+  const grips=[{x:100,y:120},{x:(100+ex)/2,y:120},{x:ex,y:120}];
+  grips.forEach((g,i)=>{
+    ctx.fillStyle = (i===2 && t>0.45 && t<0.80) ? '#ef7b7b' : '#4db8ff';
+    ctx.fillRect(g.x-4, g.y-4, 8, 8);
+  });
+  if (t>0.68 && t<0.92){                               // snap marker on arrival
+    ctx.strokeStyle='#ffd75e'; ctx.lineWidth=1.6;
+    ctx.strokeRect(430-7, 120-7, 14, 14); ctx.lineWidth=1;
+  }
+  const c=cursorPath(t, [[0.08,200,60],[0.32,320,120],[0.50,320,120],[0.75,430,120],[0.95,430,120]]);
+  clickRipple(ctx, 320,120,(t-0.44)/0.08);
+  cursorAt(ctx,c.x,c.y);
+  label(ctx, t<0.32 ? '1 · a selected object shows blue squares — grips' :
+             t<0.50 ? '2 · press and hold the end square' :
+             t<0.78 ? '3 · drag — it snaps onto other objects' :
+                      '4 · stretched and exactly connected');
+});
+
+/* ---------- OFFSET ---------- */
+runDemo('dOffset', 7, (ctx,t)=>{
+  const r={x:160,y:60,w:240,h:120};
+  ctx.strokeStyle=COL.line; ctx.lineWidth=2;
+  ctx.strokeRect(r.x, r.y, r.w, r.h); ctx.lineWidth=1;
+  const k=seg(t, 0.55, 0.70);
+  if (k>0){
+    ctx.strokeStyle=COL.new; ctx.globalAlpha=k; ctx.lineWidth=2.4;
+    ctx.strokeRect(r.x+18, r.y+18, r.w-36, r.h-36);
+    ctx.globalAlpha=1; ctx.lineWidth=1;
+  }
+  const c=cursorPath(t, [[0.06,120,40],[0.28,r.x,120],[0.42,r.x,120],[0.55,280,120],[0.95,280,120]]);
+  clickRipple(ctx, r.x,120,(t-0.30)/0.08);
+  clickRipple(ctx, 280,120,(t-0.53)/0.08);
+  cursorAt(ctx,c.x,c.y);
+  label(ctx, t<0.28 ? '1 · a room outline (one rectangle)' :
+             t<0.44 ? '2 · click the shape…' :
+             t<0.60 ? '3 · …then click the INSIDE' :
+                      '4 · parallel copy — instant wall thickness');
+});
+
+/* ---------- MIRROR ---------- */
+runDemo('dMirror', 7, (ctx,t)=>{
+  const ax=290, mx=x=>2*ax-x;
+  line(ctx, 120,60, 260,60, COL.line); line(ctx, 120,60, 120,180, COL.line); line(ctx, 120,180, 260,180, COL.line);
+  ctx.strokeStyle=COL.line; ctx.beginPath(); ctx.arc(190,120,24,0,Math.PI*2); ctx.stroke();
+  if (t>0.30) line(ctx, ax,40, ax,200, '#7c8698', 1.4, [6,5]);      // mirror axis
+  const k=seg(t, 0.60, 0.78);
+  if (k>0){
+    ctx.globalAlpha=k;
+    line(ctx, mx(120),60, mx(260),60, COL.new, 2.4); line(ctx, mx(120),60, mx(120),180, COL.new, 2.4);
+    line(ctx, mx(120),180, mx(260),180, COL.new, 2.4);
+    ctx.strokeStyle=COL.new; ctx.beginPath(); ctx.arc(mx(190),120,24,0,Math.PI*2); ctx.stroke();
+    ctx.globalAlpha=1;
+  }
+  const c=cursorPath(t, [[0.06,140,40],[0.28,ax,55],[0.42,ax,55],[0.55,ax,195],[0.95,ax,195]]);
+  clickRipple(ctx, ax,55,(t-0.30)/0.08);
+  clickRipple(ctx, ax,195,(t-0.55)/0.08);
+  cursorAt(ctx,c.x,c.y);
+  label(ctx, t<0.28 ? '1 · half of a symmetric plan (selected)' :
+             t<0.55 ? '2 · two clicks define the mirror line' :
+             t<0.78 ? '3 · Enter = keep the original too' :
+                      '4 · the other half, for free');
+});
+
+/* ---------- STRETCH ---------- */
+runDemo('dStretch', 8, (ctx,t)=>{
+  const dx = 80*seg(t, 0.60, 0.80);
+  const R = 360+dx;
+  line(ctx, 120,70, R,70, COL.line); line(ctx, 120,170, R,170, COL.line);
+  line(ctx, 120,70, 120,170, COL.line);
+  line(ctx, R,70, R,170, dx>0?COL.new:COL.line, dx>0?2.4:2);
+  if (t>0.18 && t<0.58){                               // green crossing box grows right→left
+    const bw = 130*seg(t, 0.18, 0.34);
+    ctx.strokeStyle='#6fce6f'; ctx.setLineDash([5,4]);
+    ctx.fillStyle='rgba(120,220,120,.08)';
+    ctx.fillRect(430-bw, 45, bw, 150); ctx.strokeRect(430-bw, 45, bw, 150);
+    ctx.setLineDash([]);
+  }
+  const c=cursorPath(t, [[0.06,430,50],[0.34,300,190],[0.50,320,120],[0.60,320,120],[0.80,400,120],[0.95,400,120]]);
+  clickRipple(ctx, 320,120,(t-0.56)/0.08);
+  cursorAt(ctx,c.x,c.y);
+  label(ctx, t<0.34 ? '1 · drag a green box (right→left) over the end' :
+             t<0.56 ? '2 · Enter, then pick a from-point' :
+             t<0.80 ? '3 · …and a to-point — boxed corners follow' :
+                      '4 · room longer; the left side never moved');
+});
+
+/* ---------- FILLET r>0 ---------- */
+runDemo('dFilR', 8, (ctx,t)=>{
+  const P={x:360,y:150}, r=45;                     // corner & radius
+  const T1={x:P.x-r, y:150}, T2={x:360, y:P.y-r};  // tangent points
+  const C={x:P.x-r, y:P.y-r};                      // arc center
+  const fix = seg(t, 0.60, 0.78);
+  const hx2 = lerp(480, T1.x, fix);                // H trims back to its tangent pt
+  const vy2 = lerp(150, T2.y, fix);                // V trims up to its tangent pt
+  line(ctx, 60,150, T1.x,150, COL.line);                            // kept H
+  if (fix<1) line(ctx, T1.x,150, hx2,150, t>0.30?COL.doomed:COL.line, 2, t>0.30?[6,5]:[]);
+  line(ctx, 360,45, 360,T2.y, COL.line);                            // kept V
+  if (fix<1) line(ctx, 360,T2.y, 360,vy2, t>0.30?COL.doomed:COL.line, 2, t>0.30?[6,5]:[]);
+  if (fix>0){                                       // arc sweeps in from T1 toward T2
+    ctx.strokeStyle=COL.new; ctx.lineWidth=2.4;
+    ctx.beginPath();
+    ctx.arc(C.x, C.y, r, Math.PI/2, Math.PI/2*(1-fix), true);
+    ctx.stroke();
+  }
+  const c = cursorPath(t, [[0.06,120,80],[0.24,170,150],[0.38,170,150],[0.52,360,70],[0.95,360,70]]);
+  clickRipple(ctx, 170,150, (t-0.26)/0.08);
+  clickRipple(ctx, 360,70,  (t-0.54)/0.08);
+  cursorAt(ctx, c.x, c.y);
+  label(ctx, t<0.24 ? '1 · same corner, but radius set to 40' :
+             t<0.40 ? '2 · click line 1 (keep side)' :
+             t<0.60 ? '3 · click line 2 (keep side)' :
+                      '4 · both trimmed + a smooth arc between');
+});
+</script>
+</body>
+</html>
