@@ -54,8 +54,10 @@ export function setTog(k){
 }
 
 /* ---------- snap / ortho / grid modifiers ---------- */
-// Osnap priority, highest first. 'nea' MUST stay last: it only fires when nothing else does.
-export const SNAP_PRIORITY = ['end','int','mid','cen','quad','perp','tan','nea'];
+// Osnap priority, highest first. 'nea' (nearest-on-object) is implemented but OFF by
+// default — always-on nearest makes every hover sticky. Opt in with SNAP_PRIORITY.push('nea');
+// it must stay last: it is computed lazily and only fires when nothing else does.
+export const SNAP_PRIORITY = ['end','int','mid','cen','quad','perp','tan'];
 
 export function applyModifiers(rawW, excludeId){
   setSnapMark(null);

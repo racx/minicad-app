@@ -86,11 +86,12 @@ type in `js/entities.js` (verified by grep count). Rotate/scale live in `command
 (applyRotate `:388`, applyScale `:404`) and cover all six. Renderer covers all six
 (`view.js drawEntity`), dim annotative with world-height text.
 
-**Osnap kinds:** `end, int, mid, cen, quad, perp, tan, nea` — winner chosen by the single
-config array `SNAP_PRIORITY` (`js/commands.js`), highest-priority kind within tolerance wins
-(distance breaks ties within a kind). `nea` is computed lazily and only fires when nothing
-else does. Static kinds: `entities.js snapCandidates`; dynamic int/perp/tan:
-`commands.js applyModifiers`; tan/perp require a rubber base point.
+**Osnap kinds:** `end, int, mid, cen, quad, perp, tan` active by default; `nea`
+(nearest-on-object) implemented but **opt-in** — add `'nea'` to the single config array
+`SNAP_PRIORITY` (`js/commands.js`). Highest-priority kind within tolerance wins (distance
+breaks ties within a kind); `nea` is computed lazily and only fires when nothing else does.
+Static kinds: `entities.js snapCandidates`; dynamic int/perp/tan: `commands.js
+applyModifiers`; tan/perp require a rubber base point.
 **Absent:** node, extension/parallel tracking.
 
 ## 4. Layers
@@ -151,10 +152,13 @@ screenshots), DXF acceptance by third-party CAD (checked with ezdxf ad hoc).
 > tool is the incubator, not the destination. This re-tiers DXF import into Tier 1.
 
 ### Tier 1 — next up
-- **Print / PDF at scale** — mm-true SVG sheet renderer + print pipeline (in progress).
+- **Print / PDF at scale** — **NOT STARTED** (corrected 2026-07-05: a prior session planned
+  UNITS + PLOT dialog + mm-true SVG renderer + calibration page, but none of it ever landed —
+  no code, no commits. The staged plan remains valid; treat it as the spec when picked up.)
 - **DXF import** (LINE/CIRCLE/ARC/LWPOLYLINE/TEXT subset first) — promoted per product intent.
 - **Radius + angular dimensions** (`DIMRAD`, `DIMANG`) on the existing dim entity family.
-- ~~Tangent + nearest osnap~~ ✅ shipped (TAN/NEA, priority-ordered — see §3).
+- ~~Tangent + nearest osnap~~ ✅ shipped (TAN default-on; NEA implemented but **opt-in,
+  off by default** — add `'nea'` to `SNAP_PRIORITY` — see §3).
 
 ### Tier 2 — wants, not needs
 - **ARRAY** (rectangular/polar copies).

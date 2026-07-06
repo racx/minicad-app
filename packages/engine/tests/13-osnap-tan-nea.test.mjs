@@ -10,11 +10,11 @@ S.T.osnap=false; S.T.ortho=false;
 const add=(x1,y1,x2,y2)=>{C.startCommand('L');C.handleEnter(`${x1},${y1}`);C.handleEnter(`${x2},${y2}`);C.handleEnter('');return S.entities[S.entities.length-1];};
 const reset=()=>{S.setEntities([]);S.undoStack.length=0;S.selection.clear();};
 
-/* ===== priority array is the single config ===== */
-check('SNAP_PRIORITY exported with all 8 kinds, nea last',
-      Array.isArray(C.SNAP_PRIORITY) && C.SNAP_PRIORITY.length===8 &&
-      C.SNAP_PRIORITY[C.SNAP_PRIORITY.length-1]==='nea' &&
-      ['end','int','mid','cen','quad','perp','tan','nea'].every(k=>C.SNAP_PRIORITY.includes(k)));
+/* ===== priority array is the single config; nea NOT in the default ===== */
+check('SNAP_PRIORITY default has 7 kinds, no nea',
+      Array.isArray(C.SNAP_PRIORITY) && C.SNAP_PRIORITY.length===7 &&
+      !C.SNAP_PRIORITY.includes('nea') &&
+      ['end','int','mid','cen','quad','perp','tan'].every(k=>C.SNAP_PRIORITY.includes(k)));
 
 /* ===== tangentPts math ===== */
 let ts = X.tangentPts({x:100,y:0}, {type:'circle', cx:0, cy:0, r:50});
@@ -47,18 +47,21 @@ const tanY = 50*Math.sin(Math.PI/3);             // 43.30
 let p = C.applyModifiers({x:25.5, y:tanY-0.5});  // hover near upper tangent point
 check('TAN snap fires', S.snapMark && S.snapMark.k==='tan' && near(p.x,25,1e-6) && near(p.y,tanY,1e-6));
 C.cancelCmd();
-// idle (no base): same hover must NOT produce tan — NEA takes over instead
+// idle (no base): same hover produces NOTHING by default (nea is opt-in)
 p = C.applyModifiers({x:25.5, y:tanY-0.5});
-check('no TAN without a base; NEA catches it', S.snapMark && S.snapMark.k==='nea' &&
-      near(Math.hypot(p.x,p.y),50,1e-9));
+check('no TAN without a base; default does NOT fall back to nearest', S.snapMark===null);
 
-/* ===== NEA only when nothing else fires ===== */
+/* ===== NEA is opt-in: default off, push('nea') enables, stays lowest priority ===== */
 reset();
 add(0,0,100,0);
 p = C.applyModifiers({x:37.3, y:0.9});           // mid-span, nothing else within tol
-check('NEA fires on bare geometry', S.snapMark && S.snapMark.k==='nea' && near(p.x,37.3)&&near(p.y,0));
+check('default: bare geometry does not snap', S.snapMark===null && near(p.x,37.3)&&near(p.y,0.9));
+C.SNAP_PRIORITY.push('nea');                     // opt in
+p = C.applyModifiers({x:37.3, y:0.9});
+check('opted-in: NEA fires on bare geometry', S.snapMark && S.snapMark.k==='nea' && near(p.x,37.3)&&near(p.y,0));
 p = C.applyModifiers({x:99, y:1});               // near the endpoint
-check('END beats NEA', S.snapMark && S.snapMark.k==='end' && near(p.x,100)&&near(p.y,0));
+check('opted-in: END still beats NEA', S.snapMark && S.snapMark.k==='end' && near(p.x,100)&&near(p.y,0));
+C.SNAP_PRIORITY.pop();                           // back to default for the rest
 
 /* ===== priority beats raw distance ===== */
 reset();
@@ -67,13 +70,15 @@ p = C.applyModifiers({x:2.6, y:0.5});             // mid is CLOSER (0.78) than e
 check('END outranks closer MID (priority, not distance)',
       S.snapMark && S.snapMark.k==='end' && near(p.x,4)&&near(p.y,0));
 
-/* ===== hidden layers still excluded (incl. NEA) ===== */
+/* ===== hidden layers still excluded (incl. opted-in NEA) ===== */
 reset();
 S.setCurrentLayer('walls');
 add(0,20,100,20);
 S.layerOf('walls').off = true;
+C.SNAP_PRIORITY.push('nea');
 p = C.applyModifiers({x:50, y:20.5});
-check('NEA ignores hidden layers', S.snapMark===null);
+check('NEA (opted in) ignores hidden layers', S.snapMark===null);
+C.SNAP_PRIORITY.pop();
 S.layerOf('walls').off = false;
 S.setCurrentLayer('0');
 
