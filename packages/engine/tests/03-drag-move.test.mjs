@@ -80,7 +80,7 @@ check('mouseup after abort is harmless', near(S.entities[0].x1,0));
 
 // 5. drag on empty space still box-selects (not a move)
 S.selection.clear();
-const far = V.w2s({x:200,y:200});
+const far = V.w2s({x:60,y:-40});   // empty spot that is actually on-screen (200,200 maps off-canvas)
 fire(cv,'mousedown',{button:0, clientX:far.x, clientY:far.y});
 fire(cv,'mousemove',{clientX:far.x+30, clientY:far.y+30});
 check('empty-space drag starts box selection', S.boxSel!==null);

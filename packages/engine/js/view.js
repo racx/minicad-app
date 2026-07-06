@@ -2,7 +2,7 @@
    MiniCAD — canvas, view transform, grid, rendering
    ========================================================= */
 import { dist, fmt, arcFrom3 } from './geometry.js';
-import { entities, view, T, cmd, curPt, snapMark, boxSel, mouse, selection, layerOf, layerVisible, hoverSel, hotGrip, unitFmt } from './state.js';
+import { entities, view, T, cmd, curPt, snapMark, boxSel, mouse, selection, layerOf, layerVisible, hoverSel, hotGrip, unitFmt, units } from './state.js';
 import { entBBox, entGrips, dimGeom, dimH } from './entities.js';
 import { log } from './ui.js';
 
@@ -131,7 +131,65 @@ export function draw(){
       ctx.stroke(); ctx.lineWidth = 1;
     }
   }
+
+  drawRulers();
 }
+
+/* ---------- edge rulers (drawing units, follow pan/zoom) ---------- */
+export const RULER_PX = 22;
+function drawRulers(){
+  const R = RULER_PX;
+  const s = gridStep();
+  const px = s*view.scale;
+  const every = px >= 56 ? 1 : 5;                 // label density: every step, or every major
+  // strips + corner
+  ctx.fillStyle = '#1c1f25';
+  ctx.fillRect(0,0,W,R); ctx.fillRect(0,0,R,H);
+  ctx.fillStyle = '#22262e';
+  ctx.fillRect(0,0,R,R);
+  ctx.strokeStyle = '#2e333d';
+  ctx.beginPath();
+  ctx.moveTo(0,R+.5); ctx.lineTo(W,R+.5);
+  ctx.moveTo(R+.5,0); ctx.lineTo(R+.5,H);
+  ctx.stroke();
+  ctx.font = '9px ui-monospace, monospace';
+  // corner shows what a unit means
+  ctx.fillStyle = '#8b93a1'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(units, R/2, R/2+1);
+  ctx.textBaseline='alphabetic';
+  const tl = s2w(R, R), br = s2w(W, H);
+  // X ruler (top)
+  ctx.strokeStyle = '#4a5261'; ctx.beginPath();
+  ctx.textAlign='left';
+  for (let i=Math.floor(tl.x/s); i<=Math.ceil(br.x/s); i++){
+    const sx = Math.round(i*s*view.scale + view.ox)+.5;
+    if (sx <= R) continue;
+    const major = i % every === 0;
+    ctx.moveTo(sx, R); ctx.lineTo(sx, major ? R-9 : R-4);
+    if (major) ctx.fillText(fmt(i*s), sx+3, 10);
+  }
+  // Y ruler (left) — labels rotated, reading bottom-up
+  for (let i=Math.floor(br.y/s); i<=Math.ceil(tl.y/s); i++){
+    const sy = Math.round(-i*s*view.scale + view.oy)+.5;
+    if (sy <= R) continue;
+    const major = i % every === 0;
+    ctx.moveTo(R, sy); ctx.lineTo(major ? R-9 : R-4, sy);
+    if (major){
+      ctx.save(); ctx.translate(10, sy-3); ctx.rotate(-Math.PI/2);
+      ctx.fillText(fmt(i*s), 0, 0); ctx.restore();
+    }
+  }
+  ctx.stroke();
+  // cursor position markers
+  if (mouse.inside){
+    const c = snapMark ? w2s(snapMark.p) : w2s(curPt);
+    ctx.strokeStyle = '#43d6b5'; ctx.beginPath();
+    if (c.x > R){ ctx.moveTo(Math.round(c.x)+.5, 0); ctx.lineTo(Math.round(c.x)+.5, R); }
+    if (c.y > R){ ctx.moveTo(0, Math.round(c.y)+.5); ctx.lineTo(R, Math.round(c.y)+.5); }
+    ctx.stroke();
+  }
+}
+
 function drawEntity(e, dx, dy, ghost){
   const col = ghost ? '#9fb6c9' : layerOf(e.layer).color;
   const isSel = !ghost && selection.has(e.id);

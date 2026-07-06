@@ -7,7 +7,7 @@ import { entities, setEntities, layers, currentLayer, setCurrentLayer, layerOf, 
          setHoverSel, setHotGrip, units, unitFmt } from './state.js';
 import './plotui.js';                                   // print dialog wiring (self-registers)
 import { findEntityAt, translateIds, entGrips, applyGrip } from './entities.js';
-import { cv, s2w, w2s, draw, resize, zoomExtents, W, H } from './view.js';
+import { cv, s2w, w2s, draw, resize, zoomExtents, RULER_PX, W, H } from './view.js';
 import { startCommand, handleEnter, cancelCmd, applyModifiers,
          doUndo, doRedo, setTog, clickSelect, boxSelect, onPoint, startEditText } from './commands.js';
 import { cmdInput, coordRead, layerSel, layerColor, btnLayerOff, btnLayerLock, log, setPrompt,
@@ -71,6 +71,8 @@ cv.addEventListener('mouseleave', ()=>{ mouse.inside=false; draw(); });
 
 cv.addEventListener('mousedown', ev=>{
   cmdInput.focus();
+  { const r=cv.getBoundingClientRect();               // don't trust the last mousemove
+    mouse.sx=ev.clientX-r.left; mouse.sy=ev.clientY-r.top; }
   if (ev.button===1 || (ev.button===0 && spaceHeld)){
     panning={x:mouse.sx,y:mouse.sy}; ev.preventDefault(); return;
   }
@@ -78,6 +80,7 @@ cv.addEventListener('mousedown', ev=>{
   if (cmd && cmd.name==='PAN'){                       // hand tool: left-drag pans
     panning={x:mouse.sx, y:mouse.sy}; return;
   }
+  if (mouse.sx <= RULER_PX || mouse.sy <= RULER_PX) return;   // clicks on the rulers are inert
   const needsPoint = cmd && cmd.step!=='select' && cmd.step!=='dist' && cmd.step!=='height' && cmd.step!=='string' && cmd.step!=='factor';
   if (cmd && ((cmd.name==='OFFSET' && cmd.step==='pick') || (cmd.name==='TRIM' && cmd.step==='trim') ||
               (cmd.name==='EXTEND' && cmd.step==='extend') ||
