@@ -64,6 +64,14 @@
   #osnapDlg .hint{font-size:11px;color:var(--dim)}
   #osnapDlg kbd{color:var(--dim);font-size:10px}
 
+  /* ---------- hatch dialog ---------- */
+  #hatchDlg{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:300px;background:rgba(28,31,37,.98);border:1px solid var(--line);border-radius:8px;padding:16px 18px;display:none;z-index:6}
+  #hatchDlg h2{font-size:13px;color:var(--accent);margin-bottom:12px;font-family:var(--mono)}
+  #hatchMats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+  #hatchMats .hatch-mat{display:flex;align-items:center;gap:8px;justify-content:flex-start}
+  #hatchMats .sw{width:14px;height:14px;border-radius:3px;border:1px solid var(--line);flex:none}
+  #hatchDlg .row.buttons{display:flex;justify-content:flex-end}
+
   /* ---------- command area ---------- */
   #cmdArea{background:var(--panel);border-top:1px solid var(--line);padding:4px 10px 8px;font-family:var(--mono)}
   #history{height:54px;overflow-y:auto;font-size:12px;color:var(--dim);padding:2px 4px;white-space:pre-wrap}
@@ -91,6 +99,7 @@
     <button class="btn" data-cmd="CIRCLE">Circle<kbd>C</kbd></button>
     <button class="btn" data-cmd="TEXT">Text<kbd>T</kbd></button>
     <button class="btn" data-cmd="DIM">Dim<kbd>DIM</kbd></button>
+    <button class="btn" data-cmd="HATCH">Hatch<kbd>H</kbd></button>
     <div class="sep"></div>
     <button class="btn" data-cmd="MOVE">Move<kbd>M</kbd></button>
     <button class="btn" data-cmd="COPY">Copy<kbd>CO</kbd></button>
@@ -155,6 +164,11 @@
         <button class="btn" id="plotClose">Close</button>
       </div>
     </div>
+    <div id="hatchDlg">
+      <h2>Hatch — pick a material</h2>
+      <div id="hatchMats"></div>
+      <div class="row buttons"><button class="btn" id="hatchCancel">Cancel</button></div>
+    </div>
     <div id="osnapDlg">
       <h2>Object snap</h2>
       <div class="row">
@@ -192,6 +206,8 @@
         <tr><td>A / ARC</td><td>Arc through three points: start, a point on it, end</td></tr>
         <tr><td>T / TEXT</td><td>Text — point, height, string</td></tr>
         <tr><td>DIM / DLI</td><td>Dimension — two points, then place the line (value updates live)</td></tr>
+        <tr><td>H / HATCH</td><td>Fill a closed shape with a material (concrete, green, glass…) — reports its area</td></tr>
+        <tr><td>AREA / AA</td><td>Click a hatch or closed shape → area + perimeter in the command history</td></tr>
         <tr><td>DIMTXT</td><td>Dimension text size — number, or A = automatic; applies to selected dims + future ones</td></tr>
       </table>
       <h3>Modify</h3>

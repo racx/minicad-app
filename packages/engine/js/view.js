@@ -4,6 +4,7 @@
 import { dist, fmt, arcFrom3, bulgeArc, tangentBulge, bulgeFrom3, plineEndTangent } from './geometry.js';
 import { entities, view, T, cmd, curPt, snapMark, trackGuides, boxSel, mouse, selection, layerOf, layerVisible, hoverSel, hotGrip, unitFmt, units } from './state.js';
 import { entBBox, entGrips, dimGeom, dimH } from './entities.js';
+import { materialByKey } from './materials.js';
 import { log } from './ui.js';
 
 export const cv = document.getElementById('cv');
@@ -52,8 +53,9 @@ export function draw(){
     ctx.beginPath(); ctx.moveTo(0,Math.round(ax.y)+.5); ctx.lineTo(W,Math.round(ax.y)+.5); ctx.stroke();
   }
 
-  // entities (hidden layers skipped)
-  for (const e of entities) if (layerVisible(e.layer)) drawEntity(e, 0, 0, false);
+  // entities (hidden layers skipped); hatches first, under the linework
+  for (const e of entities) if (e.type==='hatch' && layerVisible(e.layer)) drawHatch(e);
+  for (const e of entities) if (e.type!=='hatch' && layerVisible(e.layer)) drawEntity(e, 0, 0, false);
 
   // move/copy ghost preview
   if (cmd && (cmd.name==='MOVE'||cmd.name==='COPY') && cmd.step==='dest'){
@@ -202,6 +204,49 @@ function drawRulers(){
   }
 }
 
+function drawHatch(e){
+  const b = entities.find(z=>z.id===e.ref);
+  const mat = materialByKey(e.mat);
+  if (!b || !mat || !layerVisible(b.layer)) return;     // orphaned or hidden boundary: draw nothing
+  ctx.save();
+  ctx.beginPath();
+  if (b.type==='circle'){ const c=w2s({x:b.cx,y:b.cy}); ctx.arc(c.x, c.y, b.r*view.scale, 0, Math.PI*2); }
+  else tracePline(b.pts, true, 0, 0);
+  ctx.clip();
+  const bb=entBBox(b), p0=w2s({x:bb[0], y:bb[3]}), p1=w2s({x:bb[2], y:bb[1]});
+  const sel = selection.has(e.id);
+  ctx.strokeStyle = ctx.fillStyle = sel ? '#4db8ff' : mat.color;
+  ctx.globalAlpha = sel ? 0.95 : 0.6;
+  ctx.lineWidth = 1;
+  for (const fam of mat.pattern.lines || []) hatchLines(p0, p1, fam);
+  if (mat.pattern.dots) hatchDots(p0, p1, mat.pattern.dots);
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+function hatchLines(p0, p1, fam){
+  const ang = fam.ang*Math.PI/180, gap = fam.gap || 12;
+  const w=p1.x-p0.x, h=p1.y-p0.y, diag=Math.hypot(w,h)||1;
+  const cx=(p0.x+p1.x)/2, cy=(p0.y+p1.y)/2;
+  const ux=Math.cos(ang), uy=Math.sin(ang), nx=-uy, ny=ux;
+  ctx.setLineDash(fam.dash || []);
+  ctx.beginPath();
+  const n = Math.ceil(diag/gap/2);
+  for (let i=-n; i<=n; i++){
+    const ox=cx+nx*i*gap, oy=cy+ny*i*gap;
+    ctx.moveTo(ox-ux*diag/2, oy-uy*diag/2);
+    ctx.lineTo(ox+ux*diag/2, oy+uy*diag/2);
+  }
+  ctx.stroke(); ctx.setLineDash([]);
+}
+function hatchDots(p0, p1, spec){
+  const gap = spec.gap || 10;
+  const x0=Math.min(p0.x,p1.x), x1=Math.max(p0.x,p1.x);
+  const y0=Math.min(p0.y,p1.y), y1=Math.max(p0.y,p1.y);
+  let row=0;
+  for (let y=y0; y<=y1; y+=gap, row++)
+    for (let x=x0 + (row%2 ? gap/2 : 0); x<=x1; x+=gap)
+      ctx.fillRect(x-0.75, y-0.75, 1.5, 1.5);
+}
 function drawEntity(e, dx, dy, ghost){
   const col = ghost ? '#9fb6c9' : layerOf(e.layer).color;
   const isSel = !ghost && selection.has(e.id);
@@ -210,6 +255,7 @@ function drawEntity(e, dx, dy, ghost){
   ctx.lineWidth = isSel ? 1.8 : 1.3;
   ctx.setLineDash(isSel ? [6,4] : []);
   ctx.beginPath();
+  if (e.type==='hatch'){ ctx.setLineDash([]); return; }   // rendered by drawHatch (under linework)
   if (e.type==='line'){
     const a=w2s({x:e.x1+dx,y:e.y1+dy}), b=w2s({x:e.x2+dx,y:e.y2+dy});
     ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();

@@ -96,10 +96,58 @@ export function plineParts(e){
   const out=[], n=e.pts.length;
   const seg=(a,b)=>{ const bl=a.bulge||0; out.push({a, b, bulge:bl, arc: bl?bulgeArc(a,b,bl):null}); };
   for (let i=0;i<n-1;i++) seg(e.pts[i], e.pts[i+1]);
-  if (e.closed && n>2) seg(e.pts[n-1], e.pts[0]);
+  if (e.closed && n>1) seg(e.pts[n-1], e.pts[0]);   // n=2 closed is legit: two bulged segments make a ring
   return out;
 }
 export const plineCurved = e => e.type==='pline' && e.pts.some(p=>p.bulge);
+
+/* ---------- area / perimeter (closed shapes, bulge-aware) ---------- */
+// closed pline → {area, perim}: shoelace + circular-segment corrections
+export function plineArea(e){
+  let A2=0, P=0;
+  for (const part of plineParts(e)){
+    A2 += part.a.x*part.b.y - part.b.x*part.a.y;
+    if (part.arc){
+      const th = 4*Math.atan(Math.abs(part.bulge)), r = part.arc.r;
+      A2 += Math.sign(part.bulge)*(th - Math.sin(th))*r*r;
+      P  += th*r;
+    } else P += Math.hypot(part.b.x-part.a.x, part.b.y-part.a.y);
+  }
+  return { area: Math.abs(A2)/2, perim: P };
+}
+// area/perimeter of any closed entity (circle, closed pline); null otherwise
+export function entityArea(e){
+  if (e.type==='circle') return { area: Math.PI*e.r*e.r, perim: TAU*e.r };
+  if (e.type==='pline' && e.closed && e.pts.length>1) return plineArea(e);
+  return null;
+}
+// polygonize a closed boundary (arcs sampled) — for point-in tests
+export function tessellateBoundary(e){
+  if (e.type==='circle'){
+    const out=[]; for (let i=0;i<24;i++) out.push(arcPt({cx:e.cx,cy:e.cy,r:e.r}, i/24*TAU));
+    return out;
+  }
+  const out=[];
+  for (const part of plineParts(e)){
+    out.push({x:part.a.x, y:part.a.y});
+    if (part.arc){
+      const A=part.arc;
+      const angA=Math.atan2(part.a.y-A.cy, part.a.x-A.cx);
+      const th = 4*Math.atan(part.bulge);              // signed travel sweep
+      const n = Math.max(2, Math.ceil(Math.abs(th)/(Math.PI/12)));
+      for (let i=1;i<n;i++) out.push(arcPt(A, angA + th*i/n));
+    }
+  }
+  return out;
+}
+export function pointInPoly(p, poly){
+  let inside=false;
+  for (let i=0, j=poly.length-1; i<poly.length; j=i++){
+    const a=poly[i], b=poly[j];
+    if ((a.y>p.y)!==(b.y>p.y) && p.x < (b.x-a.x)*(p.y-a.y)/(b.y-a.y)+a.x) inside=!inside;
+  }
+  return inside;
+}
 
 // arc through three points (start, on-arc, end) → {cx,cy,r,a0,a1} or null if collinear
 export function arcFrom3(p1, p2, p3){

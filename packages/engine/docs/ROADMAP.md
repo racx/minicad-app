@@ -22,6 +22,8 @@ point steps accept `x,y` / `@dx,dy` / `@d<a` / direct-distance via `parsePoint`
 | LINE | `L` | ✅ Complete. Chained segments, Enter/right-click ends. Typed+clicked coords, ortho/osnap. Snapshot per segment. | prompt `commands.js:124`, points `:210`, snapshot `:213` |
 | PLINE | `PL` | ✅ Complete, now with ARC SEGMENTS: `A` switches to arc mode (tangent-continuation arc by endpoint; 3-point flow when the arc is the first segment), `L` back to straight, `C` closes, Enter finishes. Vertices carry DXF-style `bulge` (tan θ/4, +CCW). Render, rubber preview, hit/bbox/snaps (mid = apex, cen), apex grips, transforms (mirror negates bulge), SVG plot `A` paths and DXF group 42 all honor it. | PLINE modes `commands.js` (onPoint/handleEnter PLINE), bulge math `geometry.js` (bulgeApex/bulgeArc/tangentBulge/bulgeFrom3/plineParts), parts model `intersect.js`, suite 21 |
 | JOIN | `J` `JOIN` `PEDIT` | ✅ Merges touching lines, arcs and open polylines into polylines (arcs become bulged segments; loops auto-close). Ends must meet exactly. One snapshot. | `commands.js` performJoin/strandOf/reverseStrand, suite 21 |
+| HATCH | `H` `HATCH` `BHATCH` | ✅ Material fills on closed shapes (closed pline incl. bulges / circle): pick material from catalog dialog (concrete, brick, green, glass, wood, water — `js/materials.js`), click inside or on the outline. Associative: hatch references its boundary (follows move/stretch, dies with erase/explode, remaps on copy/mirror). Area+perimeter logged on creation. Renders under linework (screen-space patterns); prints as mm-true SVG patterns. NOT exported to DXF yet. | `commands.js` placeHatch/boundaryAt, `js/hatchui.js`, render `view.js` drawHatch, plot patterns `plot.js`, suite 22 |
+| AREA | `AREA` `AA` | ✅ Click a hatch or closed shape → area + perimeter (shoelace + circular-segment corrections, bulge-aware — `geometry.js` plineArea/entityArea). | suite 22 |
 | EXPLODE | `X` `EXPLODE` | ✅ Breaks polylines (incl. rectangles) into line/arc entities — the escape hatch TRIM/EXTEND/OFFSET point at for curved plines. | `commands.js` performExplode, suite 21 |
 | RECTANG | `REC` `RECT` `RECTANGLE` | ✅ Complete. Two corners → closed pline. Typed+clicked. One snapshot. | `:133`, `:234` |
 | CIRCLE | `C` | ✅ Complete. Center + radius (click **or** typed number `:731`). One snapshot. | `:134`, `:243`, makeCircle `:369` |
@@ -165,6 +167,7 @@ screenshots), DXF acceptance by third-party CAD (checked with ezdxf ad hoc).
   Chrome + Safari print of an A4-landscape 1:50 sheet (see checklist in session report).
 - **DXF import** (LINE/CIRCLE/ARC/LWPOLYLINE/TEXT subset first) — promoted per product intent.
   LWPOLYLINE bulge now has a native home (pline arc segments, shipped 2026-07-06).
+- **DXF HATCH export** (currently hatches stay in the JSON doc only).
 - **OFFSET for curved polylines** (arc segments offset to r±d, joint recompute) — the current
   refusal points users at EXPLODE → offset → JOIN.
 - **Radius + angular dimensions** (`DIMRAD`, `DIMANG`) on the existing dim entity family.

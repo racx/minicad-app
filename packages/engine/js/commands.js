@@ -3,7 +3,9 @@
    typed input, snap/ortho modifiers, undo/redo, selection
    ========================================================= */
 import { dist, fmt, deep, rotPt, ptSegDist, TAU, normAng, arcSweep, arcPt, arcFrom3,
-         tangentBulge, bulgeFrom3, plineEndTangent, plineParts, plineCurved } from './geometry.js';
+         tangentBulge, bulgeFrom3, plineEndTangent, plineParts, plineCurved, entityArea,
+         tessellateBoundary, pointInPoly } from './geometry.js';
+import { materialByKey } from './materials.js';
 import { clearAutosave } from './io.js';
 import { entIntersections, lineEntT, lineLine, perpFoot, tangentPts, nearestOnEnt } from './intersect.js';
 import { entities, setEntities, nextId, layers, currentLayer, undoStack, redoStack, snapshot,
@@ -23,6 +25,7 @@ export const ALIASES = {
   EX:'EXTEND', EXTEND:'EXTEND', F:'FILLET', FILLET:'FILLET',
   MI:'MIRROR', MIRROR:'MIRROR', S:'STRETCH', STRETCH:'STRETCH',
   J:'JOIN', JOIN:'JOIN', PEDIT:'JOIN', X:'EXPLODE', EXPLODE:'EXPLODE',
+  H:'HATCH', HATCH:'HATCH', BHATCH:'HATCH', AREA:'AREA', AA:'AREA',
   DIM:'DIM', DLI:'DIM', DAL:'DIM', DIMLINEAR:'DIM', DIMTXT:'DIMTXT', DTX:'DIMTXT',
   DI:'DIST', DIST:'DIST', Z:'ZOOM', ZOOM:'ZOOM', ZOOMEXT:'ZOOMEXT', P:'PAN', PAN:'PAN',
   U:'UNDO', UNDO:'UNDO', REDO:'REDO', ORTHO:'TOGORTHO', GRID:'TOGGRID', HELP:'HELP', '?':'HELP',
@@ -54,6 +57,8 @@ let plotOpener = null;
 export function registerPlotDialog(fn){ plotOpener = fn; }
 let osnapOpener = null;
 export function registerOsnapDialog(fn){ osnapOpener = fn; }
+let hatchOpener = null;
+export function registerHatchDialog(fn){ hatchOpener = fn; }
 
 /* ---------- toggles ---------- */
 export function setTog(k){
@@ -241,6 +246,12 @@ export function startCommand(raw){
     setPrompt(`CHLAYER — New layer name <${currentLayer}>:`);
   }
   else if (name==='PLINE'){ cmd.plMode='line'; cmd.arcMid=null; setPrompt('PLINE — Specify first point:'); }
+  else if (name==='HATCH'){
+    cmd.step='mat';
+    setPrompt('HATCH — Choose a material:');
+    if (hatchOpener) hatchOpener(); else log('Material picker unavailable.', 'e');
+  }
+  else if (name==='AREA'){ cmd.step='pick'; setPrompt('AREA — Click a hatch or closed shape (Enter to end):'); }
   else if (name==='RECTANG') setPrompt('RECTANG — Specify first corner:');
   else if (name==='CIRCLE') setPrompt('CIRCLE — Specify center point:');
   else if (name==='TEXT'){ cmd.step='point'; setPrompt('TEXT — Specify insertion point:'); }
@@ -295,9 +306,9 @@ export function afterSelect(){
   if (cmd.name==='EXPLODE'){ performExplode(cmd.sel); return; }
   if (cmd.name==='ERASE'){
     snapshot();
-    setEntities(entities.filter(e=>!cmd.sel.includes(e.id)));
+    const gone = eraseWithDependents(cmd.sel);
     selection.clear();
-    log(`Erased ${n}.`, 'r'); endCmd();
+    log(`Erased ${gone}.`, 'r'); endCmd();
     return;
   }
   if (cmd.name==='MIRROR'){
@@ -405,7 +416,9 @@ export function onPoint(p){
       snapshot();
       if (n==='MOVE'){ translateIds(cmd.sel, dx, dy); log(`Moved ${cmd.sel.length}.`, 'r'); endCmd(); return; }
       else {
-        const clones = cmd.sel.map(id=>{ const e=deep(entities.find(z=>z.id===id)); e.id=nextId(); return e; });
+        const idMap = new Map();
+        const clones = cmd.sel.map(id=>{ const e=deep(entities.find(z=>z.id===id)); const nid=nextId(); idMap.set(id, nid); e.id=nid; return e; });
+        clones.forEach(e=>{ if (e.type==='hatch' && idMap.has(e.ref)) e.ref = idMap.get(e.ref); });
         clones.forEach(e=>translateEnt(e,dx,dy));
         entities.push(...clones);
         log(`Copied ${clones.length}.`, 'r');
@@ -502,6 +515,13 @@ export function onPoint(p){
       }
     }
   }
+  else if (n==='HATCH'){
+    if (cmd.step==='mat'){ if (hatchOpener) hatchOpener(); }
+    else if (cmd.step==='pick') placeHatch(p);
+  }
+  else if (n==='AREA'){
+    if (cmd.step==='pick') reportArea(p);
+  }
   else if (n==='OFFSET'){
     if (cmd.step==='pick'){
       const e = findEntityAt(p);
@@ -519,6 +539,68 @@ export function onPoint(p){
   draw();
 }
 
+export function areaLabel(a){
+  return `${fmt(a.area)} ${units}² (perimeter ${fmt(a.perim)} ${units})`;
+}
+// material picked in the hatch dialog (or by tests) — advances the command
+export function chooseHatchMaterial(key){
+  if (!cmd || cmd.name!=='HATCH' || !materialByKey(key)) return;
+  cmd.mat = key; cmd.step='pick';
+  setPrompt(`HATCH (${materialByKey(key).name.toLowerCase()}) — Click a closed shape (closed polyline or circle):`);
+  draw();
+}
+function boundaryFor(e){                  // resolve what a click means for HATCH/AREA
+  if (!e) return {err:'No shape there.'};
+  if (e.type==='hatch'){
+    const b = entities.find(z=>z.id===e.ref);
+    return b ? {b, hatch:e} : {err:'That hatch lost its outline.'};
+  }
+  if (e.type==='circle') return {b:e};
+  if (e.type==='pline'){
+    if (e.closed) return {b:e};
+    return {err:"That polyline isn't closed — JOIN it into a loop first."};
+  }
+  return {err:'Pick a closed shape — a closed polyline or a circle.'};
+}
+// what a HATCH/AREA click means: an edge under the cursor, else the smallest
+// closed shape CONTAINING the point (the pick-inside-the-room gesture)
+function boundaryAt(p){
+  const hit = findEntityAt(p);
+  if (hit) return boundaryFor(hit);
+  let best=null, bestArea=Infinity;
+  for (const e of entities){
+    if (!layerVisible(e.layer) || !layerUnlocked(e.layer)) continue;
+    const a = entityArea(e);
+    if (!a || a.area>=bestArea) continue;
+    if (pointInPoly(p, tessellateBoundary(e))){ best=e; bestArea=a.area; }
+  }
+  return best ? {b:best} : {err:'No closed shape there — click inside a room or on its outline.'};
+}
+function placeHatch(p){
+  const {b, err} = boundaryAt(p);
+  if (err){ log(err, 'e'); return; }
+  const a = entityArea(b);
+  if (!a){ log('Could not measure that shape.', 'e'); return; }
+  snapshot();
+  const existing = entities.find(z=>z.type==='hatch' && z.ref===b.id);
+  const matName = materialByKey(cmd.mat).name;
+  if (existing){
+    existing.mat = cmd.mat;
+    log(`${matName} hatch updated — area ${areaLabel(a)}.`, 'r');
+  } else {
+    entities.push({id:nextId(), type:'hatch', ref:b.id, mat:cmd.mat, layer:currentLayer});
+    log(`${matName} hatch created — area ${areaLabel(a)}.`, 'r');
+  }
+  setPrompt(`HATCH (${matName.toLowerCase()}) — Click another closed shape (Enter to end):`);
+}
+function reportArea(p){
+  const {b, hatch, err} = boundaryAt(p);
+  if (err){ log(err, 'e'); return; }
+  const a = entityArea(b);
+  if (!a){ log('Could not measure that shape.', 'e'); return; }
+  const what = hatch ? `${materialByKey(hatch.mat)?.name || 'Hatch'}` : (b.type==='circle' ? 'Circle' : 'Polyline');
+  log(`${what} — area ${areaLabel(a)}.`, 'r');
+}
 function makeCircle(r){
   if (!(r>0)){ log('Radius must be positive.', 'e'); return; }
   snapshot();
@@ -736,8 +818,10 @@ function extendArc(t, p, bounds){
 /* ---------- mirror / stretch ---------- */
 function doMirror(eraseSrc){
   snapshot();
+  const idMap = new Map();
   const clones = cmd.sel.map(id=>{ const e=entities.find(z=>z.id===id); if(!e) return null;
-                                   const c=deep(e); c.id=nextId(); return c; }).filter(Boolean);
+                                   const c=deep(e); const nid=nextId(); idMap.set(id, nid); c.id=nid; return c; }).filter(Boolean);
+  clones.forEach(c=>{ if (c.type==='hatch' && idMap.has(c.ref)) c.ref = idMap.get(c.ref); });
   clones.forEach(c=>mirrorEnt(c, cmd.p1, cmd.p2));
   entities.push(...clones);
   if (eraseSrc){
@@ -760,6 +844,14 @@ function stretchEnt(e, r, dx, dy){   // move vertices inside r; null r = move ev
   }
   else if (e.type==='circle' || e.type==='arc'){ if (inR({x:e.cx,y:e.cy})){ e.cx+=dx; e.cy+=dy; } }
   else if (e.type==='text'){ if (inR({x:e.x,y:e.y})){ e.x+=dx; e.y+=dy; } }
+}
+
+// erase ids + any hatches whose boundary is going away; returns the count (no snapshot)
+export function eraseWithDependents(ids){
+  const doomed = new Set(ids);
+  for (const e of entities) if (e.type==='hatch' && doomed.has(e.ref)) doomed.add(e.id);
+  setEntities(entities.filter(e=>!doomed.has(e.id)));
+  return doomed.size;
 }
 
 /* ---------- join / explode ---------- */
@@ -864,9 +956,11 @@ function performExplode(ids){
     endCmd(); return;
   }
   snapshot();
+  let hatchesGone = 0;
+  for (const e of entities) if (e.type==='hatch' && consumed.has(e.ref)){ consumed.add(e.id); hatchesGone++; }
   setEntities(entities.filter(e=>!consumed.has(e.id)).concat(born));
   selection.clear();
-  log(`Exploded ${plines} polyline${plines>1?'s':''} into ${born.length} objects${skipped?` (${skipped} skipped)`:''}.`, 'r');
+  log(`Exploded ${plines} polyline${plines>1?'s':''} into ${born.length} objects${skipped?` (${skipped} skipped)`:''}${hatchesGone?` — ${hatchesGone} hatch${hatchesGone>1?'es':''} removed with the outline`:''}.`, 'r');
   endCmd();
 }
 
@@ -1089,7 +1183,7 @@ export function handleEnter(text){
     if (cmd.step==='select'){ afterSelect(); return; }
     if (n==='PLINE'){ finishPline(false); return; }
     if (n==='PAN'){ endCmd(); return; }
-    if (n==='LINE' || n==='OFFSET' || n==='TRIM' || n==='EXTEND' || (n==='COPY'&&cmd.step==='dest')){
+    if (n==='LINE' || n==='OFFSET' || n==='TRIM' || n==='EXTEND' || n==='HATCH' || n==='AREA' || (n==='COPY'&&cmd.step==='dest')){
       if (n==='TRIM' || n==='EXTEND') selection.clear();   // edge highlights are command-internal
       endCmd(); return;
     }

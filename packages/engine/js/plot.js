@@ -38,6 +38,7 @@ export function computeFitScale(win, paper, landscape, units){
    The SVG's width/height are real millimetres; 1 viewBox unit = 1 mm.
    ========================================================= */
 import { arcPt, arcSweep, formatLen, plineParts } from './geometry.js';
+import { materialByKey } from './materials.js';
 import { dimGeom, dimH } from './entities.js';
 
 const f = v => Math.round(v*1000)/1000;
@@ -55,6 +56,59 @@ export function buildPlotSVG({entities, layers=[], settings, filename='drawing',
   const layerOf = name => layers.find(z=>z.name===name);
   const col = e => { if (!colors) return '#000'; const l=layerOf(e.layer); return l ? l.color : '#000'; };
   const out = [];
+  const plineD = e => {
+    let d = `M ${X(e.pts[0].x)} ${Y(e.pts[0].y)}`;
+    for (const part of plineParts(e)){
+      if (part.arc){
+        const r=f(part.arc.r*mmu);
+        const large = Math.abs(4*Math.atan(part.bulge)) > Math.PI ? 1 : 0;
+        const sweep = part.bulge>0 ? 0 : 1;
+        d += ` A ${r} ${r} 0 ${large} ${sweep} ${X(part.b.x)} ${Y(part.b.y)}`;
+      } else d += ` L ${X(part.b.x)} ${Y(part.b.y)}`;
+    }
+    return d + (e.closed ? ' Z' : '');
+  };
+
+  // hatches print first (under the linework), as mm-true SVG patterns
+  const usedMats = new Set();
+  for (const e of entities){
+    if (e.type!=='hatch') continue;
+    const l = layerOf(e.layer);
+    if (l && l.off) continue;
+    const b = entities.find(z=>z.id===e.ref);
+    const mat = materialByKey(e.mat);
+    if (!b || !mat) continue;
+    const bl = layerOf(b.layer);
+    if (bl && bl.off) continue;
+    usedMats.add(e.mat);
+    const fill = `fill="url(#hpat-${e.mat})" stroke="none"`;
+    if (b.type==='circle')
+      out.push(`<circle cx="${X(b.cx)}" cy="${Y(b.cy)}" r="${f(b.r*mmu)}" ${fill}/>`);
+    else out.push(`<path d="${plineD(b)}" ${fill}/>`);
+  }
+  if (usedMats.size){
+    const defs=['<defs>'];
+    for (const key of usedMats){
+      const mat = materialByKey(key);
+      const col = colors ? mat.color : '#000';
+      const inner=[];
+      for (const fam of mat.pattern.lines||[]){
+        const gap=(fam.gap||12)/4;                    // screen px → mm-ish on paper
+        const dash=fam.dash?` stroke-dasharray="${fam.dash.map(v=>f(v/4)).join(' ')}"`:'';
+        inner.push(`<pattern id="hpat-${key}" width="${f(gap)}" height="${f(gap)}" patternUnits="userSpaceOnUse" patternTransform="rotate(${fam.ang})">`+
+          `<line x1="0" y1="0" x2="${f(gap)}" y2="0" stroke="${col}" stroke-width="0.13" stroke-opacity="0.85"${dash}/></pattern>`);
+        break;                                        // one printable family per material keeps defs simple
+      }
+      if (mat.pattern.dots){
+        const gap=(mat.pattern.dots.gap||10)/4;
+        inner.push(`<pattern id="hpat-${key}" width="${f(gap)}" height="${f(gap)}" patternUnits="userSpaceOnUse">`+
+          `<circle cx="${f(gap/2)}" cy="${f(gap/2)}" r="0.18" fill="${col}" fill-opacity="0.85"/></pattern>`);
+      }
+      defs.push(...inner);
+    }
+    defs.push('</defs>');
+    out.unshift(defs.join(''));
+  }
 
   for (const e of entities){
     const l = layerOf(e.layer);
@@ -70,17 +124,7 @@ export function buildPlotSVG({entities, layers=[], settings, filename='drawing',
       out.push(`<path d="M ${X(s0.x)} ${Y(s0.y)} A ${r} ${r} 0 ${large} 0 ${X(s1.x)} ${Y(s1.y)}" ${st}/>`);
     }
     else if (e.type==='pline'){
-      let d = `M ${X(e.pts[0].x)} ${Y(e.pts[0].y)}`;
-      for (const part of plineParts(e)){
-        if (part.arc){
-          const r=f(part.arc.r*mmu);
-          const large = Math.abs(4*Math.atan(part.bulge)) > Math.PI ? 1 : 0;
-          const sweep = part.bulge>0 ? 0 : 1;          // Y flip: world CCW = paper sweep 0
-          d += ` A ${r} ${r} 0 ${large} ${sweep} ${X(part.b.x)} ${Y(part.b.y)}`;
-        } else d += ` L ${X(part.b.x)} ${Y(part.b.y)}`;
-      }
-      if (e.closed) d += ' Z';
-      out.push(`<path d="${d}" ${st}/>`);
+      out.push(`<path d="${plineD(e)}" ${st}/>`);
     }
     else if (e.type==='text'){
       out.push(`<text x="${X(e.x)}" y="${Y(e.y)}" font-size="${f(e.h*mmu)}" font-family="monospace" fill="${col(e)}">${esc(e.str)}</text>`);

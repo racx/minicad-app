@@ -7,9 +7,10 @@ import { entities, setEntities, layers, currentLayer, setCurrentLayer, layerOf, 
          setHoverSel, setHotGrip, units, unitFmt } from './state.js';
 import './plotui.js';                                   // print dialog wiring (self-registers)
 import './osnapui.js';                                  // object-snap dialog wiring (self-registers)
+import './hatchui.js';                                  // hatch material picker (self-registers)
 import { findEntityAt, translateIds, entGrips, applyGrip } from './entities.js';
 import { cv, s2w, w2s, draw, resize, zoomExtents, RULER_PX, W, H } from './view.js';
-import { startCommand, handleEnter, cancelCmd, applyModifiers,
+import { startCommand, handleEnter, cancelCmd, applyModifiers, eraseWithDependents,
          doUndo, doRedo, setTog, clickSelect, boxSelect, onPoint, startEditText } from './commands.js';
 import { cmdInput, coordRead, layerSel, layerColor, btnLayerOff, btnLayerLock, log, setPrompt,
          toggleHelp, refreshLayers } from './ui.js';
@@ -182,8 +183,8 @@ window.addEventListener('keydown', ev=>{
   if ((ev.key==='Delete'||ev.key==='Backspace') && !cmd && document.activeElement===cmdInput && !cmdInput.value && selection.size){
     ev.preventDefault();
     snapshot();
-    setEntities(entities.filter(e=>!selection.has(e.id)));
-    log(`Erased ${selection.size}.`, 'r');
+    const gone = eraseWithDependents([...selection]);
+    log(`Erased ${gone}.`, 'r');
     selection.clear(); draw(); return;
   }
   if (ev.key===' ' && document.activeElement!==cmdInput){ spaceHeld=true; }

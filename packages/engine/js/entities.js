@@ -3,7 +3,7 @@
    snap candidates, transforms
    ========================================================= */
 import { dist, ptSegDist, arcPt, arcSweep, angleOnArc, normAng, mirrorPt,
-         plineParts, bulgeApex, bulgeFromApex } from './geometry.js';
+         plineParts, bulgeApex, bulgeFromApex, tessellateBoundary, pointInPoly } from './geometry.js';
 import { entities, view, layerVisible, layerUnlocked } from './state.js';
 
 // text height of a dim: explicit e.h, else automatic (4% of measured length)
@@ -47,6 +47,11 @@ export function entHitDist(ent, p){
     }
     return m;
   }
+  if (ent.type==='hatch'){
+    const b = entities.find(z=>z.id===ent.ref);
+    if (!b) return Infinity;
+    return pointInPoly(p, tessellateBoundary(b)) ? 6/view.scale : Infinity;
+  }
   if (ent.type==='text'){
     const w = ent.str.length * ent.h * 0.62, h = ent.h;
     if (p.x>=ent.x && p.x<=ent.x+w && p.y>=ent.y && p.y<=ent.y+h) return 0;
@@ -85,6 +90,10 @@ export function entBBox(e){
       for (const q of [0, Math.PI/2, Math.PI, 3*Math.PI/2])
         if (angleOnArc(part.arc, q)) eat(arcPt(part.arc, q));
     return [x0,y0,x1,y1];
+  }
+  if (e.type==='hatch'){
+    const b = entities.find(z=>z.id===e.ref);
+    return b ? entBBox(b) : [0,0,0,0];
   }
   if (e.type==='text'){ const w=e.str.length*e.h*0.62; return [e.x,e.y,e.x+w,e.y+e.h]; }
   if (e.type==='dim'){
