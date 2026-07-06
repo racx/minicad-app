@@ -2,7 +2,7 @@
 
 **Single source of truth** for what exists, how complete it is, and what comes next.
 Evidence-based: every claim below cites `file:line` in the codebase as of commit `536d7c7`.
-Verified against the test suite: `node tests/run.mjs` → **12 suites, 206 checks, all passing** (2026-07-05).
+Verified against the test suite: `node tests/run.mjs` → **16 suites, 278 checks, all passing** (2026-07-06).
 
 Update this file whenever a feature lands or a decision changes the plan.
 
@@ -110,7 +110,8 @@ unpickable + unsnappable + excluded from TRIM/EXTEND edges — `entities.js find
 | Autosave | ✅ localStorage every 5 s + beforeunload; restore on boot (skips empty saves); NEW clears. Real-browser round-trip verified. | `io.js:38–64`, `main.js:242–243`, boot restore `main.js` boot() |
 | DXF export | ✅ R12/AC1009 (`io.js:69`). LINE/CIRCLE/ARC/POLYLINE/TEXT native; **DIM decomposed to 3 LINEs + rotated TEXT** (`io.js:90–99`) — a deliberate simplification (no block defs). Layer off/lock flags exported (`62` negative / `70`=4). ezdxf audit: 0 errors. | `io.js:66–104` |
 | DXF import | ❌ Absent. Export is one-way. | — |
-| Print / PDF | ❌ Absent (browser print of a dark canvas is not usable output). | — |
+| Print / PDF | ✅ PLOT/⌘P → mm-true SVG sheet (white/black print palette, footer strip) in a hidden iframe with real-mm `@page`; browser Save-as-PDF gives a scale-accurate vector PDF. Calibration test page with 100/50 mm bars. All linework is CONTINUOUS today, so the "dashes in mm" requirement is vacuously satisfied — revisit when linetypes exist. | `js/plot.js` (pure), `js/plotui.js`, suites 15–16 |
+| Units | ✅ UNITS mm/cm/m (default cm); dim text + readout formatting; persisted in JSON + autosave. | `state.js` units/unitFmt, `geometry.js formatLen`, suite 14 |
 
 ## 6. Test coverage map
 
@@ -152,9 +153,12 @@ screenshots), DXF acceptance by third-party CAD (checked with ezdxf ad hoc).
 > tool is the incubator, not the destination. This re-tiers DXF import into Tier 1.
 
 ### Tier 1 — next up
-- **Print / PDF at scale** — **NOT STARTED** (corrected 2026-07-05: a prior session planned
-  UNITS + PLOT dialog + mm-true SVG renderer + calibration page, but none of it ever landed —
-  no code, no commits. The staged plan remains valid; treat it as the spec when picked up.)
+- ~~Print / PDF at scale~~ ✅ **shipped 2026-07-06**: UNITS (mm/cm/m, persisted), PLOT
+  dialog (paper/orientation/scale incl. fit-with-displayed-1:N/print window/lineweight/
+  mono-vs-colors), pure mm-true SVG renderer (`js/plot.js`), iframe print with real-mm
+  `@page`, calibration test page. Suites 14–16.
+  **Pending human verification:** physical ruler check of the calibration page and a
+  Chrome + Safari print of an A4-landscape 1:50 sheet (see checklist in session report).
 - **DXF import** (LINE/CIRCLE/ARC/LWPOLYLINE/TEXT subset first) — promoted per product intent.
 - **Radius + angular dimensions** (`DIMRAD`, `DIMANG`) on the existing dim entity family.
 - ~~Tangent + nearest osnap~~ ✅ shipped (TAN default-on; NEA implemented but **opt-in,

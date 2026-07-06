@@ -57,7 +57,7 @@ EDITTEXT #id "new string"                # engine: startEditText + apply
 ```
 DIMTXT  h<height>|AUTO
 LAYER   "name" [color<#hex>] [OFF|ON] [LOCK|UNLOCK] [CURRENT]
-UNITS   mm|cm|m                          # reserved — lands with Stage 1
+UNITS   mm|cm|m                          # engine command exists (print session)
 NEW     CONFIRM                          # explicit keyword instead of Y/N prompt
 ZOOM    E
 ```
@@ -70,7 +70,8 @@ ZOOM    E
 scripted form anywhere.
 
 **In the grammar but NOT in the engine:**
-- `UNITS` — reserved; engine has no units concept yet (Stage 1 work).
+- ~~`UNITS`~~ — landed with the print session; grammar and engine now agree.
+- `PLOT` deliberately has no scripted form — printing is interactive by nature.
 - Entity ids as a *user-facing* concept (`#id` selectors): engine has stable numeric ids
   (`state.js nextId`) but nothing exposes them.
 - `LAYER ... color/OFF/LOCK` one-liner: engine has the capabilities but only via UI

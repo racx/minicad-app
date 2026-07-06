@@ -1,7 +1,7 @@
 /* =========================================================
    MiniCAD — PLOT dialog wiring (DOM side of js/plot.js)
    ========================================================= */
-import { paperSize, computeFitScale } from './plot.js';
+import { paperSize, computeFitScale, buildPlotSVG, buildTestPageSVG } from './plot.js';
 import { entities, layers, units, unitFmt, plotWin, layerVisible } from './state.js';
 import { entBBox } from './entities.js';
 import { registerPlotDialog, startCommand } from './commands.js';
@@ -69,12 +69,52 @@ function refresh(){
     : 'whole drawing';
 }
 
+/* ---------- print pipeline ---------- */
+export function buildCurrentSVG(){
+  const s = currentSettings();
+  if (!s) return null;
+  const date = new Date().toISOString().slice(0,10);
+  return { settings:s,
+           size: paperSize(s.paper, s.landscape),
+           svg: buildPlotSVG({entities, layers, settings:s, filename:'drawing', date}) };
+}
+
+// Load the sheet into a hidden iframe with a real-mm @page and print it.
+// "Save as PDF" in the browser dialog yields a scale-accurate vector PDF.
+// Returns the full HTML (testable headlessly; printing is skipped without a real DOM).
+export function printSVG(svg, size){
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>MiniCAD plot</title>`+
+    `<style>@page{size:${size.w}mm ${size.h}mm;margin:0}html,body{margin:0;padding:0}svg{display:block}</style>`+
+    `</head><body>${svg}</body></html>`;
+  if (!document.body) return html;                       // headless tests stop here
+  const ifr = document.createElement('iframe');
+  ifr.style.position='fixed'; ifr.style.right='0'; ifr.style.bottom='0';
+  ifr.style.width='0'; ifr.style.height='0'; ifr.style.border='0';
+  document.body.appendChild(ifr);
+  const win = ifr.contentWindow;
+  if (!win){ document.body.removeChild(ifr); return html; }
+  win.document.open(); win.document.write(html); win.document.close();
+  setTimeout(()=>{
+    win.focus(); win.print();
+    setTimeout(()=>{ try{ document.body.removeChild(ifr); }catch(e){} }, 2000);
+  }, 100);
+  return html;
+}
+
 /* wiring */
 for (const id of ['plotPaper','plotOrient','plotScale','plotCustomN','plotWeight','plotColors'])
   $(id).addEventListener('change', refresh);
 $('plotPickWin').addEventListener('click', ()=>{ closePlot(); startCommand('PLOTWIN'); });
 $('plotClose').addEventListener('click', closePlot);
-$('plotPrint').addEventListener('click', ()=>log('Printing arrives in Stage 3.', 'e'));
-$('plotTest').addEventListener('click', ()=>log('Test page arrives in Stage 3.', 'e'));
+$('plotPrint').addEventListener('click', ()=>{
+  const cur = buildCurrentSVG();
+  if (!cur){ log('Nothing to print — the drawing is empty.', 'e'); return; }
+  printSVG(cur.svg, cur.size);
+  log(`Printing 1:${cur.settings.scaleN} on ${cur.settings.paper} — in the browser dialog, keep 100% scale (or Save as PDF).`, 'r');
+});
+$('plotTest').addEventListener('click', ()=>{
+  printSVG(buildTestPageSVG(), {w:210, h:297});
+  log('Calibration page sent — print at 100%, then measure the bars with a real ruler.', 'r');
+});
 
 registerPlotDialog(openPlot);

@@ -156,6 +156,18 @@
     <tr><td>Export DXF</td><td>Makes a <code>.dxf</code> file that opens in AutoCAD, LibreCAD, or any professional CAD program — for when you need to send your plan to an architect or a kitchen company.</td></tr>
   </table>
 
+  <h2>Printing to scale</h2>
+  <p>First tell the app what your numbers mean: type <span class="say">UNITS</span> and answer
+  <span class="say">cm</span> (or mm, or m). Then press <kbd>⌘P</kbd> (or type <span class="say">PLOT</span>):</p>
+  <ol class="steps">
+    <li>Pick the paper (A4/A3/Letter) and orientation.</li>
+    <li>Pick a scale — <b>1:50</b> is the classic for floor plans (1 cm on paper = 50 cm real). Or choose <b>fit window</b> and the app shows you what scale it managed.</li>
+    <li><b>Pick window</b> lets you click two corners around the part you want on paper.</li>
+    <li>Press <b>Print…</b> — in the browser dialog keep scale at <b>100%</b>, or choose <b>Save as PDF</b> for a file that stays true to scale.</li>
+  </ol>
+  <div class="box tip"><b>Trust but verify:</b> the <b>Test page</b> button prints a ruler — a 100&nbsp;mm bar and a 50&nbsp;mm bar. Print it once at 100% and measure with a real ruler. If the bars measure true, every plan you print will too.</div>
+  <p>The print is clean black-on-white (layer colors optional), with a footer showing the scale, paper and date — so whoever receives it knows exactly what they're holding.</p>
+
   <h2>When things go wrong</h2>
   <table>
     <tr><td>Nothing responds</td><td>A command is probably waiting for input — read the yellow prompt, or press <kbd>Esc</kbd>.</td></tr>
@@ -172,6 +184,7 @@
     <tr><th>Keys</th><th>Meaning</th></tr>
     <tr><td>L · PL · REC · C · A · T</td><td>Line · Polyline · Rectangle · Circle · Arc · Text</td></tr>
     <tr><td>NEW · CH</td><td>Fresh drawing · move selection to another layer</td></tr>
+    <tr><td>UNITS · PLOT (⌘P)</td><td>Set what a unit means · print to scale</td></tr>
     <tr><td>M · CO · RO · SC · O · TR · EX · F · MI · S · E</td><td>Move · Copy · Rotate · Scale · Offset · Trim · Extend · Fillet · Mirror · Stretch · Erase</td></tr>
     <tr><td>DIM</td><td>Measurement label (two points + where to put it)</td></tr>
     <tr><td>U · DI · Z E</td><td>Undo · Measure · Zoom to fit</td></tr>
