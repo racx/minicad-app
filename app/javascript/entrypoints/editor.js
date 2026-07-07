@@ -327,6 +327,7 @@ function startAdapter() {
 /* ---------- AI commands: request → engine MScript validation → ghost → Enter/Esc ---------- */
 let aiGhosts = null   // previewed entities awaiting commit
 let aiScript = null   // the validated script, executed atomically on Enter
+let aiClarify = null  // prior clarify round {request, question} — one round max
 
 function startAiLoop() {
   const input = document.getElementById('saas-ai')
@@ -346,10 +347,11 @@ function startAiLoop() {
           'Accept': 'application/json',
           'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content
         },
-        body: JSON.stringify({ request, context: { units: engine.state.units } })
+        body: JSON.stringify({ request, context: engine.face.serializeContext(), clarify: aiClarify })
       })
       const data = await res.json().catch(() => ({}))
       if (data.status === 'ok' && data.script) {
+        aiClarify = null
         const preview = engine.face.previewScript(data.script)
         if (preview.errors.length) {
           const e0 = preview.errors[0]
@@ -360,6 +362,7 @@ function startAiLoop() {
           startAiPreview(preview.entities, data.plan)
         }
       } else if (data.status === 'clarify' && data.question) {
+        aiClarify = { request, question: data.question }   // the next message answers this
         engine.ui.log(`AI: ${data.question}`, 'e')
         setStatus('AI needs more', 'dirty')
       } else if (res.status === 429) {

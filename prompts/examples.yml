@@ -1,0 +1,111 @@
+# Few-shot examples for the AI drawing assistant. Each entry becomes a
+# user/assistant message pair ahead of the real request. Contexts are compact
+# serializeContext-shaped payloads; assistant replies are the exact JSON the
+# model should produce.
+#
+# 1–4: the four canonical shapes (computed-delta MOVE, TRIM with pick point,
+# clarify, unsupported-feature). 5–6: floor-plan-scale, drawn from the seed
+# drawings (studio apartment A-101).
+
+- name: computed-delta-move
+  request: "move the kitchen counter 20 to the right"
+  context:
+    units: cm
+    currentLayer: furniture
+    counts: { total: 3, byType: { pline: 2, line: 1 } }
+    selection: []
+    entities:
+      - { id: 3, type: pline, layer: furniture, closed: true, pts: [ { x: 15, y: 115 }, { x: 75, y: 115 }, { x: 75, y: 415 }, { x: 15, y: 415 } ] }
+      - { id: 1, type: pline, layer: walls, closed: true, pts: [ { x: 0, y: 0 }, { x: 830, y: 0 }, { x: 830, y: 430 }, { x: 0, y: 430 } ] }
+      - { id: 2, type: line, layer: walls, x1: 595, y1: 15, x2: 595, y2: 415 }
+  response:
+    status: ok
+    plan: "Move the kitchen counter (#3) 20 cm to the right."
+    script: "MOVE #3 20,0"
+    question: null
+
+- name: trim-with-pick-point
+  request: "cut away the part of the long horizontal line to the right of the vertical one"
+  context:
+    units: cm
+    currentLayer: "0"
+    counts: { total: 2, byType: { line: 2 } }
+    selection: []
+    entities:
+      - { id: 1, type: line, layer: "0", x1: 0, y1: 50, x2: 300, y2: 50 }
+      - { id: 2, type: line, layer: "0", x1: 180, y1: 0, x2: 180, y2: 120 }
+  response:
+    status: ok
+    plan: "Trim line #1 against #2, removing the piece right of x=180."
+    script: "TRIM edges(#2) at240,50"
+    question: null
+
+- name: ambiguous-request
+  request: "make it bigger"
+  context:
+    units: cm
+    currentLayer: "0"
+    counts: { total: 2, byType: { circle: 1, pline: 1 } }
+    selection: []
+    entities:
+      - { id: 1, type: circle, layer: "0", cx: 100, cy: 100, r: 40 }
+      - { id: 2, type: pline, layer: "0", closed: true, pts: [ { x: 200, y: 0 }, { x: 300, y: 0 }, { x: 300, y: 80 }, { x: 200, y: 80 } ] }
+  response:
+    status: clarify
+    plan: null
+    script: null
+    question: "Which one — the circle (#1) or the rectangle (#2) — and by how much (a scale factor like 2, or a target size)?"
+
+- name: unsupported-feature
+  request: "add a bathtub symbol in the bathroom"
+  context:
+    units: cm
+    currentLayer: furniture
+    counts: { total: 1, byType: { pline: 1 } }
+    selection: []
+    entities:
+      - { id: 1, type: pline, layer: walls, closed: true, pts: [ { x: 605, y: 15 }, { x: 815, y: 15 }, { x: 815, y: 415 }, { x: 605, y: 415 } ] }
+  response:
+    status: clarify
+    plan: null
+    script: null
+    question: "MiniCAD has no symbol/block library yet, so I can't insert a bathtub symbol. I can draw a simple tub outline (rectangle with rounded inner basin) sized ~170×75 in the bathroom — want that, and against which wall?"
+
+- name: seed-studio-rehatch
+  request: "hatch the bathroom as wood instead"
+  context:
+    units: cm
+    currentLayer: region
+    counts: { total: 4, byType: { pline: 2, hatch: 2 } }
+    selection: []
+    entities:
+      - { id: 71, type: pline, layer: region, closed: true, pts: [ { x: 15, y: 15 }, { x: 595, y: 15 }, { x: 595, y: 415 }, { x: 15, y: 415 } ] }
+      - { id: 72, type: hatch, layer: region, ref: 71, mat: wood, material: Wood, area: 232000, perimeter: 1960 }
+      - { id: 73, type: pline, layer: region, closed: true, pts: [ { x: 605, y: 15 }, { x: 815, y: 15 }, { x: 815, y: 415 }, { x: 605, y: 415 } ] }
+      - { id: 74, type: hatch, layer: region, ref: 73, mat: concrete, material: Concrete, area: 84000, perimeter: 1220 }
+  response:
+    status: ok
+    plan: "Re-hatch the bathroom floor region (#73) as wood — re-hatching swaps the material."
+    script: "HATCH #73 wood"
+    question: null
+
+- name: seed-studio-add-desk
+  request: "add a 200 by 90 desk against the middle of the north wall of the living room and label it"
+  context:
+    units: cm
+    currentLayer: furniture
+    counts: { total: 3, byType: { line: 2, pline: 1 } }
+    selection: []
+    entities:
+      - { id: 12, type: line, layer: walls, x1: 15, y1: 415, x2: 250, y2: 415 }
+      - { id: 13, type: line, layer: walls, x1: 370, y1: 415, x2: 595, y2: 415 }
+      - { id: 40, type: pline, layer: region, closed: true, pts: [ { x: 15, y: 15 }, { x: 595, y: 15 }, { x: 595, y: 415 }, { x: 15, y: 415 } ] }
+  response:
+    status: ok
+    plan: "Draw a 200×90 desk centered on the living room's north wall (inner face y=415, room 15–595 → center x=305) with a label."
+    script: |-
+      LAYER "furniture" CURRENT
+      RECT 205,325 405,415
+      LAYER "annot" CURRENT
+      TEXT 265,355 h18 "DESK"
+    question: null

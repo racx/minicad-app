@@ -13,9 +13,11 @@ module Api
                       status: :too_many_requests
       end
 
-      result = AiCommandStubService.call(
+      result = AiCommandService.call(
         request: params[:request],
-        context: params[:context].respond_to?(:to_unsafe_h) ? params[:context].to_unsafe_h : {}
+        context: params[:context].respond_to?(:to_unsafe_h) ? params[:context].to_unsafe_h : {},
+        clarify: params[:clarify].respond_to?(:to_unsafe_h) ? params[:clarify].to_unsafe_h : nil,
+        drawing: drawing
       )
       Rails.logger.info("ai_commands user=#{current_user.id} drawing=#{drawing.id} " \
                         "status=#{result[:status]} count=#{current_user.ai_requests_count}")
