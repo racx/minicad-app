@@ -28,7 +28,7 @@ export const ALIASES = {
   H:'HATCH', HATCH:'HATCH', BHATCH:'HATCH', AREA:'AREA', AA:'AREA',
   DIM:'DIM', DLI:'DIM', DAL:'DIM', DIMLINEAR:'DIM', DIMTXT:'DIMTXT', DTX:'DIMTXT',
   DI:'DIST', DIST:'DIST', Z:'ZOOM', ZOOM:'ZOOM', ZOOMEXT:'ZOOMEXT', P:'PAN', PAN:'PAN',
-  U:'UNDO', UNDO:'UNDO', REDO:'REDO', ORTHO:'TOGORTHO', GRID:'TOGGRID', HELP:'HELP', '?':'HELP',
+  U:'UNDO', UNDO:'UNDO', REDO:'REDO', ORTHO:'TOGORTHO', GRID:'TOGGRID', DYN:'TOGDYN', HELP:'HELP', '?':'HELP',
   OSNAP:'OSNAPDLG', OS:'OSNAPDLG',   // AutoCAD-style: typed OSNAP opens the mode picker (F3 = quick toggle)
   UNITS:'UNITS', PLOT:'PLOT', PRINT:'PLOT', PLOTWIN:'PLOTWIN'
 };
@@ -63,7 +63,7 @@ export function registerHatchDialog(fn){ hatchOpener = fn; }
 /* ---------- toggles ---------- */
 export function setTog(k){
   T[k]=!T[k];
-  const map={grid:'tGrid',snap:'tSnap',ortho:'tOrtho',osnap:'tOsnap'};
+  const map={grid:'tGrid',snap:'tSnap',ortho:'tOrtho',osnap:'tOsnap',dyn:'tDyn'};
   document.getElementById(map[k]).classList.toggle('on', T[k]);
   log(`${k.toUpperCase()} ${T[k]?'on':'off'}`);
   draw();
@@ -222,6 +222,7 @@ export function startCommand(raw){
   if (name==='TOGORTHO'){ setTog('ortho'); return; }
   if (name==='TOGOSNAP'){ setTog('osnap'); return; }
   if (name==='TOGGRID'){ setTog('grid'); return; }
+  if (name==='TOGDYN'){ setTog('dyn'); return; }
   if (name==='HELP'){ toggleHelp(); return; }
   if (name==='PLOT'){
     if (plotOpener) plotOpener(); else log('Print dialog unavailable.', 'e');

@@ -61,6 +61,7 @@ point steps accept `x,y` / `@dx,dy` / `@d<a` / direct-distance via `parsePoint`
 | TOGORTHO/TOGOSNAP/TOGGRID | `ORTHO` `GRID`, F8/F3/F7 (+F9 snap) | ✅ Instant toggles. Typed `OSNAP` now opens the mode picker instead (F3/chip remain the quick toggle). | `:114–116`, keys `main.js:150–153` |
 | OSNAP dialog | `OSNAP` `OS` | ✅ Per-mode snap picker (AutoCAD Drafting Settings analog): checkbox per marker incl. Nearest ⧖ (default off) and Edge crossing, master F3 sync, alignment-tracking toggle, All on/off. Choices persist per browser (`minicad.osnap`). Gating: `SNAP_ACTIVE` set filters candidates before the fixed `SNAP_PRIORITY` ranking. | `commands.js` (SNAP_ACTIVE/setSnapActive/loadSnapConfig), `js/osnapui.js`, markup `index.html#osnapDlg`, suite 20 |
 | HELP | `?` `HELP` | ✅ In-app panel. | `:117` |
+| TOGDYN | `DYN`, F12, chip | ✅ Dynamic input: prompt + live typing rendered in a tooltip riding the crosshair (edge-aware flip), on by default. Pure display — input routing/UX unchanged. | `view.js` drawDynInput, `main.js` (F12, input redraw), suite 23 |
 | EDITTEXT | *(no alias — double-click a text)* | ✅ Complete. Prefills input with current string; Enter applies (one snapshot), Esc/empty keeps. | `startEditText commands.js:825`, dblclick `main.js:129–133`, apply `:760–766` |
 
 ### Explicitly ABSENT (confirmed by grep over `js/` and `index.html`)

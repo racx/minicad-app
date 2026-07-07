@@ -132,6 +132,7 @@ export function draw(){
     ctx.stroke();
     ctx.strokeStyle = 'rgba(220,225,235,.9)';
     ctx.strokeRect(s.x-4.5, s.y-4.5, 9, 9);
+    drawDynInput(s);
     if (hoverSel){                       // "you can drag this" move glyph
       const gx=s.x+16, gy=s.y-16, a=6;
       ctx.strokeStyle = '#43d6b5'; ctx.lineWidth = 1.4;
@@ -246,6 +247,34 @@ function hatchDots(p0, p1, spec){
   for (let y=y0; y<=y1; y+=gap, row++)
     for (let x=x0 + (row%2 ? gap/2 : 0); x<=x1; x+=gap)
       ctx.fillRect(x-0.75, y-0.75, 1.5, 1.5);
+}
+// dynamic input (AutoCAD F12): prompt + what you're typing, riding the crosshair
+function drawDynInput(s){
+  if (!T.dyn) return;
+  const typed = document.getElementById('cmdInput')?.value || '';
+  let prompt = document.getElementById('prompt')?.textContent || '';
+  if (!cmd && !typed) return;                       // idle and silent: keep the canvas clean
+  if (prompt.length > 46) prompt = prompt.slice(0, 45) + '…';
+  ctx.font = '11px ui-monospace, Menlo, monospace';
+  const lines = typed ? [prompt, typed] : [prompt];
+  const tw = t => ctx.measureText(t)?.width ?? t.length*6.2;   // headless ctx stubs measureText
+  const wMax = Math.max(...lines.map(tw));
+  const bw = wMax + 14, bh = lines.length*15 + 8;
+  let x = s.x + 16, y = s.y + 16;                   // right-below the crosshair…
+  if (x + bw > W - 4) x = s.x - 16 - bw;            // …flip when the edge is near
+  if (y + bh > H - 4) y = s.y - 16 - bh;
+  ctx.fillStyle = 'rgba(28,31,37,.92)';
+  ctx.fillRect(x, y, bw, bh);
+  ctx.strokeStyle = '#2e333d'; ctx.lineWidth = 1;
+  ctx.strokeRect(x+.5, y+.5, bw-1, bh-1);
+  ctx.fillStyle = '#8b93a1';
+  ctx.fillText(prompt, x+7, y+15);
+  if (typed){
+    ctx.fillStyle = '#43d6b5';
+    ctx.fillText(typed, x+7, y+30);
+    const cw = tw(typed);
+    ctx.fillRect(x+8+cw, y+21, 1.5, 11);            // caret
+  }
 }
 function drawEntity(e, dx, dy, ghost){
   const col = ghost ? '#9fb6c9' : layerOf(e.layer).color;

@@ -149,6 +149,7 @@ cv.addEventListener('contextmenu', ev=>{
 });
 
 /* ================= keyboard ================= */
+cmdInput.addEventListener('input', ()=>{ if (T.dyn) draw(); });   // dynamic input mirrors keystrokes live
 cmdInput.addEventListener('keydown', ev=>{
   const typingText = cmd && cmd.step==='string';        // spaces allowed inside TEXT strings
   if (ev.key==='Enter' || (ev.key===' ' && !typingText)){
@@ -162,6 +163,7 @@ window.addEventListener('keydown', ev=>{
   if (ev.key==='F3'){ ev.preventDefault(); setTog('osnap'); return; }
   if (ev.key==='F7'){ ev.preventDefault(); setTog('grid'); return; }
   if (ev.key==='F9'){ ev.preventDefault(); setTog('snap'); return; }
+  if (ev.key==='F12'){ ev.preventDefault(); setTog('dyn'); return; }
   if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase()==='p'){
     ev.preventDefault(); startCommand('PLOT'); return;
   }
@@ -194,8 +196,8 @@ window.addEventListener('keydown', ev=>{
 window.addEventListener('keyup', ev=>{ if (ev.key===' ') spaceHeld=false; });
 
 /* ================= toggles / UI ================= */
-['grid','snap','ortho','osnap'].forEach(k=>{
-  const map={grid:'tGrid',snap:'tSnap',ortho:'tOrtho',osnap:'tOsnap'};
+['grid','snap','ortho','osnap','dyn'].forEach(k=>{
+  const map={grid:'tGrid',snap:'tSnap',ortho:'tOrtho',osnap:'tOsnap',dyn:'tDyn'};
   document.getElementById(map[k]).addEventListener('click', ()=>setTog(k));
 });
 document.querySelectorAll('#topbar .btn[data-cmd]').forEach(b=>{
