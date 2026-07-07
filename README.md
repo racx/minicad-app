@@ -31,10 +31,14 @@ zero-dependency drafting engine, in one monorepo.
   dev defaults to local Ollama (`llama3.2`), free and keyless:
 
   ```bash
-  AI_BASE_URL=http://localhost:11434/v1        AI_MODEL=llama3.2                            AI_API_KEY=          # Ollama (dev default)
+  AI_BASE_URL=http://localhost:11434/v1        AI_MODEL=qwen2.5-coder:7b                    AI_API_KEY=          # Ollama (dev default)
   AI_BASE_URL=https://api.anthropic.com/v1     AI_MODEL=claude-sonnet-5                     AI_API_KEY=sk-ant-…  # Anthropic (OpenAI-compat)
   AI_BASE_URL=https://openrouter.ai/api/v1     AI_MODEL=meta-llama/llama-3.3-70b-instruct   AI_API_KEY=sk-or-…   # OpenRouter
   ```
+
+  **Ollama note:** its default context window (~4k tokens) silently truncates
+  the prompt on larger drawings — run it with
+  `OLLAMA_CONTEXT_LENGTH=16384 ollama serve`.
 
   The system prompt embeds the engine design doc's grammar **verbatim at
   boot** (`prompts/system.md` + `AiPrompt`; CI gates against drift); few-shot
@@ -76,6 +80,24 @@ npm test -w packages/engine   # engine suites alone
 
 `/try` starts first-time visitors on a copy of the demo studio plan — baked
 from the same `.mscript` source at build time.
+
+### AI evals
+
+```bash
+bin/dev                                              # server with the model AI_* points at
+node evals/run.mjs --base http://localhost:3000 --label $AI_MODEL
+```
+
+Ten fixtures in `evals/fixtures/` (drawing doc or seed script + request +
+entity assertions at 0.05 tolerance): computed-delta MOVE, TRIM pick, COPY
+array, HATCH, clarify, unsupported-feature, deliberately-ambiguous, basic
+draw, and two floor-plan-scale cases against the seeded studio. The runner
+signs in via the developer strategy, creates a drawing per fixture, hits the
+LIVE endpoint, re-executes returned scripts through the engine face and
+grades. Results land in `evals/results/<date>-<model>.md` and are committed —
+baseline evidence, not a gate; failures are data. Every production call is
+also logged to `ai_calls` (request, outcome, retries, tokens, latency, model)
+as eval feedstock.
 
 Copy `.env.example` → `.env` for Google OAuth (a **fresh** OAuth client per
 app — never reuse another app's secret). Local dev works without it via the

@@ -67,6 +67,37 @@ class AiCommandsTest < ActionDispatch::IntegrationTest
     assert_response :unauthorized
   end
 
+  test "every call lands one queryable AiCall row" do
+    assert_difference "AiCall.count", 2 do
+      ask "draw a test square"
+      ask "and a pony"
+    end
+    row = AiCall.order(:id).last
+    assert_equal "clarify", row.status
+    assert_equal "and a pony", row.request
+    assert_equal "stub", row.model
+    assert_equal @user, row.user
+    assert_equal @drawing, row.drawing
+  end
+
+  test "tokens ride the daily counter reset" do
+    @user.update!(ai_requests_on: Date.yesterday, ai_requests_count: 50, ai_tokens_count: 9999)
+    ask "draw a test square"
+    assert_equal 1, @user.reload.ai_requests_count
+    assert_equal 0, @user.ai_tokens_count      # stub burns no tokens; yesterday's meter cleared
+  end
+
+  test "deleting a drawing keeps its AI call log (nullified)" do
+    ask "draw a test square"
+    call = AiCall.order(:id).last
+    assert_difference "Drawing.count", -1 do
+      delete drawing_path(@drawing)
+    end
+    assert_response :see_other
+    assert_nil call.reload.drawing_id
+    assert_equal @user, call.user
+  end
+
   test "rack-attack throttles 10/min/user" do
     Rack::Attack.enabled = true
     Rack::Attack.cache.store = ActiveSupport::Cache::MemoryStore.new

@@ -8,6 +8,8 @@ class AiCommandServiceTest < ActiveSupport::TestCase
       @calls = []
     end
 
+    def model = "fake-model"
+
     def chat(messages:)
       @calls << messages.map(&:dup)
       { content: @replies.shift || "{}", usage: { "prompt_tokens" => 10, "completion_tokens" => 5 },
@@ -63,7 +65,22 @@ class AiCommandServiceTest < ActiveSupport::TestCase
   test "model clarify passes straight through" do
     provider = FakeProvider.new('{"status":"clarify","plan":null,"script":null,"question":"Which line?"}')
     result = call(provider)
-    assert_equal({ status: "clarify", plan: nil, script: nil, question: "Which line?" }, result)
+    assert_equal "clarify", result[:status]
+    assert_equal "Which line?", result[:question]
+    assert_nil result[:script]
+  end
+
+  test "meta reports attempts, tokens, latency and model for logging" do
+    provider = FakeProvider.new(
+      '{"status":"ok","plan":"x","script":"MOVE #99 5,0","question":null}',
+      '{"status":"ok","plan":"x","script":"MOVE #1 5,0","question":null}'
+    )
+    meta = call(provider)[:meta]
+    assert_equal 2, meta[:attempts]
+    assert_equal 20, meta[:prompt_tokens]
+    assert_equal 10, meta[:completion_tokens]
+    assert_equal "fake-model", meta[:model]
+    assert meta[:validator_errors].any? { |e| e["msg"].include?("#99") }
   end
 
   test "garbage reply becomes a friendly failure" do

@@ -10,7 +10,7 @@ class AiProvider
   class Error < StandardError; end
 
   DEV_DEFAULT_BASE  = "http://localhost:11434/v1"
-  DEV_DEFAULT_MODEL = "llama3.2"
+  DEV_DEFAULT_MODEL = "qwen2.5-coder:7b"   # eval-picked: 4/10 (llama3.2) vs 6/10, see evals/results/
 
   def self.from_env
     base = ENV["AI_BASE_URL"].presence

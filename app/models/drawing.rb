@@ -4,6 +4,7 @@ class Drawing < ApplicationRecord
 
   belongs_to :user
   has_many :snapshots, class_name: "DrawingSnapshot", dependent: :delete_all
+  has_many :ai_calls, dependent: :nullify   # call logs are usage evidence — keep them
 
   validates :title, presence: true
   validates :units, inclusion: { in: %w[mm cm m] }

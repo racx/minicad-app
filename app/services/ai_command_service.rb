@@ -19,18 +19,23 @@ class AiCommandService < BaseService
   VALIDATOR = Rails.root.join("bin/validate-mscript.mjs").to_s
 
   def call
-    return AiCommandStubService.call(request: request, context: context) unless provider
+    @meta = { attempts: 0, prompt_tokens: 0, completion_tokens: 0, latency_ms: 0,
+              model: provider ? provider.model : "stub", validator_errors: [] }
+    return AiCommandStubService.call(request: request, context: context).merge(meta: @meta) unless provider
 
     messages = build_messages
-    attempt = 0
     loop do
-      attempt += 1
+      @meta[:attempts] += 1
       begin
         reply = provider.chat(messages: messages)
       rescue AiProvider::Error => e
         Rails.logger.warn("ai_command provider error: #{e.message}")
         return failure("The AI backend didn't answer — try again in a moment.")
       end
+      @meta[:prompt_tokens]     += reply.dig(:usage, "prompt_tokens").to_i
+      @meta[:completion_tokens] += reply.dig(:usage, "completion_tokens").to_i
+      @meta[:latency_ms]        += reply[:latency_ms].to_i
+      @meta[:model] = reply[:model] if reply[:model].present?
 
       data = extract_json(reply[:content])
       return failure("The AI answered in a format MiniCAD couldn't read — try again.") unless data
@@ -38,19 +43,22 @@ class AiCommandService < BaseService
       case data["status"]
       when "clarify"
         question = data["question"].to_s.presence || "Could you say more precisely what to draw?"
-        return { status: "clarify", plan: nil, script: nil, question: question }
+        return { status: "clarify", plan: nil, script: nil, question: question, meta: @meta }
       when "ok"
         script = data["script"].to_s
         errors = validate(script)
         if errors.empty?
-          return { status: "ok", plan: data["plan"].to_s.presence || "AI drawing", script: script, question: nil }
-        elsif attempt < MAX_ATTEMPTS
+          return { status: "ok", plan: data["plan"].to_s.presence || "AI drawing", script: script,
+                   question: nil, meta: @meta }
+        elsif @meta[:attempts] < MAX_ATTEMPTS
+          @meta[:validator_errors] += errors.first(5)
           messages << { role: "assistant", content: reply[:content] }
           messages << { role: "user", content: retry_message(errors) }
         else
-          Rails.logger.info("ai_command gave up after #{attempt} attempts: #{errors.first(3).to_json}")
+          @meta[:validator_errors] += errors.first(5)
+          Rails.logger.info("ai_command gave up after #{@meta[:attempts]} attempts: #{errors.first(3).to_json}")
           return failure("The AI couldn't produce a valid script for that (two tries) — " \
-                         "rephrasing or breaking the request into smaller steps usually helps.")
+                         "rephrasing or breaking the request into smaller steps usually helps.", failed: true)
         end
       else
         return failure("The AI answered in a format MiniCAD couldn't read — try again.")
@@ -60,8 +68,9 @@ class AiCommandService < BaseService
 
   private
 
-  def failure(message)
-    { status: "clarify", plan: nil, script: nil, question: message }
+  def failure(message, failed: false)
+    { status: "clarify", plan: nil, script: nil, question: message,
+      meta: (@meta || {}).merge(failed: failed) }
   end
 
   def build_messages

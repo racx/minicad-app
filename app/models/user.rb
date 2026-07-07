@@ -2,6 +2,7 @@ class User < ApplicationRecord
   devise :database_authenticatable, :trackable, :omniauthable
 
   has_many :drawings, dependent: :destroy
+  has_many :ai_calls, dependent: :delete_all   # a deleted user takes their logs along
 
   validates :name, presence: true
   validates :email, presence: true, uniqueness: true
@@ -13,12 +14,16 @@ class User < ApplicationRecord
   def register_ai_request!(limit:)
     today = Date.current
     if ai_requests_on != today
-      update!(ai_requests_on: today, ai_requests_count: 1)
+      update!(ai_requests_on: today, ai_requests_count: 1, ai_tokens_count: 0)
       return true
     end
     return false if ai_requests_count >= limit
 
     increment!(:ai_requests_count)
     true
+  end
+
+  def add_ai_tokens!(n)
+    increment!(:ai_tokens_count, n) if n.positive?
   end
 end
