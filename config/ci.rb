@@ -11,6 +11,7 @@ CI.run do
   step "Tests: Rails", "bin/rails test"
   step "Tests: Seeds", "env RAILS_ENV=test bin/rails db:seed:replant"
   step "Tests: Engine (packages/engine)", "npm test -w packages/engine"
+  step "Boundary: engine face only", "bin/check-engine-boundary"
 
   # Tailwind serves the shell views, Vite serves the editor bundle — both must build.
   step "Build: Tailwind (shell)", "bin/rails tailwindcss:build"

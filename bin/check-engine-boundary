@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Engine boundary gate: app code imports @minicad/engine ONLY via the
+# package face ('@minicad/engine'), the DOM adapter ('@minicad/engine/dom'),
+# or the raw markup ('@minicad/engine/index.html'). Deep module paths
+# ('@minicad/engine/js/…') are forbidden — they bypass the face.
+set -euo pipefail
+hits=$(grep -rn "@minicad/engine/js/" app/javascript || true)
+if [ -n "$hits" ]; then
+  echo "Deep engine imports are forbidden (use the face or /dom):"
+  echo "$hits"
+  exit 1
+fi
+echo "Engine boundary clean — no deep imports in app/javascript."

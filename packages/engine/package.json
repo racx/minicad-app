@@ -10,7 +10,6 @@
   "exports": {
     ".": "./js/core/index.js",
     "./dom": "./js/adapters/dom/index.js",
-    "./index.html": "./index.html",
-    "./js/*": "./js/*"
+    "./index.html": "./index.html"
   }
 }

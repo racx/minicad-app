@@ -10,7 +10,7 @@
    Anonymous /try mode boots the engine with its own localStorage autosave and
    shows a "sign in with Google to save" nudge instead. */
 import engineHtml from '@minicad/engine/index.html?raw'
-import { parseMScript } from '../lib/mscript.js'
+import { createEngine } from '@minicad/engine'
 
 const mount = document.getElementById('editor-mount')
 const cfg = mount.dataset
@@ -83,7 +83,7 @@ function injectEngine() {
 }
 
 /* ---------- boot ---------- */
-let engine // { state, view, ui } module namespaces
+let engine // { state, view, ui, face } — face bundle + dom adapter handles
 
 async function boot() {
   injectEngine()
@@ -93,14 +93,16 @@ async function boot() {
   // behavior — the engine restores and autosaves its own key untouched.
   if (!anonymous) localStorage.removeItem(ENGINE_AUTOSAVE_KEY)
 
-  // Engine modules touch the DOM at import time — inject first, import after.
-  const [state, view, ui] = await Promise.all([
-    import('@minicad/engine/js/core/state.js'),
-    import('@minicad/engine/js/adapters/dom/view.js'),
-    import('@minicad/engine/js/adapters/dom/ui.js')
-  ])
-  await import('@minicad/engine/js/adapters/dom/main.js')
-  engine = { state, view, ui }
+  // The face is DOM-free; the dom adapter boots on import and must come
+  // AFTER the engine markup is injected.
+  const face = createEngine()
+  const dom = await import('@minicad/engine/dom')
+  engine = {
+    face,
+    state: face.state,
+    view: { draw: dom.draw, zoomExtents: dom.zoomExtents, ctx: dom.ctx, w2s: dom.w2s },
+    ui: { log: dom.log, refreshLayers: dom.refreshLayers }
+  }
 
   if (!anonymous) startAdapter()
 }
@@ -309,8 +311,9 @@ function startAdapter() {
   startAiLoop()
 }
 
-/* ---------- AI commands: request → MScript validation → ghost → Enter/Esc ---------- */
-let aiGhosts = null   // parsed entities awaiting commit
+/* ---------- AI commands: request → engine MScript validation → ghost → Enter/Esc ---------- */
+let aiGhosts = null   // previewed entities awaiting commit
+let aiScript = null   // the validated script, executed atomically on Enter
 
 function startAiLoop() {
   const input = document.getElementById('saas-ai')
@@ -334,12 +337,14 @@ function startAiLoop() {
       })
       const data = await res.json().catch(() => ({}))
       if (data.status === 'ok' && data.script) {
-        const parsed = parseMScript(data.script)
-        if (parsed.errors.length) {
-          engine.ui.log(`AI script rejected: ${parsed.errors[0].msg} (line ${parsed.errors[0].line}) — nothing was drawn.`, 'e')
+        const preview = engine.face.previewScript(data.script)
+        if (preview.errors.length) {
+          const e0 = preview.errors[0]
+          engine.ui.log(`AI script rejected: ${e0.msg} (line ${e0.line}) — nothing was drawn.`, 'e')
           setStatus('AI script invalid', 'err')
         } else {
-          startAiPreview(parsed.entities, data.plan)
+          aiScript = data.script
+          startAiPreview(preview.entities, data.plan)
         }
       } else if (data.status === 'clarify' && data.question) {
         engine.ui.log(`AI: ${data.question}`, 'e')
@@ -380,20 +385,25 @@ function aiPreviewKeys(e) {
 
 function endAiPreview() {
   aiGhosts = null
+  aiScript = null
   hideBanner()
   window.removeEventListener('keydown', aiPreviewKeys, { capture: true })
   engine.view.draw()
 }
 
 function commitAiPreview() {
-  const { state, view, ui } = engine
-  const ghosts = aiGhosts
+  const script = aiScript
+  const n = aiGhosts.length
   endAiPreview()
-  state.snapshot()                                    // one undo step, engine idiom
-  for (const g of ghosts)
-    state.entities.push({ ...g, id: state.nextId(), layer: state.currentLayer })
-  view.zoomExtents()
-  ui.log(`AI: drew ${ghosts.length} object${ghosts.length > 1 ? 's' : ''} — U to undo.`, 'r')
+  const result = engine.face.executeScript(script)    // atomic, ONE undo entry
+  if (result.errors.length) {
+    const e0 = result.errors[0]
+    engine.ui.log(`AI script failed: ${e0.msg} (line ${e0.line}) — nothing was drawn.`, 'e')
+    setStatus('AI script invalid', 'err')
+    return
+  }
+  engine.view.zoomExtents()
+  engine.ui.log(`AI: drew ${result.created.length || n} object${(result.created.length || n) > 1 ? 's' : ''} — U to undo.`, 'r')
   document.getElementById('saas-ai').value = ''
 }
 
