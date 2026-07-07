@@ -126,6 +126,18 @@ check('EDITTEXT rewrites the string', r.errors.length === 0 && byType('text')[0]
 r = run('NEW CONFIRM');
 check('NEW CONFIRM wipes the drawing', r.errors.length === 0 && S.entities.length === 0);
 
+/* ===== PLINE arc segments (A/L, mirroring the interactive command) ===== */
+reset();
+r = run('PLINE 0,10 0,0 A 10,0 L 20,0');
+check('scripted A: tangent arc segment gets bulge 1', r.errors.length === 0 &&
+      byType('pline')[0].pts.length === 4 && near(byType('pline')[0].pts[1].bulge, 1, 1e-9));
+reset();
+r = run('PLINE 0,0 A 5,-5 10,0 CLOSE');
+check('scripted arc as FIRST segment: on-arc + end (3-point flow)', r.errors.length === 0 &&
+      near(byType('pline')[0].pts[0].bulge, 1, 1e-6));
+r = run('PLINE 0,0 A');
+check('PLINE ending on a mode token rejected', r.errors.length === 1);
+
 /* ===== extensions: JOIN / EXPLODE / HATCH / AREA ===== */
 reset();
 r = run(`

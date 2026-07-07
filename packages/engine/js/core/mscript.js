@@ -76,7 +76,8 @@ const single = (ids, line, errors) => {
 /* ---------- grammar table: pattern → {kind, build(match)} ---------- */
 const GRAMMAR = [
   [rx(String.raw`LINE((?:\s+${PT}){2,})`),                       m => ({ cmd:'LINE', pts:pts(m[1]) })],
-  [rx(String.raw`PLINE((?:\s+${PT}){2,})(\s+CLOSE)?`),           m => ({ cmd:'PLINE', pts:pts(m[1]), close:!!m[2] })],
+  [rx(String.raw`PLINE((?:\s+(?:${PT}|A|L))+?)(\s+CLOSE)?`),     m => ({ cmd:'PLINE',
+      toks:(m[1].trim().match(new RegExp(`${PT}|A|L`, 'gi')) || []), close:!!m[2] })],
   [rx(String.raw`RECT\s+(${PT})\s+(${PT})`),                     m => ({ cmd:'RECT', p1:pt(m[1]), p2:pt(m[2]) })],
   [rx(String.raw`CIRCLE\s+(${PT})\s+r(${NUM})`),                 m => ({ cmd:'CIRCLE', c:pt(m[1]), r:+m[2] })],
   [rx(String.raw`ARC\s+(${PT})\s+(${PT})\s+(${PT})`),            m => ({ cmd:'ARC', pts:[pt(m[1]),pt(m[2]),pt(m[3])] })],
@@ -150,7 +151,22 @@ function runStatement(st, errors){
 
   switch (st.cmd){
     case 'LINE':   startCommand('LINE');   st.pts.forEach(onPoint); handleEnter(''); break;
-    case 'PLINE':  startCommand('PLINE');  st.pts.forEach(onPoint); handleEnter(st.close ? 'C' : ''); break;
+    case 'PLINE': {
+      // tokens mirror the interactive command: points, A = arc mode (tangent
+      // arc by endpoint; right after the first point it takes on-arc + end),
+      // L = straight again. Must contain at least two points.
+      const nPts = st.toks.filter(t => t.includes(',')).length;
+      if (nPts < 2){ err('PLINE needs at least two points'); return; }
+      if (!st.toks[st.toks.length - 1].includes(',')){ err('PLINE must end with a point'); return; }
+      startCommand('PLINE');
+      for (const tok of st.toks){
+        if (/^A$/i.test(tok)) handleEnter('A');
+        else if (/^L$/i.test(tok)) handleEnter('L');
+        else onPoint(pt(tok));
+      }
+      handleEnter(st.close ? 'C' : '');
+      break;
+    }
     case 'RECT':   startCommand('RECTANG'); onPoint(st.p1); onPoint(st.p2); break;
     case 'CIRCLE': startCommand('CIRCLE'); onPoint(st.c); handleEnter(String(st.r)); break;
     case 'ARC':    startCommand('ARC');    st.pts.forEach(onPoint); break;
