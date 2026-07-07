@@ -1,13 +1,13 @@
 /* =========================================================
    MiniCAD — save / open / DXF export
    ========================================================= */
-import { normAng, fmt } from './geometry.js';
-import { dimGeom, dimH } from './entities.js';
+import { normAng, fmt } from '../../core/geometry.js';
+import { dimGeom, dimH } from '../../core/entities.js';
 import { entities, setEntities, layers, setLayers, getIdSeq, setIdSeq,
-         setCurrentLayer, snapshot, selection, units, setUnits } from './state.js';
+         setCurrentLayer, snapshot, selection, units, setUnits } from '../../core/state.js';
 import { zoomExtents } from './view.js';
 import { log, refreshLayers } from './ui.js';
-import { connectUI } from './core/bus.js';
+import { connectUI } from '../../core/bus.js';
 
 export function download(name, data, mime){
   const a=document.createElement('a');

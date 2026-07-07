@@ -1,10 +1,10 @@
 /* ARC command: 3-point arc drawing. */
 import { setupDOM, check, near, finish } from './stub-dom.mjs';
 const dom = setupDOM();
-await import('../js/main.js');
-const S = await import('../js/state.js');
-const C = await import('../js/commands.js');
-const G = await import('../js/geometry.js');
+await import('../js/adapters/dom/main.js');
+const S = await import('../js/core/state.js');
+const C = await import('../js/core/commands.js');
+const G = await import('../js/core/geometry.js');
 
 S.T.osnap=false; S.T.ortho=false;
 

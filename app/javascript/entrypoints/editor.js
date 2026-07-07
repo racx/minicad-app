@@ -95,11 +95,11 @@ async function boot() {
 
   // Engine modules touch the DOM at import time — inject first, import after.
   const [state, view, ui] = await Promise.all([
-    import('@minicad/engine/js/state.js'),
-    import('@minicad/engine/js/view.js'),
-    import('@minicad/engine/js/ui.js')
+    import('@minicad/engine/js/core/state.js'),
+    import('@minicad/engine/js/adapters/dom/view.js'),
+    import('@minicad/engine/js/adapters/dom/ui.js')
   ])
-  await import('@minicad/engine/js/main.js')
+  await import('@minicad/engine/js/adapters/dom/main.js')
   engine = { state, view, ui }
 
   if (!anonymous) startAdapter()

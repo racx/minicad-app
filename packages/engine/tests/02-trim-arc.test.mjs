@@ -16,12 +16,12 @@ globalThis.window = { devicePixelRatio:1, addEventListener(){} };
 const logLines = [];
 document.getElementById('history').appendChild = d => { logLines.push(d.textContent); };
 
-await import('../js/main.js');
-const S = await import('../js/state.js');
-const C = await import('../js/commands.js');
-const E = await import('../js/entities.js');
-const G = await import('../js/geometry.js');
-const X = await import('../js/intersect.js');
+await import('../js/adapters/dom/main.js');
+const S = await import('../js/core/state.js');
+const C = await import('../js/core/commands.js');
+const E = await import('../js/core/entities.js');
+const G = await import('../js/core/geometry.js');
+const X = await import('../js/core/intersect.js');
 
 let fails = 0;
 const check = (name, cond) => { console.log((cond?'PASS':'FAIL')+'  '+name); if(!cond) fails++; };
@@ -165,7 +165,7 @@ S.setEntities([{id:1, type:'arc', cx:10, cy:20, r:5, a0:Math.PI/2, a1:Math.PI, l
 let dxfData=null;
 globalThis.Blob = class { constructor(parts){ this.data = parts.join(''); } };
 globalThis.URL = { createObjectURL(b){ dxfData=b.data; return 'blob:x'; }, revokeObjectURL(){} };
-const IO = await import('../js/io.js');
+const IO = await import('../js/adapters/dom/io.js');
 IO.dxfExport();
 const lines = dxfData.split('\n');
 const ai = lines.indexOf('ARC');

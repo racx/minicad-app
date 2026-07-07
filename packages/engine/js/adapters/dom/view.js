@@ -1,10 +1,10 @@
 /* =========================================================
    MiniCAD — canvas, view transform, grid, rendering
    ========================================================= */
-import { dist, fmt, arcFrom3, bulgeArc, tangentBulge, bulgeFrom3, plineEndTangent } from './geometry.js';
-import { entities, view, T, cmd, curPt, snapMark, trackGuides, boxSel, mouse, selection, layerOf, layerVisible, hoverSel, hotGrip, unitFmt, units } from './state.js';
-import { entBBox, entGrips, dimGeom, dimH } from './entities.js';
-import { materialByKey } from './materials.js';
+import { dist, fmt, arcFrom3, bulgeArc, tangentBulge, bulgeFrom3, plineEndTangent } from '../../core/geometry.js';
+import { entities, view, T, cmd, curPt, snapMark, trackGuides, boxSel, mouse, selection, layerOf, layerVisible, hoverSel, hotGrip, unitFmt, units } from '../../core/state.js';
+import { entBBox, entGrips, dimGeom, dimH } from '../../core/entities.js';
+import { materialByKey } from '../../core/materials.js';
 import { log } from './ui.js';
 
 export const cv = document.getElementById('cv');
@@ -12,9 +12,9 @@ export const ctx = cv.getContext('2d');
 
 export let DPR = 1, W = 0, H = 0;
 
-export { w2s, s2w, gridStep } from './core/viewport.js';
-import { w2s, s2w, gridStep } from './core/viewport.js';
-import { connectUI } from './core/bus.js';
+export { w2s, s2w, gridStep } from '../../core/viewport.js';
+import { w2s, s2w, gridStep } from '../../core/viewport.js';
+import { connectUI } from '../../core/bus.js';
 
 export function draw(){
   ctx.setTransform(DPR,0,0,DPR,0,0);

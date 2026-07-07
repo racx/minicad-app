@@ -1,10 +1,10 @@
 /* Edge rulers: inert click zone, exported width, render doesn't throw. */
 import { setupDOM, check, near, finish } from './stub-dom.mjs';
 const dom = setupDOM();
-await import('../js/main.js');
-const S = await import('../js/state.js');
-const C = await import('../js/commands.js');
-const V = await import('../js/view.js');
+await import('../js/adapters/dom/main.js');
+const S = await import('../js/core/state.js');
+const C = await import('../js/core/commands.js');
+const V = await import('../js/adapters/dom/view.js');
 
 S.T.osnap=false; S.T.ortho=false;
 

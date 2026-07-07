@@ -1,13 +1,13 @@
 /* UNITS command + persistence + readout; PLOT dialog + window pick + fit math. */
 import { setupDOM, check, near, finish } from './stub-dom.mjs';
 const dom = setupDOM();
-await import('../js/main.js');
-const S = await import('../js/state.js');
-const C = await import('../js/commands.js');
-const IO = await import('../js/io.js');
-const P = await import('../js/plot.js');
-const PU = await import('../js/plotui.js');
-const G = await import('../js/geometry.js');
+await import('../js/adapters/dom/main.js');
+const S = await import('../js/core/state.js');
+const C = await import('../js/core/commands.js');
+const IO = await import('../js/adapters/dom/io.js');
+const P = await import('../js/core/plot.js');
+const PU = await import('../js/adapters/dom/plotui.js');
+const G = await import('../js/core/geometry.js');
 
 S.T.osnap=false; S.T.ortho=false;
 const add=(x1,y1,x2,y2)=>{C.startCommand('L');C.handleEnter(`${x1},${y1}`);C.handleEnter(`${x2},${y2}`);C.handleEnter('');return S.entities[S.entities.length-1];};

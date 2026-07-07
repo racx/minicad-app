@@ -3,9 +3,9 @@
    The AutoCAD "Drafting Settings > Object Snap" analog: typed
    OSNAP/OS opens it; F3 stays the master on/off toggle.
    ========================================================= */
-import { T } from './state.js';
+import { T } from '../../core/state.js';
 import { SNAP_ACTIVE, SNAP_FLAGS, setSnapActive, setSnapTracking,
-         registerOsnapDialog, setTog } from './commands.js';
+         registerOsnapDialog, setTog } from '../../core/commands.js';
 
 const $ = id => document.getElementById(id);
 const dlg = $('osnapDlg');

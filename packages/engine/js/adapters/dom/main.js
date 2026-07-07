@@ -1,17 +1,17 @@
 /* =========================================================
    MiniCAD — event wiring & boot
    ========================================================= */
-import { fmt } from './geometry.js';
+import { fmt } from '../../core/geometry.js';
 import { entities, setEntities, layers, currentLayer, setCurrentLayer, layerOf, snapshot,
          undoStack, view, T, cmd, selection, mouse, curPt, setCurPt, boxSel, setBoxSel,
-         setHoverSel, setHotGrip, units, unitFmt } from './state.js';
+         setHoverSel, setHotGrip, units, unitFmt } from '../../core/state.js';
 import './plotui.js';                                   // print dialog wiring (self-registers)
 import './osnapui.js';                                  // object-snap dialog wiring (self-registers)
 import './hatchui.js';                                  // hatch material picker (self-registers)
-import { findEntityAt, translateIds, entGrips, applyGrip } from './entities.js';
+import { findEntityAt, translateIds, entGrips, applyGrip } from '../../core/entities.js';
 import { cv, s2w, w2s, draw, resize, zoomExtents, RULER_PX, W, H } from './view.js';
 import { startCommand, handleEnter, cancelCmd, applyModifiers, eraseWithDependents,
-         doUndo, doRedo, setTog, clickSelect, boxSelect, onPoint, startEditText } from './commands.js';
+         doUndo, doRedo, setTog, clickSelect, boxSelect, onPoint, startEditText } from '../../core/commands.js';
 import { cmdInput, coordRead, layerSel, layerColor, btnLayerOff, btnLayerLock, log, setPrompt,
          toggleHelp, refreshLayers } from './ui.js';
 import { saveJSON, openJSON, dxfExport, autosaveTick, restoreAutosave } from './io.js';

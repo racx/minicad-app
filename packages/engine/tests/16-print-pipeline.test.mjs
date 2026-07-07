@@ -1,11 +1,11 @@
 /* Print pipeline: dialog settings → sheet HTML with real-mm @page. */
 import { setupDOM, check, near, finish } from './stub-dom.mjs';
 const dom = setupDOM();
-await import('../js/main.js');
-const S = await import('../js/state.js');
-const C = await import('../js/commands.js');
-const PU = await import('../js/plotui.js');
-const P = await import('../js/plot.js');
+await import('../js/adapters/dom/main.js');
+const S = await import('../js/core/state.js');
+const C = await import('../js/core/commands.js');
+const PU = await import('../js/adapters/dom/plotui.js');
+const P = await import('../js/core/plot.js');
 
 S.T.osnap=false; S.T.ortho=false;
 

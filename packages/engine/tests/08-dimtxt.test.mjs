@@ -1,10 +1,10 @@
 /* DIMTXT: adjustable dimension text height (0/absent = automatic). */
 import { setupDOM, check, near, finish } from './stub-dom.mjs';
 const dom = setupDOM();
-await import('../js/main.js');
-const S = await import('../js/state.js');
-const C = await import('../js/commands.js');
-const E = await import('../js/entities.js');
+await import('../js/adapters/dom/main.js');
+const S = await import('../js/core/state.js');
+const C = await import('../js/core/commands.js');
+const E = await import('../js/core/entities.js');
 
 S.T.osnap=false; S.T.ortho=false;
 const reset=()=>{ S.setEntities([]); S.undoStack.length=0; S.selection.clear(); };
@@ -62,7 +62,7 @@ check('scale doubles explicit dim height', near(d4.h,20) && near(E.dimGeom(d4).L
 
 // DXF export uses the explicit height
 const box = dom.captureDownload();
-const IO = await import('../js/io.js');
+const IO = await import('../js/adapters/dom/io.js');
 IO.dxfExport();
 const lines = box.data.split('\n');
 const ti = lines.indexOf('TEXT');

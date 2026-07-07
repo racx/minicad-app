@@ -1,9 +1,9 @@
 /* PAN hand tool: left-drag pans the view, Enter/Esc exits, drawing untouched. */
 import { setupDOM, check, near, finish } from './stub-dom.mjs';
 const dom = setupDOM();
-await import('../js/main.js');
-const S = await import('../js/state.js');
-const C = await import('../js/commands.js');
+await import('../js/adapters/dom/main.js');
+const S = await import('../js/core/state.js');
+const C = await import('../js/core/commands.js');
 
 S.T.osnap=false; S.T.ortho=false;
 C.startCommand('L'); C.handleEnter('0,0'); C.handleEnter('100,0'); C.handleEnter('');

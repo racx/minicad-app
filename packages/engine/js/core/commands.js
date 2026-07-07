@@ -12,8 +12,8 @@ import { entities, setEntities, nextId, layers, currentLayer, undoStack, redoSta
          selRect, setSelRect, plotWin, setPlotWin, units, setUnits,
          setTrackGuides, layerVisible, layerUnlocked } from './state.js';
 import { findEntityAt, entInWindow, entBBox, snapCandidates, translateEnt, translateIds, mirrorEnt } from './entities.js';
-import { sink } from './core/bus.js';
-import { gridStep, s2w } from './core/viewport.js';
+import { sink } from './bus.js';
+import { gridStep, s2w } from './viewport.js';
 
 /* All UI/effect traffic goes through the sink — commands stays DOM-free.
    Local names keep the call sites identical to before the extraction. */

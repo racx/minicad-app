@@ -36,12 +36,12 @@ globalThis.prompt = ()=>null;
 const historyEl = document.getElementById('history');
 historyEl.appendChild = d => { logLines.push(d.textContent); };
 
-await import('../js/main.js');
+await import('../js/adapters/dom/main.js');
 
-const S = await import('../js/state.js');
-const C = await import('../js/commands.js');
-const E = await import('../js/entities.js');
-const IO = await import('../js/io.js');
+const S = await import('../js/core/state.js');
+const C = await import('../js/core/commands.js');
+const E = await import('../js/core/entities.js');
+const IO = await import('../js/adapters/dom/io.js');
 
 let fails = 0;
 const check = (name, cond) => { console.log((cond?'PASS':'FAIL')+'  '+name); if(!cond) fails++; };
@@ -114,7 +114,7 @@ C.cancelCmd();
 
 // --- DXF export content ---
 let dxfData = null;
-IO && (await import('../js/io.js'));
+IO && (await import('../js/adapters/dom/io.js'));
 // intercept download via URL/Blob stubs
 globalThis.Blob = class { constructor(parts){ this.data = parts.join(''); } };
 globalThis.URL = { createObjectURL(b){ dxfData = b.data; return 'blob:x'; }, revokeObjectURL(){} };

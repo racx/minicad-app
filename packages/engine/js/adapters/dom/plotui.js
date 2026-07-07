@@ -1,10 +1,10 @@
 /* =========================================================
    MiniCAD — PLOT dialog wiring (DOM side of js/plot.js)
    ========================================================= */
-import { paperSize, computeFitScale, buildPlotSVG, buildTestPageSVG } from './plot.js';
-import { entities, layers, units, unitFmt, plotWin, layerVisible } from './state.js';
-import { entBBox } from './entities.js';
-import { registerPlotDialog, startCommand } from './commands.js';
+import { paperSize, computeFitScale, buildPlotSVG, buildTestPageSVG } from '../../core/plot.js';
+import { entities, layers, units, unitFmt, plotWin, layerVisible } from '../../core/state.js';
+import { entBBox } from '../../core/entities.js';
+import { registerPlotDialog, startCommand } from '../../core/commands.js';
 import { log } from './ui.js';
 
 const $ = id => document.getElementById(id);

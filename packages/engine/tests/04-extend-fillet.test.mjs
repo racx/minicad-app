@@ -17,10 +17,10 @@ const logLines = [];
 document.getElementById('history').appendChild = d => { logLines.push(d.textContent); };
 const promptEl = document.getElementById('prompt');
 
-await import('../js/main.js');
-const S = await import('../js/state.js');
-const C = await import('../js/commands.js');
-const G = await import('../js/geometry.js');
+await import('../js/adapters/dom/main.js');
+const S = await import('../js/core/state.js');
+const C = await import('../js/core/commands.js');
+const G = await import('../js/core/geometry.js');
 
 let fails = 0;
 const check = (n,c)=>{ console.log((c?'PASS':'FAIL')+'  '+n); if(!c) fails++; };

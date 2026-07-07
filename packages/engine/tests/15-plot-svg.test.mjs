@@ -1,7 +1,7 @@
 /* Pure SVG sheet renderer: mm dimensions, scale math, palette, footer, test page.
    No DOM stub needed — plot.js is a pure module. */
 import { check, near, finish } from './stub-dom.mjs';
-const P = await import('../js/plot.js');
+const P = await import('../js/core/plot.js');
 
 const layers = [{name:'0',color:'#e8e8e8'},{name:'walls',color:'#4db8ff',off:false},{name:'hid',color:'#f00',off:true}];
 const settings = (over={}) => ({paper:'A4', landscape:true, scaleN:50, win:[0,0,400,300],

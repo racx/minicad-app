@@ -1,10 +1,10 @@
 /* Dynamic input (DYN / F12): toggle plumbing + tooltip render path. */
 import { setupDOM, check, finish } from './stub-dom.mjs';
 const dom = setupDOM();
-await import('../js/main.js');
-const S = await import('../js/state.js');
-const C = await import('../js/commands.js');
-const V = await import('../js/view.js');
+await import('../js/adapters/dom/main.js');
+const S = await import('../js/core/state.js');
+const C = await import('../js/core/commands.js');
+const V = await import('../js/adapters/dom/view.js');
 
 check('DYN on by default', S.T.dyn === true);
 

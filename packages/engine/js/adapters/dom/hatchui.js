@@ -1,8 +1,8 @@
 /* =========================================================
    MiniCAD — HATCH dialog wiring (material catalog picker)
    ========================================================= */
-import { MATERIALS } from './materials.js';
-import { registerHatchDialog, chooseHatchMaterial, cancelCmd } from './commands.js';
+import { MATERIALS } from '../../core/materials.js';
+import { registerHatchDialog, chooseHatchMaterial, cancelCmd } from '../../core/commands.js';
 
 const $ = id => document.getElementById(id);
 const dlg = $('hatchDlg');

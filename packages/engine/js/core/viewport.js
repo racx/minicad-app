@@ -3,7 +3,7 @@
    Screen↔world transforms and the adaptive grid step. No DOM:
    canvas sizing/rendering stay in the view adapter.
    ========================================================= */
-import { view } from '../state.js';
+import { view } from './state.js';
 
 export function w2s(p){ return { x: p.x*view.scale + view.ox, y: -p.y*view.scale + view.oy }; }
 export function s2w(x, y){ return { x: (x - view.ox)/view.scale, y: (view.oy - y)/view.scale }; }

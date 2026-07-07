@@ -1,8 +1,8 @@
 /* =========================================================
    MiniCAD — command line, history, help, layer widgets
    ========================================================= */
-import { layers, currentLayer, layerOf } from './state.js';
-import { connectUI } from './core/bus.js';
+import { layers, currentLayer, layerOf } from '../../core/state.js';
+import { connectUI } from '../../core/bus.js';
 
 export const cmdInput = document.getElementById('cmdInput');
 export const promptEl = document.getElementById('prompt');

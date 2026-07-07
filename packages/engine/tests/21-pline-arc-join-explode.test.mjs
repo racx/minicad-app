@@ -1,13 +1,13 @@
 /* Arc segments in polylines (bulge vertices), PLINE A/L modes, JOIN, EXPLODE. */
 import { setupDOM, check, near, finish } from './stub-dom.mjs';
 const dom = setupDOM();
-await import('../js/main.js');
-const S = await import('../js/state.js');
-const C = await import('../js/commands.js');
-const G = await import('../js/geometry.js');
-const E = await import('../js/entities.js');
-const X = await import('../js/intersect.js');
-const IO = await import('../js/io.js');
+await import('../js/adapters/dom/main.js');
+const S = await import('../js/core/state.js');
+const C = await import('../js/core/commands.js');
+const G = await import('../js/core/geometry.js');
+const E = await import('../js/core/entities.js');
+const X = await import('../js/core/intersect.js');
+const IO = await import('../js/adapters/dom/io.js');
 
 S.T.osnap=false; S.T.ortho=false; S.T.snap=false;
 const reset=()=>{S.setEntities([]);S.undoStack.length=0;S.selection.clear();C.cancelCmd(true);};

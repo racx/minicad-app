@@ -16,10 +16,10 @@ globalThis.document = { getElementById(id){ if(!els.has(id)) els.set(id, makeEl(
 const winListeners = {};
 globalThis.window = { devicePixelRatio:1, addEventListener(type,fn){ (winListeners[type] ||= []).push(fn); } };
 
-await import('../js/main.js');
-const S = await import('../js/state.js');
-const C = await import('../js/commands.js');
-const V = await import('../js/view.js');
+await import('../js/adapters/dom/main.js');
+const S = await import('../js/core/state.js');
+const C = await import('../js/core/commands.js');
+const V = await import('../js/adapters/dom/view.js');
 
 const cv = document.getElementById('cv');
 const fire = (target, type, ev) => (target.listeners||winListeners)[type]?.forEach(fn=>fn({preventDefault(){}, ...ev}));

@@ -6,10 +6,10 @@ globalThis.document={getElementById(id){if(!els.has(id))els.set(id,makeEl());ret
 const winL={};
 globalThis.window={devicePixelRatio:1,addEventListener(t,f){(winL[t] ||= []).push(f);}};
 const logs=[]; document.getElementById('history').appendChild=d=>logs.push(d.textContent);
-await import('../js/main.js');
-const S=await import('../js/state.js'); const C=await import('../js/commands.js');
-const E=await import('../js/entities.js'); const V=await import('../js/view.js');
-const G=await import('../js/geometry.js');
+await import('../js/adapters/dom/main.js');
+const S=await import('../js/core/state.js'); const C=await import('../js/core/commands.js');
+const E=await import('../js/core/entities.js'); const V=await import('../js/adapters/dom/view.js');
+const G=await import('../js/core/geometry.js');
 let fails=0; const check=(n,c)=>{console.log((c?'PASS':'FAIL')+'  '+n); if(!c)fails++;};
 const near=(a,b,e=1e-6)=>Math.abs(a-b)<e;
 S.T.osnap=false; S.T.ortho=false;
@@ -135,7 +135,7 @@ check('stretch moved line end and dim defpoint together',
 let dxf=null;
 globalThis.Blob=class{constructor(p){this.data=p.join('');}};
 globalThis.URL={createObjectURL(b){dxf=b.data;return 'blob:x';},revokeObjectURL(){}};
-const IO=await import('../js/io.js');
+const IO=await import('../js/adapters/dom/io.js');
 IO.dxfExport();
 check('DXF contains dim as 3 lines + text with value', (dxf.match(/\nLINE\n/g)||[]).length>=4 && dxf.includes('140'));
 
