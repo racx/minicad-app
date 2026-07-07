@@ -1,0 +1,84 @@
+# @title Terrace house facade
+# @sheet A-201
+# Street elevation 1:50 · units cm. Two storeys, gabled roof.
+# Origin at the left end of the facade on the ground line.
+
+UNITS cm
+
+# ===== ground line + body =====
+LAYER "walls" CURRENT
+# ground line, drawn past the house both sides
+LINE -120,0 720,0
+LINE -120,-8 720,-8
+# facade outline: eaves at 560
+RECT 0,0 600,560
+# floor line (first-floor slab shows as a string course)
+LINE 0,280 600,280
+LINE 0,292 600,292
+
+# ===== gabled roof, ridge at 720 =====
+LINE -30,560 300,720
+LINE 300,720 630,560
+LINE -30,560 630,560
+# chimney on the right slope
+LINE 470,638 470,730
+LINE 530,638 530,730
+LINE 460,730 540,730
+LINE 460,742 540,742
+
+# ===== entrance door 90×210 with fanlight and handle =====
+LINE 40,0 40,210
+LINE 130,0 130,210
+LINE 40,210 130,210
+# fanlight over the door
+RECT 40,218 130,258
+LINE 85,218 85,258
+CIRCLE 118,105 r4
+
+# ===== ground-floor windows 120×140, sill at 80 =====
+LAYER "region" color#55606b CURRENT
+RECT 200,80 320,220
+HATCH LAST glass
+RECT 400,80 520,220
+HATCH LAST glass
+# first-floor windows 120×140, sill at 360
+RECT 60,360 180,500
+HATCH LAST glass
+RECT 240,360 360,500
+HATCH LAST glass
+RECT 420,360 540,500
+HATCH LAST glass
+
+# ===== mullions + sills =====
+LAYER "walls" CURRENT
+LINE 260,80 260,220
+LINE 200,150 320,150
+LINE 460,80 460,220
+LINE 400,150 520,150
+LINE 120,360 120,500
+LINE 60,430 180,430
+LINE 300,360 300,500
+LINE 240,430 360,430
+LINE 480,360 480,500
+LINE 420,430 540,430
+# projecting sills
+LINE 192,80 328,80
+LINE 392,80 528,80
+LINE 52,360 188,360
+LINE 232,360 368,360
+LINE 412,360 548,360
+
+# ===== dimensions + labels =====
+LAYER "annot" CURRENT
+DIMTXT h20
+# heights on the left: storey, eaves, ridge
+DIM 0,0 0,280 off90
+DIM 0,280 0,560 off90
+DIM 0,0 0,560 off160
+DIM 300,0 300,720 off-330
+# overall width under the ground line
+DIM 0,0 600,0 off-70
+DIMTXT AUTO
+TEXT 0,-160 h30 "A-201 · TERRACE HOUSE · STREET ELEVATION · 1:50"
+
+ZOOM E

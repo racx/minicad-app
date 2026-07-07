@@ -51,9 +51,15 @@ zero-dependency drafting engine, in one monorepo.
 ```bash
 bin/setup          # deps, db
 bin/dev            # server + tailwind watcher → http://localhost:3000
-bin/ci             # rubocop, security audits, minitest, engine suites, both builds
-npm test -w packages/engine   # engine suites alone (23 suites)
+bin/rails db:seed  # demo user (demo@minicad.local) + four MScript-authored demo
+                   # drawings (db/seeds/drawings/*.mscript, executed through the
+                   # engine face — previews land in tmp/seed-previews/)
+bin/ci             # rubocop, audits, boundary gate, minitest, engine suites, builds
+npm test -w packages/engine   # engine suites alone
 ```
+
+`/try` starts first-time visitors on a copy of the demo studio plan — baked
+from the same `.mscript` source at build time.
 
 Copy `.env.example` → `.env` for Google OAuth (a **fresh** OAuth client per
 app — never reuse another app's secret). Local dev works without it via the

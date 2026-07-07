@@ -11,6 +11,9 @@
    shows a "sign in with Google to save" nudge instead. */
 import engineHtml from '@minicad/engine/index.html?raw'
 import { createEngine } from '@minicad/engine'
+// /try starter canvas: the demo studio plan, straight from its MScript source
+// (single source of truth — the same file the DB seeds execute)
+import starterScript from '../../../db/seeds/drawings/01-studio-apartment.mscript?raw'
 
 const mount = document.getElementById('editor-mount')
 const cfg = mount.dataset
@@ -104,7 +107,17 @@ async function boot() {
     ui: { log: dom.log, refreshLayers: dom.refreshLayers }
   }
 
-  if (!anonymous) startAdapter()
+  if (anonymous){
+    // first visit (no localStorage autosave restored): start with a copy of
+    // the demo studio plan instead of an empty board
+    if (!engine.state.entities.length){
+      const r = engine.face.executeScript(starterScript)
+      if (!r.errors.length){
+        engine.view.zoomExtents()
+        engine.ui.log('Loaded the demo studio plan to play with — type NEW to start fresh.', 'r')
+      }
+    }
+  } else startAdapter()
 }
 
 /* ---------- Rails persistence adapter ---------- */

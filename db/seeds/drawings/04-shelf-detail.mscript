@@ -1,0 +1,62 @@
+# @title Furniture detail — shelf unit
+# @sheet D-301
+# Joinery detail, front elevation, implied 1:10 · units cm.
+# 120×180 unit, 2 cm plywood carcass, three adjustable shelves.
+
+UNITS cm
+
+# ===== carcass: sides, top, plinth — every board drawn as its section =====
+LAYER "walls" CURRENT
+# left + right sides (2 thick, full height)
+RECT 0,0 2,180
+RECT 118,0 120,180
+# top board
+RECT 0,178 120,180
+# plinth / kick, 8 high, set back is not visible in front view
+RECT 2,0 118,8
+
+# ===== shelves: three, 2 thick, at 48 / 92 / 136 =====
+RECT 2,46 118,48
+RECT 2,90 118,92
+RECT 2,134 118,136
+# back panel shows as a hairline at mid-bay (dashed effect via short strokes)
+LINE 60,8 60,46
+LINE 60,48 60,90
+LINE 60,92 60,134
+LINE 60,136 60,178
+
+# ===== shelf-pin holes on the left side, 32 apart =====
+LAYER "furniture" CURRENT
+CIRCLE 6,62 r0.6
+CIRCLE 6,76 r0.6
+CIRCLE 6,106 r0.6
+CIRCLE 6,120 r0.6
+CIRCLE 114,62 r0.6
+CIRCLE 114,76 r0.6
+CIRCLE 114,106 r0.6
+CIRCLE 114,120 r0.6
+
+# ===== dimensions: aligned dims, both axes + bay spacing =====
+LAYER "annot" CURRENT
+DIMTXT h5
+# overall width + height
+DIM 0,0 120,0 off-14
+DIM 0,0 0,180 off16
+# shelf spacing chain on the right edge
+DIM 120,8 120,46 off-12
+DIM 120,48 120,90 off-12
+DIM 120,92 120,134 off-12
+DIM 120,136 120,178 off-12
+# ===== callouts: text + leader lines =====
+DIMTXT AUTO
+TEXT 132,168 h5 "20 PLY THROUGHOUT"
+LINE 130,169 121,176
+TEXT 132,150 h5 "ADJUSTABLE SHELF"
+LINE 130,151 119,137
+TEXT 132,60 h5 "5mm PIN HOLES @ 140"
+LINE 130,61 116,62
+TEXT -60,4 h5 "PLINTH 80"
+LINE -14,6 1,6
+TEXT 0,-32 h7 "D-301 · SHELF UNIT · FRONT · 1:10"
+
+ZOOM E

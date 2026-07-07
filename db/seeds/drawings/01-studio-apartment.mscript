@@ -1,0 +1,132 @@
+# @title Studio apartment — 32 m²
+# @sheet A-101
+# Plan 1:50 · units cm · wall thickness 15, partition 10.
+# Inner shell 800×400 (32.0 m² gross). Origin at the outer SW corner.
+
+UNITS cm
+
+# ===== exterior walls: double lines, 15 apart, drawn with door/window gaps =====
+LAYER "walls" CURRENT
+
+# south wall, outer face (y=0) — gaps: entry 60–150, window 460–580
+LINE 0,0 60,0
+LINE 150,0 460,0
+LINE 580,0 830,0
+# south wall, inner face (y=15)
+LINE 15,15 60,15
+LINE 150,15 460,15
+LINE 580,15 815,15
+
+# north wall, outer face (y=430) — gaps: window 250–370, bath window 640–760
+LINE 0,430 250,430
+LINE 370,430 640,430
+LINE 760,430 830,430
+# north wall, inner face (y=415)
+LINE 15,415 250,415
+LINE 370,415 640,415
+LINE 760,415 815,415
+
+# west + east walls (solid)
+LINE 0,0 0,430
+LINE 15,15 15,415
+LINE 830,0 830,430
+LINE 815,15 815,415
+
+# ===== openings =====
+# entry door 90: jambs, leaf hinged at (60,15), quarter swing r90
+LINE 60,0 60,15
+LINE 150,0 150,15
+LINE 60,15 60,105
+ARC 150,15 123.64,78.64 60,105
+
+# south window 460–580: jambs + double glazing lines
+LINE 460,0 460,15
+LINE 580,0 580,15
+LINE 460,5 580,5
+LINE 460,10 580,10
+
+# north living window 250–370
+LINE 250,415 250,430
+LINE 370,415 370,430
+LINE 250,420 370,420
+LINE 250,425 370,425
+
+# north bath window 640–760
+LINE 640,415 640,430
+LINE 760,415 760,430
+LINE 640,420 760,420
+LINE 640,425 760,425
+
+# ===== partition (10 thick) at x 595–605, door opening y 270–350 =====
+LINE 595,15 595,270
+LINE 595,350 595,415
+LINE 605,15 605,270
+LINE 605,350 605,415
+LINE 595,270 605,270
+LINE 595,350 605,350
+# bath door leaf hinged at (605,350), swings into the bathroom
+LINE 605,350 685,350
+ARC 685,350 661.57,293.43 605,270
+
+# ===== furniture =====
+LAYER "furniture" CURRENT
+# kitchen counter along the west wall, 60 deep
+RECT 15,115 75,415
+# sink + drain
+RECT 25,315 65,375
+CIRCLE 45,345 r4
+# cooktop, four rings
+CIRCLE 33,165 r9
+CIRCLE 57,165 r9
+CIRCLE 33,205 r9
+CIRCLE 57,205 r9
+# bed 140×210
+RECT 430,25 570,235
+LINE 430,80 570,80
+# table + two chairs
+CIRCLE 300,200 r45
+RECT 230,140 270,180
+RECT 330,220 370,260
+# sofa along the north wall
+RECT 180,330 330,405
+# bathroom: shower 90×90 with diagonals, WC, basin
+RECT 615,15 705,105
+LINE 615,15 705,105
+LINE 615,105 705,15
+RECT 745,340 810,415
+CIRCLE 777,377 r18
+CIRCLE 650,375 r22
+RECT 620,345 680,415
+
+# ===== floor finishes (hatch boundaries on their own layer) =====
+LAYER "region" color#55606b CURRENT
+RECT 15,15 595,415
+HATCH LAST wood
+# AREA readback: Polyline — area 232000 cm² (perimeter 1960 cm) → 23.2 m²
+AREA LAST
+RECT 605,15 815,415
+HATCH LAST concrete
+# AREA readback: Polyline — area 84000 cm² (perimeter 1220 cm) → 8.4 m²
+AREA LAST
+
+# ===== annotation =====
+LAYER "annot" CURRENT
+TEXT 200,270 h28 "LIVING · 23.2 m²"
+TEXT 630,150 h22 "BATH · 8.4 m²"
+TEXT 90,135 h20 "KITCHEN"
+# fixed dim text so the short chain segments stay readable at 1:50
+DIMTXT h20
+# dimension chain along the south wall, then the two overalls
+DIM 0,0 60,0 off-45
+DIM 60,0 150,0 off-45
+DIM 150,0 460,0 off-45
+DIM 460,0 580,0 off-45
+DIM 580,0 830,0 off-45
+DIM 0,0 830,0 off-95
+DIM 0,0 0,430 off75
+DIM 830,430 830,0 off75
+# sheet label
+DIMTXT AUTO
+TEXT 0,-165 h30 "A-101 · STUDIO APARTMENT · 1:50"
+
+ZOOM E

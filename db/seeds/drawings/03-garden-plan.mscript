@@ -1,0 +1,69 @@
+# @title Garden plan
+# @sheet L-101
+# Landscape plan 1:100 · units cm. Corner plot, house at the SW,
+# lawn to the east, brick path from the terrace door to the street gate.
+
+UNITS cm
+
+# ===== site boundary: five-sided corner plot, splayed NW corner =====
+LAYER "walls" CURRENT
+PLINE 0,0 1200,0 1200,800 400,800 0,500 CLOSE
+
+# ===== house footprint with terrace =====
+RECT 100,100 500,400
+# terrace slab off the east face
+RECT 500,140 620,360
+# door from house to terrace (gap marked by jambs on the shared edge)
+LINE 500,220 500,280
+
+# ===== brick path: terrace → street gate at the SE =====
+LAYER "region" color#55606b CURRENT
+PLINE 620,220 1080,220 1080,0 1160,0 1160,280 620,280 CLOSE
+HATCH LAST brick
+# AREA readback: Brick / masonry — area 50000 cm² (perimeter 1640 cm) → 5.0 m²
+AREA LAST
+
+# ===== lawn: everything NE of house and path =====
+PLINE 560,360 1140,360 1140,740 440,740 CLOSE
+HATCH LAST green
+# AREA readback: Green area — area 243200 cm² → 24.3 m²
+AREA LAST
+
+# ===== pond: organic blob — 3-point arc, tangent arc, straight close =====
+PLINE 700,540 A 780,600 860,540 A 800,470 CLOSE
+HATCH LAST water
+AREA LAST
+
+# ===== trees: canopy circles with center marks =====
+LAYER "furniture" CURRENT
+CIRCLE 950,560 r90
+LINE 935,560 965,560
+LINE 950,545 950,575
+CIRCLE 260,620 r70
+LINE 245,620 275,620
+LINE 260,605 260,635
+# hedge along the north boundary
+LINE 420,780 1180,780
+
+# ===== north arrow (above the plot, clear of the boundary), built from lines =====
+LAYER "annot" CURRENT
+CIRCLE 1130,890 r45
+LINE 1130,850 1130,930
+LINE 1130,930 1115,895
+LINE 1130,930 1145,895
+TEXT 1118,935 h26 "N"
+
+# ===== labels + key dimensions =====
+# note: the lawn's dot hatch runs under the pond and tree canopies — the
+# engine has no hatch island detection yet (see ROADMAP); acceptable here.
+TEXT 220,240 h30 "HOUSE"
+TEXT 920,415 h26 "LAWN"
+TEXT 800,240 h24 "PATH"
+TEXT 512,240 h20 "TERRACE"
+DIMTXT h24
+DIM 0,0 1200,0 off-80
+DIM 1200,0 1200,800 off-80
+DIMTXT AUTO
+TEXT 0,-190 h32 "L-101 · GARDEN PLAN · 1:100"
+
+ZOOM E
