@@ -14,6 +14,7 @@ export const sink = {
   toggleHelp: () => {},    // (force?) — help panel
   editText: () => {},      // (str) — seed the command input for in-place text editing
   clearAutosave: () => {}, // NEW command wipes the crash-net copy
+  layersChanged: () => {}, // layer list/props changed — adapter refreshes the layer widget
 };
 
 export function connectUI(impl){ Object.assign(sink, impl); }

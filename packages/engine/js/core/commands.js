@@ -43,6 +43,9 @@ export const ALIASES = {
 const MODIFY = new Set(['MOVE','COPY','ROTATE','SCALE','ERASE','MIRROR','JOIN','EXPLODE']);
 let filletRadius = 0;   // remembered across FILLET invocations
 let dimTextHeight = 0;  // remembered dim text height; 0 = automatic (4% of length)
+// scripted execution (mscript) snapshots these so a failed script restores them
+export function snapshotPrefs(){ return { filletRadius, dimTextHeight }; }
+export function restorePrefs(p){ filletRadius = p.filletRadius; dimTextHeight = p.dimTextHeight; }
 
 /* ---------- undo / redo ---------- */
 export function doUndo(){
@@ -584,22 +587,28 @@ function boundaryAt(p){
   }
   return best ? {b:best} : {err:'No closed shape there — click inside a room or on its outline.'};
 }
+// create/update the hatch on a validated boundary — shared by the interactive
+// HATCH command and scripted HATCH (mscript). Returns false if unmeasurable.
+export function hatchBoundary(b, matKey){
+  const a = entityArea(b);
+  if (!a){ log('Could not measure that shape.', 'e'); return false; }
+  snapshot();
+  const existing = entities.find(z=>z.type==='hatch' && z.ref===b.id);
+  const matName = materialByKey(matKey).name;
+  if (existing){
+    existing.mat = matKey;
+    log(`${matName} hatch updated — area ${areaLabel(a)}.`, 'r');
+  } else {
+    entities.push({id:nextId(), type:'hatch', ref:b.id, mat:matKey, layer:currentLayer});
+    log(`${matName} hatch created — area ${areaLabel(a)}.`, 'r');
+  }
+  return true;
+}
 function placeHatch(p){
   const {b, err} = boundaryAt(p);
   if (err){ log(err, 'e'); return; }
-  const a = entityArea(b);
-  if (!a){ log('Could not measure that shape.', 'e'); return; }
-  snapshot();
-  const existing = entities.find(z=>z.type==='hatch' && z.ref===b.id);
-  const matName = materialByKey(cmd.mat).name;
-  if (existing){
-    existing.mat = cmd.mat;
-    log(`${matName} hatch updated — area ${areaLabel(a)}.`, 'r');
-  } else {
-    entities.push({id:nextId(), type:'hatch', ref:b.id, mat:cmd.mat, layer:currentLayer});
-    log(`${matName} hatch created — area ${areaLabel(a)}.`, 'r');
-  }
-  setPrompt(`HATCH (${matName.toLowerCase()}) — Click another closed shape (Enter to end):`);
+  if (!hatchBoundary(b, cmd.mat)) return;
+  setPrompt(`HATCH (${materialByKey(cmd.mat).name.toLowerCase()}) — Click another closed shape (Enter to end):`);
 }
 function reportArea(p){
   const {b, hatch, err} = boundaryAt(p);

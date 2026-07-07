@@ -46,6 +46,7 @@ export function refreshLayers(){
 /* the command-line adapter implements the core's UI sink */
 connectUI({
   log, setPrompt, toggleHelp,
+  layersChanged: refreshLayers,
   editText: str => { cmdInput.value = str; },
   toggled: (k, on) => {
     const map = {grid:'tGrid', snap:'tSnap', ortho:'tOrtho', osnap:'tOsnap', dyn:'tDyn'};
