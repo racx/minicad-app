@@ -172,6 +172,7 @@ for (const f of files){
   const fix = (await import(`./fixtures/${f}`)).default
   const doc = fix.seedScript ? docFromSeed(fix.seedScript) : fix.doc
   loadDoc(doc)
+  for (const id of fix.selection || []) S.selection.add(id)
   const context = engine.serializeContext()
   const before = JSON.parse(JSON.stringify(S.entities))
 

@@ -71,6 +71,23 @@
     script: null
     question: "MiniCAD has no symbol/block library yet, so I can't insert a bathtub symbol. I can draw a simple tub outline (rectangle with rounded inner basin) sized ~170×75 in the bathroom — want that, and against which wall?"
 
+- name: selection-grounded-move
+  request: "move the selected table 50 down"
+  context:
+    units: cm
+    currentLayer: furniture
+    counts: { total: 3, byType: { pline: 2, circle: 1 } }
+    selection: [7]
+    entities:
+      - { id: 7, type: circle, layer: furniture, cx: 300, cy: 200, r: 45 }
+      - { id: 1, type: pline, layer: walls, closed: true, pts: [ { x: 0, y: 0 }, { x: 830, y: 0 }, { x: 830, y: 430 }, { x: 0, y: 430 } ] }
+      - { id: 2, type: pline, layer: furniture, closed: true, pts: [ { x: 430, y: 25 }, { x: 570, y: 25 }, { x: 570, y: 235 }, { x: 430, y: 235 } ] }
+  response:
+    status: ok
+    plan: "Move the selected table (#7, from the selection array) 50 cm down."
+    script: "MOVE #7 0,-50"
+    question: null
+
 - name: seed-studio-rehatch
   request: "hatch the bathroom as wood instead"
   context:
