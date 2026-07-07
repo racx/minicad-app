@@ -158,7 +158,20 @@ cmdInput.addEventListener('keydown', ev=>{
     syncPanBtn();
   }
 });
+// typing in some OTHER editable element (a host app's input, the plot dialog's
+// number field…): the board must keep its hands off — no focus stealing, no
+// Esc-cancel, no space-pan. The engine's own command line stays exempt.
+function foreignInputFocused(){
+  const t = document.activeElement;
+  if (!t || t === cmdInput) return false;
+  return t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable === true;
+}
+
 window.addEventListener('keydown', ev=>{
+  if (foreignInputFocused()){
+    if (ev.key === 'Escape') document.activeElement.blur();   // Esc hands focus back to the board
+    return;
+  }
   if (ev.key==='F8'){ ev.preventDefault(); setTog('ortho'); return; }
   if (ev.key==='F3'){ ev.preventDefault(); setTog('osnap'); return; }
   if (ev.key==='F7'){ ev.preventDefault(); setTog('grid'); return; }
