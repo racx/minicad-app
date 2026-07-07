@@ -10,6 +10,7 @@
      data-lock-version="<%= @drawing.lock_version %>"
      data-updated-at="<%= @drawing.updated_at.iso8601 %>"
      data-autosave-url="<%= autosave_drawing_path(@drawing) %>"
+     data-ai-url="<%= api_drawing_ai_commands_path(@drawing) %>"
      data-copy-url="<%= drawings_path %>"
      data-drawings-url="<%= drawings_path %>">
   <script type="application/json" id="drawing-doc"><%= raw ERB::Util.json_escape(@drawing.doc.to_json) %></script>

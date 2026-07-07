@@ -10,6 +10,7 @@
    Anonymous /try mode boots the engine with its own localStorage autosave and
    shows a "sign in with Google to save" nudge instead. */
 import engineHtml from '@minicad/engine/index.html?raw'
+import { parseMScript } from '../lib/mscript.js'
 
 const mount = document.getElementById('editor-mount')
 const cfg = mount.dataset
@@ -34,6 +35,10 @@ const shellCss = `
   #saas-save{background:var(--panel);border:1px solid var(--line);color:var(--text);
     padding:3px 10px;border-radius:5px;cursor:pointer;font-family:var(--mono);font-size:12px}
   #saas-save:hover{border-color:var(--accent);color:var(--accent)}
+  #saas-ai{background:var(--panel);border:1px solid var(--line);color:var(--text);
+    padding:3px 10px;border-radius:5px;font-family:var(--mono);font-size:12px;width:240px}
+  #saas-ai:focus{outline:none;border-color:var(--accent)}
+  #saas-ai:disabled{opacity:.5}
   #saas-banner{position:absolute;top:0;left:50%;transform:translateX(-50%);z-index:20;
     margin-top:6px;max-width:640px;background:var(--panel);border:1px solid var(--warn);
     border-radius:8px;padding:10px 14px;font-family:var(--mono);font-size:12px;color:var(--text);
@@ -69,6 +74,7 @@ function injectEngine() {
     title.textContent = cfg.drawingTitle
     bar.appendChild(title)
     bar.appendChild(h(`<span class="spacer"></span>`))
+    bar.appendChild(h(`<input id="saas-ai" type="text" placeholder="AI: draw a test square" aria-label="Ask the AI to draw">`))
     bar.appendChild(h(`<span id="saas-status">loading&hellip;</span>`))
     bar.appendChild(h(`<button id="saas-save" type="button">Save</button>`))
   }
@@ -299,6 +305,129 @@ function startAdapter() {
       } catch { /* best effort */ }
     }
   })
+
+  startAiLoop()
+}
+
+/* ---------- AI commands: request → MScript validation → ghost → Enter/Esc ---------- */
+let aiGhosts = null   // parsed entities awaiting commit
+
+function startAiLoop() {
+  const input = document.getElementById('saas-ai')
+
+  input.addEventListener('keydown', async e => {
+    if (e.key !== 'Enter' || aiGhosts) return
+    e.stopPropagation()
+    const request = input.value.trim()
+    if (!request) return
+    input.disabled = true
+    setStatus('asking AI…', 'dirty')
+    try {
+      const res = await fetch(cfg.aiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content
+        },
+        body: JSON.stringify({ request, context: { units: engine.state.units } })
+      })
+      const data = await res.json().catch(() => ({}))
+      if (data.status === 'ok' && data.script) {
+        const parsed = parseMScript(data.script)
+        if (parsed.errors.length) {
+          engine.ui.log(`AI script rejected: ${parsed.errors[0].msg} (line ${parsed.errors[0].line}) — nothing was drawn.`, 'e')
+          setStatus('AI script invalid', 'err')
+        } else {
+          startAiPreview(parsed.entities, data.plan)
+        }
+      } else if (data.status === 'clarify' && data.question) {
+        engine.ui.log(`AI: ${data.question}`, 'e')
+        setStatus('AI needs more', 'dirty')
+      } else if (res.status === 429) {
+        engine.ui.log(`AI: ${data.question || 'rate limit reached — try again in a minute.'}`, 'e')
+        setStatus('AI rate-limited', 'err')
+      } else {
+        engine.ui.log('AI request failed — try again.', 'e')
+        setStatus('AI failed', 'err')
+      }
+    } catch {
+      engine.ui.log('AI request failed — are you offline?', 'e')
+      setStatus('AI failed', 'err')
+    } finally {
+      input.disabled = false
+      if (!aiGhosts) input.focus()
+    }
+  })
+}
+
+function startAiPreview(ghosts, plan) {
+  aiGhosts = ghosts
+  engine.ui.log(`AI plan: ${plan}  —  Enter to keep, Esc to discard.`, 'p')
+  showBanner(`AI wants to draw: ${plan}`, [
+    [ 'Keep (Enter)', commitAiPreview ],
+    [ 'Discard (Esc)', cancelAiPreview ]
+  ])
+  window.addEventListener('keydown', aiPreviewKeys, { capture: true })
+  requestAnimationFrame(aiOverlayTick)
+}
+
+function aiPreviewKeys(e) {
+  if (!aiGhosts) return
+  if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); commitAiPreview() }
+  if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cancelAiPreview() }
+}
+
+function endAiPreview() {
+  aiGhosts = null
+  hideBanner()
+  window.removeEventListener('keydown', aiPreviewKeys, { capture: true })
+  engine.view.draw()
+}
+
+function commitAiPreview() {
+  const { state, view, ui } = engine
+  const ghosts = aiGhosts
+  endAiPreview()
+  state.snapshot()                                    // one undo step, engine idiom
+  for (const g of ghosts)
+    state.entities.push({ ...g, id: state.nextId(), layer: state.currentLayer })
+  view.zoomExtents()
+  ui.log(`AI: drew ${ghosts.length} object${ghosts.length > 1 ? 's' : ''} — U to undo.`, 'r')
+  document.getElementById('saas-ai').value = ''
+}
+
+function cancelAiPreview() {
+  endAiPreview()
+  engine.ui.log('AI preview discarded.', 'r')
+}
+
+// ghost overlay: engine redraws are event-driven; we stroke on top every frame
+function aiOverlayTick() {
+  if (!aiGhosts) return
+  const { view } = engine
+  const { ctx, w2s } = view
+  ctx.save()
+  ctx.strokeStyle = '#43d6b5'
+  ctx.setLineDash([6, 5])
+  ctx.globalAlpha = 0.9
+  ctx.lineWidth = 1.4
+  for (const g of aiGhosts) {
+    ctx.beginPath()
+    if (g.type === 'line') {
+      const a = w2s({ x: g.x1, y: g.y1 }), b = w2s({ x: g.x2, y: g.y2 })
+      ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y)
+    } else if (g.type === 'circle') {
+      const c = w2s({ x: g.cx, y: g.cy })
+      ctx.arc(c.x, c.y, g.r * engine.state.view.scale, 0, Math.PI * 2)
+    } else if (g.type === 'pline') {
+      g.pts.forEach((p, i) => { const s = w2s(p); i ? ctx.lineTo(s.x, s.y) : ctx.moveTo(s.x, s.y) })
+      if (g.closed) ctx.closePath()
+    }
+    ctx.stroke()
+  }
+  ctx.restore()
+  requestAnimationFrame(aiOverlayTick)
 }
 
 boot()

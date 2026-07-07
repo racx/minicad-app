@@ -16,6 +16,10 @@ Rails.application.routes.draw do
 
   get "/try", to: "tries#show", as: :try
 
+  namespace :api do
+    post "drawings/:id/ai_commands", to: "ai_commands#create", as: :drawing_ai_commands
+  end
+
   resources :drawings, except: [ :new, :show ] do
     member do
       get   :rename

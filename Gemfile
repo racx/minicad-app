@@ -70,3 +70,6 @@ gem "devise"
 gem "omniauth", "~> 2.1.4"
 gem "omniauth-google-oauth2", "~> 1.2.2"
 gem "dry-initializer" # service objects (BaseService)
+
+# AI endpoint guardrails (Stage 5)
+gem "rack-attack"
