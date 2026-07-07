@@ -6,15 +6,23 @@ import { dist, fmt, deep, rotPt, ptSegDist, TAU, normAng, arcSweep, arcPt, arcFr
          tangentBulge, bulgeFrom3, plineEndTangent, plineParts, plineCurved, entityArea,
          tessellateBoundary, pointInPoly } from './geometry.js';
 import { materialByKey } from './materials.js';
-import { clearAutosave } from './io.js';
 import { entIntersections, lineEntT, lineLine, perpFoot, tangentPts, nearestOnEnt } from './intersect.js';
 import { entities, setEntities, nextId, layers, currentLayer, undoStack, redoStack, snapshot,
          view, T, cmd, setCmd, lastCmdName, setLastCmdName, selection, curPt, setSnapMark,
          selRect, setSelRect, plotWin, setPlotWin, units, setUnits,
          setTrackGuides, layerVisible, layerUnlocked } from './state.js';
 import { findEntityAt, entInWindow, entBBox, snapCandidates, translateEnt, translateIds, mirrorEnt } from './entities.js';
-import { draw, zoomExtents, gridStep, s2w } from './view.js';
-import { log, setPrompt, toggleHelp, cmdInput } from './ui.js';
+import { sink } from './core/bus.js';
+import { gridStep, s2w } from './core/viewport.js';
+
+/* All UI/effect traffic goes through the sink — commands stays DOM-free.
+   Local names keep the call sites identical to before the extraction. */
+const log = (text, cls) => sink.log(text, cls);
+const setPrompt = text => sink.setPrompt(text);
+const draw = () => sink.changed();
+const zoomExtents = () => sink.zoomExtents();
+const toggleHelp = force => sink.toggleHelp(force);
+const clearAutosave = () => sink.clearAutosave();
 
 export const ALIASES = {
   L:'LINE', LINE:'LINE', PL:'PLINE', PLINE:'PLINE', REC:'RECTANG', RECT:'RECTANG', RECTANG:'RECTANG', RECTANGLE:'RECTANG',
@@ -63,8 +71,7 @@ export function registerHatchDialog(fn){ hatchOpener = fn; }
 /* ---------- toggles ---------- */
 export function setTog(k){
   T[k]=!T[k];
-  const map={grid:'tGrid',snap:'tSnap',ortho:'tOrtho',osnap:'tOsnap',dyn:'tDyn'};
-  document.getElementById(map[k]).classList.toggle('on', T[k]);
+  sink.toggled(k, T[k]);
   log(`${k.toUpperCase()} ${T[k]?'on':'off'}`);
   draw();
 }
@@ -1207,7 +1214,7 @@ function finishPline(close){
 export function startEditText(e){
   cancelCmd(true);
   setCmd({name:'EDITTEXT', step:'string', target:e, pts:[], sel:[]});
-  cmdInput.value = e.str;                                // edit in place
+  sink.editText(e.str);                                  // edit in place
   setPrompt('TEXT — Edit text (Enter to apply, Esc to keep):');
   log(`Editing text: "${e.str}"`);
 }

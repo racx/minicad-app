@@ -12,15 +12,9 @@ export const ctx = cv.getContext('2d');
 
 export let DPR = 1, W = 0, H = 0;
 
-export function w2s(p){ return { x: p.x*view.scale + view.ox, y: -p.y*view.scale + view.oy }; }
-export function s2w(x, y){ return { x: (x - view.ox)/view.scale, y: (view.oy - y)/view.scale }; }
-
-export function gridStep(){
-  const target = 28/view.scale;                 // want ≥28 px between lines
-  const pow = Math.pow(10, Math.floor(Math.log10(target)));
-  for (const m of [1,2,5,10]) if (m*pow >= target) return m*pow;
-  return 10*pow;
-}
+export { w2s, s2w, gridStep } from './core/viewport.js';
+import { w2s, s2w, gridStep } from './core/viewport.js';
+import { connectUI } from './core/bus.js';
 
 export function draw(){
   ctx.setTransform(DPR,0,0,DPR,0,0);
@@ -416,3 +410,6 @@ export function resize(){
   cv.width = Math.round(W*DPR); cv.height = Math.round(H*DPR);
   draw();
 }
+
+/* the view adapter answers the core's redraw / fit-view requests */
+connectUI({ changed: draw, zoomExtents });

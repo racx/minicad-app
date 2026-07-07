@@ -2,6 +2,7 @@
    MiniCAD — command line, history, help, layer widgets
    ========================================================= */
 import { layers, currentLayer, layerOf } from './state.js';
+import { connectUI } from './core/bus.js';
 
 export const cmdInput = document.getElementById('cmdInput');
 export const promptEl = document.getElementById('prompt');
@@ -41,3 +42,13 @@ export function refreshLayers(){
   btnLayerOff.textContent = cur.off ? '🚫' : '👁';
   btnLayerLock.textContent = cur.locked ? '🔒' : '🔓';
 }
+
+/* the command-line adapter implements the core's UI sink */
+connectUI({
+  log, setPrompt, toggleHelp,
+  editText: str => { cmdInput.value = str; },
+  toggled: (k, on) => {
+    const map = {grid:'tGrid', snap:'tSnap', ortho:'tOrtho', osnap:'tOsnap', dyn:'tDyn'};
+    document.getElementById(map[k])?.classList.toggle('on', on);
+  },
+});

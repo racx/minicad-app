@@ -7,6 +7,7 @@ import { entities, setEntities, layers, setLayers, getIdSeq, setIdSeq,
          setCurrentLayer, snapshot, selection, units, setUnits } from './state.js';
 import { zoomExtents } from './view.js';
 import { log, refreshLayers } from './ui.js';
+import { connectUI } from './core/bus.js';
 
 export function download(name, data, mime){
   const a=document.createElement('a');
@@ -108,3 +109,5 @@ export function dxfExport(){
   download('drawing.dxf', L.join('\n'), 'application/dxf');
   log('Exported drawing.dxf — opens in AutoCAD, LibreCAD, QCAD…', 'r');
 }
+
+connectUI({ clearAutosave });
