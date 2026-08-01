@@ -27,7 +27,7 @@ const clearAutosave = () => sink.clearAutosave();
 export const ALIASES = {
   L:'LINE', LINE:'LINE', PL:'PLINE', PLINE:'PLINE', REC:'RECTANG', RECT:'RECTANG', RECTANG:'RECTANG', RECTANGLE:'RECTANG',
   C:'CIRCLE', CIRCLE:'CIRCLE', A:'ARC', ARC:'ARC', T:'TEXT', TEXT:'TEXT', DT:'TEXT',
-  CH:'CHLAYER', CHLAYER:'CHLAYER', NEW:'NEW',
+  CH:'CHLAYER', CHLAYER:'CHLAYER', NEW:'NEW', THAW:'THAW',
   M:'MOVE', MOVE:'MOVE', CO:'COPY', CP:'COPY', COPY:'COPY', RO:'ROTATE', ROTATE:'ROTATE', SC:'SCALE', SCALE:'SCALE',
   O:'OFFSET', OFFSET:'OFFSET', E:'ERASE', ERASE:'ERASE', DEL:'ERASE', TR:'TRIM', TRIM:'TRIM',
   EX:'EXTEND', EXTEND:'EXTEND', F:'FILLET', FILLET:'FILLET',
@@ -228,6 +228,14 @@ export function startCommand(raw){
   // instant commands
   if (name==='UNDO'){ doUndo(); return; }
   if (name==='REDO'){ doRedo(); return; }
+  if (name==='THAW'){                                  // release imported approximations
+    const frozen = entities.filter(e=>e.frozen);
+    if (!frozen.length){ log('Nothing is frozen — every object here is already editable.', 'r'); return; }
+    snapshot();
+    for (const e of frozen) delete e.frozen;
+    log(`${frozen.length} imported object${frozen.length>1?'s are':' is'} now editable.`, 'r');
+    return;
+  }
   if (name==='ZOOMEXT'){ zoomExtents(); return; }
   if (name==='TOGORTHO'){ setTog('ortho'); return; }
   if (name==='TOGOSNAP'){ setTog('osnap'); return; }
@@ -580,7 +588,7 @@ function boundaryAt(p){
   if (hit) return boundaryFor(hit);
   let best=null, bestArea=Infinity;
   for (const e of entities){
-    if (!layerVisible(e.layer) || !layerUnlocked(e.layer)) continue;
+    if (!layerVisible(e.layer) || !layerUnlocked(e.layer) || e.frozen) continue;
     const a = entityArea(e);
     if (!a || a.area>=bestArea) continue;
     if (pointInPoly(p, tessellateBoundary(e))){ best=e; bestArea=a.area; }
@@ -1241,5 +1249,5 @@ export function boxSelect(r, crossing){
   const rect=[w0.x,w0.y,w1.x,w1.y];
   setSelRect(rect);                               // STRETCH uses the last box drawn
   for (const e of entities)
-    if (layerVisible(e.layer) && layerUnlocked(e.layer) && entInWindow(e, rect, crossing)) selection.add(e.id);
+    if (layerVisible(e.layer) && layerUnlocked(e.layer) && !e.frozen && entInWindow(e, rect, crossing)) selection.add(e.id);
 }

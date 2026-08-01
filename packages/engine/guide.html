@@ -179,11 +179,13 @@
   (hatched) areas come in <b>filled</b> where we can manage it — the material is a best guess from
   the drawing, so type <span class="say">HATCH</span> on one to change it.</p>
   <p>But real CAD files also contain shapes MiniCAD doesn't have — curvy splines, ovals. Those
-  still <b>appear</b>, drawn in grey on a locked layer called <b>FROZEN</b>. You can see them and
-  snap to them, so you can measure and draw off them, but clicks and selection boxes pass straight
-  through, which keeps them out of your way. To get at them anyway, pick <b>FROZEN</b> in the
-  layer box and press <b>🔒</b> to unlock (now they behave like anything else) or <b>👁</b> to hide
-  them.</p>
+  still <b>appear</b>, on their own layers and in their own colours, but MiniCAD only has an
+  approximation of them, so clicks and selection boxes pass straight through. You can still see
+  them, hide them with their layer, and snap to them for measuring. Type
+  <span class="say">THAW</span> if you want to make them fully editable.</p>
+  <p><b>Layers work normally.</b> Everything keeps the layer the architect drew it on, so switching
+  a layer off in the layer box really does hide all of it — handy when a drawing arrives with
+  scratch layers you don't care about.</p>
   <p>If a drawing was made in units MiniCAD doesn't have (some files claim inches even when
   they're really metres), the numbers are kept <b>exactly as the architect drew them</b> — nothing
   is silently resized. The app says so, and you can type <span class="say">UNITS</span> to tell it

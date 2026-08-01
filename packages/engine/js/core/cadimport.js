@@ -11,8 +11,13 @@
    ========================================================= */
 import { TAU, normAng, dist, arcPt, bulgeArc } from './geometry.js';
 
-export const FROZEN_LAYER = 'FROZEN';
-const FROZEN_COLOR = '#6f6f6f';
+/* Geometry we could only approximate is marked `frozen` ON THE ENTITY and
+   KEEPS ITS OWN LAYER. An earlier version moved it all to one shared FROZEN
+   layer, which quietly broke the most important tool an architect has: in a
+   real house plan that swallowed 49% of the drawing — every object of
+   "RED-Mobiliário hatch" and "EXCLUIR 13" among them — so switching those
+   layers off hid nothing. Frozen is a property of the object, not a place. */
+export const FROZEN_LAYER = 'FROZEN';   // kept only for older saved drawings
 
 /* ---------- tessellation ---------- */
 const steps = sweep => Math.max(2, Math.ceil(Math.abs(sweep) / (Math.PI/16)));
@@ -192,29 +197,21 @@ export function importDoc(doc){
     if (!seen.has(name)) seen.set(name, {name, color:'#e8e8e8'});
     return name;
   };
-  let frozenUsed = false;
-  const freezeLayer = () => {
-    if (!frozenUsed){
-      seen.delete(FROZEN_LAYER);                   // ours wins over any same-named DXF layer
-      seen.set(FROZEN_LAYER, {name:FROZEN_LAYER, color:FROZEN_COLOR, locked:true});
-      frozenUsed = true;
-    }
-    return FROZEN_LAYER;
-  };
 
   const add = (e, frozen) => {
     e.id = id++;
+    if (frozen) e.frozen = true;                   // non-editable, but keeps its layer
     entities.push(e);
     if (frozen) report.frozen++; else report.native++;
     return e;
   };
-  // A shape can be exactly representable and still belong on FROZEN — a HATCH
-  // boundary is perfectly good geometry that the user must not be able to drag.
-  const place = s => s.frozen ? freezeLayer() : layerFor(s.layer);
-  const freezePoly = (pts, closed) => {
+  // A shape can be exactly representable and still be frozen — a HATCH boundary
+  // is perfectly good geometry the user must not be able to drag by accident.
+  const place = s => layerFor(s.layer);
+  const freezePoly = (pts, closed, layer) => {
     const p = dedupe(pts, closed);
     if (p.length < 2) return;
-    add({type:'pline', layer:freezeLayer(), pts:p, closed:!!closed && p.length>2}, true);
+    add({type:'pline', layer:layerFor(layer), pts:p, closed:!!closed && p.length>2}, true);
   };
 
   // ---- hatches ----
@@ -282,7 +279,7 @@ export function importDoc(doc){
           report.filled++;
         }
       }
-      else freezePoly(pts, s.closed);
+      else freezePoly(pts, s.closed, s.layer);
     }
     else if (s.k==='text'){
       const e = {type:'text', layer:place(s), x:s.p.x, y:s.p.y, h:s.h || 2.5, str:s.s};
@@ -299,13 +296,13 @@ export function importDoc(doc){
     }
     else if (s.k==='ellipse'){
       const e = ellipsePts(s);
-      freezePoly(e.pts, e.closed);
+      freezePoly(e.pts, e.closed, s.layer);
     }
     else if (s.k==='spline'){
-      freezePoly(splinePts(s), s.closed);
+      freezePoly(splinePts(s), s.closed, s.layer);
     }
     else if (s.k==='solid'){
-      freezePoly(s.pts, true);
+      freezePoly(s.pts, true, s.layer);
     }
     // POINT: no MiniCAD equivalent and nothing visible to lose — most are
     // AutoCAD's invisible dimension "Defpoints". Dropped without a fuss.
@@ -316,8 +313,7 @@ export function importDoc(doc){
 
   // A file whose every drawn-on layer is off opens as a blank canvas, which
   // reads as "the importer is broken". Show it and say so instead.
-  // FROZEN is ours, not the file's — it must not vote on whether the file is visible
-  const drawn = layers.filter(l=>used.has(l.name) && l.name!==FROZEN_LAYER);
+  const drawn = layers.filter(l=>used.has(l.name));
   if (drawn.length && drawn.every(l=>l.off)){
     for (const l of drawn) l.off = false;
     report.turnedOn = true;
@@ -362,8 +358,8 @@ export function reportLines(r, name){
              `Ask whoever sent it to "bind" the references, or to send those files too.`);
   }
   if (r.frozen)
-    out.push(`${r.frozen} curved/complex objects are on the locked "${FROZEN_LAYER}" layer — you can see and snap to them, but not edit them. ` +
-             `To change or delete them, pick ${FROZEN_LAYER} in the layer box and press 🔒; press 👁 to hide them instead.`);
+    out.push(`${r.frozen} curved/complex objects came in as approximations — they stay on their own layers and you can see, hide and snap to them, ` +
+             `but clicks pass through so you can't nudge them by accident. Type THAW to make them editable.`);
   if (r.foreignUnit)
     out.push(`That file says it is drawn in ${r.foreignUnit}, which MiniCAD doesn't have — ` +
              `the numbers were kept exactly as they are. Type UNITS to say what 1 unit means.`)

@@ -70,7 +70,8 @@ export function findEntityAt(p){
   const tol = 8/view.scale;
   let best=null, bd=tol;
   for (const e of entities){
-    if (!layerVisible(e.layer) || !layerUnlocked(e.layer)) continue;   // hidden/locked: hands off
+    // hidden / locked layer, or an imported approximation: hands off
+    if (!layerVisible(e.layer) || !layerUnlocked(e.layer) || e.frozen) continue;
     const d=entHitDist(e,p); if (d<=bd){ bd=d; best=e; }
   }
   return best;

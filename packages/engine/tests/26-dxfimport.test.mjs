@@ -47,8 +47,12 @@ r = imp(ents('0','LWPOLYLINE','8','walls','90','2','70','0',
              '10','0','20','0','42','1','10','10','20','0'));   // bulge 1 = half circle
 const fz = one(r,'pline');
 check('bulged polyline is frozen, not native', r.report.frozen===1 && r.report.native===0);
-check('frozen geometry moves to the FROZEN layer', fz.layer===M.FROZEN_LAYER);
-check('FROZEN layer is locked', r.layers.find(l=>l.name===M.FROZEN_LAYER).locked===true);
+// Frozen is a property of the OBJECT, not a place. Moving approximations to a
+// shared layer swallowed 49% of a real house plan and broke layer visibility.
+check('frozen geometry keeps its own layer', fz.layer==='walls');
+check('…and is marked frozen on the entity', fz.frozen===true);
+check('…so turning that layer off still hides it',
+      !r.layers.some(l=>l.name===M.FROZEN_LAYER));
 check('bulge tessellated into many points', fz.pts.length>8);
 // +1 bulge = CCW half turn, which for this chord sweeps *below* it
 check('bulge 1 = semicircle of radius 5', near(Math.min(...fz.pts.map(p=>p.y)), -5, 0.05));
@@ -59,7 +63,7 @@ check('negative bulge sweeps the other way', near(Math.max(...neg.pts.map(p=>p.y
 
 r = imp(ents('0','ELLIPSE','8','0','10','0','20','0','11','20','21','0','40','0.5','41','0','42','0'));
 const el = one(r,'pline');
-check('ELLIPSE frozen as a closed pline', el && el.closed===true && el.layer===M.FROZEN_LAYER);
+check('ELLIPSE frozen as a closed pline on its own layer', el && el.closed===true && el.frozen===true && el.layer==='0');
 check('ELLIPSE respects the 0.5 minor ratio',
       near(Math.max(...el.pts.map(p=>Math.abs(p.x))),20,0.01) &&
       near(Math.max(...el.pts.map(p=>Math.abs(p.y))),10,0.01));
@@ -69,7 +73,7 @@ r = imp(ents('0','SPLINE','8','0','70','8','71','1',
              '40','0','40','0','40','1','40','1',
              '10','0','20','0','10','10','20','10'));
 const sp = one(r,'pline');
-check('SPLINE frozen as a pline', sp && sp.layer===M.FROZEN_LAYER);
+check('SPLINE frozen as a pline on its own layer', sp && sp.frozen===true && sp.layer==='0');
 check('degree-1 spline follows its control polygon',
       near(sp.pts[0].x,0,1e-6) && near(sp.pts[sp.pts.length-1].x,10,1e-6) &&
       sp.pts.every(p=>near(p.x,p.y,1e-6)));
@@ -156,7 +160,7 @@ check('no duplicate "0" layer is invented',
 r = imp(wrap([], ['0','TABLE','2','LAYER','0','LAYER','2','a','62','-2','70','0','0','ENDTAB'], [],
              ['0','LINE','8','a','10','0','20','0','11','1','21','0',
               '0','ELLIPSE','8','a','10','0','20','0','11','5','21','0','40','0.5','41','0','42','0']));
-check('FROZEN does not mask an all-off file',
+check('frozen geometry does not mask an all-off file',
       r.report.turnedOn===true && r.layers.find(l=>l.name==='a').off===false);
 
 /* ===== dimensions and MTEXT ===== */
@@ -282,8 +286,8 @@ r = imp(ents('0','HATCH','8','0','2','SOLID','91','1','92','1','93','3',
              '72','1','10','10','20','10','11','5','21','50',   // flies off, never closes
              '97','0','75','0'));
 check('an open chain is refused rather than force-closed', of(r,'hatch').length===0);
-check('…and its edges survive as frozen outlines',
-      of(r,'line').length===3 && of(r,'line').every(l=>l.layer===M.FROZEN_LAYER));
+check('…and its edges survive as frozen outlines on their own layer',
+      of(r,'line').length===3 && of(r,'line').every(l=>l.frozen===true && l.layer==='0'));
 
 // chainLoop directly: ordering and reversal
 check('chainLoop returns null on a gap',
@@ -297,8 +301,8 @@ r = imp(ents('0','HATCH','8','0','2','SOLID','91','2',
              '92','3','72','0','73','1','93','3','10','1','20','1','10','3','20','1','10','1','20','3',
              '97','0','75','1'));
 check('an island hatch is not filled', of(r,'hatch').length===0);
-check('…its loops are kept as frozen outlines',
-      of(r,'pline').length===2 && of(r,'pline').every(p=>p.layer===M.FROZEN_LAYER));
+check('…its loops are kept as frozen outlines on their own layer',
+      of(r,'pline').length===2 && of(r,'pline').every(p=>p.frozen===true && p.layer==='0'));
 check('…and the user is told why',
       M.reportLines(r.report,'x.dxf').some(l=>/too complex to fill/.test(l)));
 
@@ -365,8 +369,9 @@ check('openDXF replaces the drawing', S.entities.length===2);
 check('openDXF is one undo step', S.undoStack.length===1);
 check('openDXF leaves the user on an unlocked layer', S.layerUnlocked(S.currentLayer));
 check('openDXF reports what it did', dom.logs.some(l=>/client\.dxf/.test(l)));
-check('openDXF explains the FROZEN layer', dom.logs.some(l=>l.includes(M.FROZEN_LAYER)));
-check('…and how to get at frozen objects', dom.logs.some(l=>/🔒/.test(l) && /👁/.test(l)));
+check('openDXF explains the frozen approximations',
+      dom.logs.some(l=>/approximations/.test(l) && /own layers/.test(l)));
+check('…and how to make them editable', dom.logs.some(l=>/THAW/.test(l)));
 
 const before = S.entities.length;
 dom.logs.length=0;
@@ -400,5 +405,36 @@ const rp = one(back,'pline');
 check('round-trip: rectangle survives closed', rp.closed===true && rp.pts.length===src.pline.pts.length);
 check('round-trip: text survives', one(back,'text').str==='label' && near(one(back,'text').h,2.5,1e-9));
 check('round-trip: layer names survive', of(back,'line')[0].layer==='walls');
+
+/* ===== frozen objects still obey their layer =====
+   The whole point of keeping the source layer: an architect navigates by
+   switching layers on and off, and half a real drawing arrives frozen. */
+S.setEntities([]); S.setIdSeq(1); dom.logs.length=0;
+IO.openDXF(fakeFile('f.dxf', ents(
+  '0','LWPOLYLINE','8','furniture','90','2','70','0','10','0','20','0','42','1','10','10','20','0',
+  '0','LINE','8','walls','10','0','20','0','11','100','21','0')));
+const froz = S.entities.find(e=>e.frozen);
+check('the approximation landed on the source layer', froz.layer==='furniture');
+S.layerOf('furniture').off = true;
+check('turning that layer off hides it', S.layerVisible(froz.layer)===false);
+check('the other layer is unaffected', S.layerVisible('walls')===true);
+S.layerOf('furniture').off = false;
+
+// clicks pass through frozen geometry, but snapping still finds it
+const E2 = await import('../js/core/entities.js');
+check('a click does not select a frozen object',
+      E2.findEntityAt({x:5, y:-4.9})?.frozen !== true);
+check('but it is still a snap candidate',
+      E2.snapCandidates().some(c=>Math.abs(c.p.x-10)<1e-6 && Math.abs(c.p.y)<1e-6));
+
+// THAW releases them
+C.startCommand('THAW');
+check('THAW makes them editable', S.entities.every(e=>!e.frozen));
+check('THAW says how many it released', dom.logs.some(l=>/now editable/.test(l)));
+check('THAW is one undo step', S.undoStack.length>0);
+dom.logs.length=0;
+C.startCommand('THAW');
+check('THAW on a clean drawing says so, without a snapshot',
+      dom.logs.some(l=>/already editable/i.test(l)));
 
 finish();
