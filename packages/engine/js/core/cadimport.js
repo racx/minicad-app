@@ -178,7 +178,8 @@ export function importDoc(doc){
   const seen = new Map();                          // layer name → layer object
   let id = 1;
   const report = {native:0, frozen:0, skipped:{...doc.skipped}, layers:0,
-                  hatch:doc.hatch || 0, filled:0, foreignUnit:doc.foreignUnit || null};
+                  hatch:doc.hatch || 0, filled:0, foreignUnit:doc.foreignUnit || null,
+                  missingRefs:doc.missingRefs || []};
 
   for (const l of doc.layers) if (!seen.has(l.name)) seen.set(l.name, {...l});
 
@@ -347,6 +348,14 @@ function dedupe(pts, closed){
 /* ---------- human-readable summary ---------- */
 export function reportLines(r, name){
   const out = [`Opened ${name} — ${r.native + r.frozen} objects on ${r.layers} layers.`];
+  // First, because it explains why the drawing looks empty: a CAD file can be
+  // just the annotation sheet, with the building itself in a separate file.
+  if (r.missingRefs && r.missingRefs.length){
+    const names = r.missingRefs.map(n=>`"${n}"`).join(', ');
+    out.push(`⚠ This looks like only the annotation layer — the walls and furniture live in ` +
+             `${r.missingRefs.length>1?'other files':'another file'} (${names}) that wasn't included. ` +
+             `Ask whoever sent it to "bind" the references, or to send those files too.`);
+  }
   if (r.frozen)
     out.push(`${r.frozen} curved/complex objects are on the locked "${FROZEN_LAYER}" layer — you can see and snap to them, but not edit them. ` +
              `To change or delete them, pick ${FROZEN_LAYER} in the layer box and press 🔒; press 👁 to hide them instead.`);

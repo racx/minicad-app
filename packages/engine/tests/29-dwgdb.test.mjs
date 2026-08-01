@@ -124,6 +124,27 @@ err=null; try { W.dwgDocToIR(db([])); } catch(e){ err=e; }
 check('an empty model space is refused with a message',
       err instanceof W.DwgDbError && /model space/i.test(err.message));
 
+/* ===== unresolved external references ===== */
+r = imp([{type:'LINE', layer:'0', startPoint:{x:0,y:0}, endPoint:{x:1,y:0}}],
+        {x:{name:'-BASE-HNX-J-R05', flags:68, basePoint:{x:0,y:0}, entities:[]}});
+check('an xref with no geometry is detected', r.report.missingRefs.length===1);
+check('…named, so the user can ask for the right file',
+      r.report.missingRefs[0]==='-BASE-HNX-J-R05');
+const warn = M.reportLines(r.report,'x.dwg');
+check('…and warned about first, because it explains the empty drawing',
+      /annotation layer/.test(warn[1]) && /-BASE-HNX-J-R05/.test(warn[1]));
+check('…telling them how to fix it', /bind/i.test(warn[1]));
+
+r = imp([{type:'LINE', layer:'0', startPoint:{x:0,y:0}, endPoint:{x:1,y:0}}],
+        {x:{name:'resolved', flags:68, basePoint:{x:0,y:0},
+            entities:[{type:'LINE', layer:'0', startPoint:{x:0,y:0}, endPoint:{x:2,y:0}}]}});
+check('a RESOLVED xref is not warned about', r.report.missingRefs.length===0);
+
+r = imp([{type:'LINE', layer:'0', startPoint:{x:0,y:0}, endPoint:{x:1,y:0}}],
+        {x:{name:'plainblock', flags:0, basePoint:{x:0,y:0}, entities:[]}});
+check('an ordinary empty block is not mistaken for an xref',
+      r.report.missingRefs.length===0);
+
 /* ===== the real house slice ===== */
 const doc = W.dwgDocToIR(slice);
 const house = M.importDoc(doc);

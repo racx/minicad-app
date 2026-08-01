@@ -234,11 +234,16 @@ export function dwgDocToIR(db){
 
   // block definitions by name; the two spaces are layouts, not blocks
   const blocks = new Map();
+  const missingRefs = [];
   let model = null;
   for (const b of Object.values(db.tables.BLOCK_RECORD?.entries || {})){
     if (!b || !b.name) continue;
     if (/^\*Model_Space/i.test(b.name)){ model = b; continue; }
     if (/^\*Paper_Space/i.test(b.name)) continue;
+    // flag bit 4 = external reference. An xref with no geometry was never
+    // resolved: the drawing it points at is simply not in this file, so the
+    // walls/furniture the user expects are not here to import.
+    if (((b.flags | 0) & 4) && !(b.entities || []).length) missingRefs.push(b.name);
     blocks.set(b.name, b);
   }
   // Import model space — the building. Paper space is a presentation sheet of
@@ -250,7 +255,7 @@ export function dwgDocToIR(db){
   const shapes = [];
   toShapes(ents, blocks, [1,0,0,1,0,0], 0, shapes, report);
 
-  return {shapes, layers,
+  return {shapes, layers, missingRefs,
           units: INSUNITS[code] || null,
           foreignUnit: (!INSUNITS[code] && UNIT_NAME[code]) || null,
           skipped: report.skipped, hatch: report.hatch};

@@ -440,6 +440,7 @@ export function parseDXF(text){
 
   // BLOCK definitions
   const blocks = {};
+  const missingRefs = [];
   if (sec.BLOCKS){
     const recs = records(p, sec.BLOCKS[0], sec.BLOCKS[1]);
     for (let i=0; i<recs.length; i++){
@@ -449,7 +450,11 @@ export function parseDXF(text){
       const body = [];
       let j = i+1;
       for (; j<recs.length && recs[j].t!=='ENDBLK'; j++) body.push(recs[j]);
-      if (name && !/^\*(MODEL|PAPER)_SPACE/i.test(name)) blocks[name] = {base, recs:body};
+      if (name && !/^\*(MODEL|PAPER)_SPACE/i.test(name)){
+        blocks[name] = {base, recs:body};
+        // flag bit 4 = external reference; empty means it was never resolved
+        if ((g(recs[i],70,0) & 4) && !body.length) missingRefs.push(name);
+      }
       i = j;
     }
   }
@@ -459,7 +464,7 @@ export function parseDXF(text){
   toShapes(records(p, sec.ENTITIES[0], sec.ENTITIES[1]), blocks, [1,0,0,1,0,0], 0, shapes, report);
 
   return {
-    shapes, layers,
+    shapes, layers, missingRefs,
     units: INSUNITS[code] || null,
     foreignUnit: (!INSUNITS[code] && UNIT_NAME[code]) || null,
     skipped: report.skipped,
