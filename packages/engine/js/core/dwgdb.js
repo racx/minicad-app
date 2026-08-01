@@ -14,7 +14,7 @@
    degrees — that is the main difference from `dxf.js`.
    ========================================================= */
 import { arcFrom3, normAng, TAU } from './geometry.js';
-import { mtextLines, aciColor } from './dxf.js';
+import { mtextLines, wrapCharsFor, aciColor } from './dxf.js';
 
 export class DwgDbError extends Error {}
 
@@ -146,7 +146,7 @@ function toShapes(ents, blocks, m, depth, out, report){
       const dir = e.direction;
       const rot = (dir && (dir.x || dir.y)) ? Math.atan2(dir.y, dir.x) : (e.rotation || 0);
       const at = e.attachmentPoint || 1;
-      const lines = mtextLines(e.text || '');
+      const lines = mtextLines(e.text || '', wrapCharsFor(e.rectWidth || 0, e.textHeight || 0));
       const p0 = xfPt(m, P(e.insertionPoint));
       const ang = rot + xfRot(m), dy = h*1.6;
       const row = at<=3 ? 1 : at<=6 ? 0.5*(lines.length-1)+1 : lines.length;

@@ -62,6 +62,17 @@ check('MTEXT splits per line', of(r,'text').length===2 &&
       of(r,'text')[0].str==='one' && of(r,'text')[1].str==='two');
 check('MTEXT stacks downward', of(r,'text')[0].y > of(r,'text')[1].y);
 
+r = imp([{type:'MTEXT', layer:'0', text:'aaa bbb ccc ddd eee fff', insertionPoint:{x:0,y:0},
+          textHeight:1, rectWidth:10, attachmentPoint:1, rotation:0, direction:{x:1,y:0}}]);
+check('MTEXT wraps to its reference rectangle', of(r,'text').length > 1);
+check('…within the box', of(r,'text').every(t=>t.str.length <= 16));
+check('…losing no words',
+      of(r,'text').map(t=>t.str).join(' ')==='aaa bbb ccc ddd eee fff');
+
+r = imp([{type:'MTEXT', layer:'0', text:'aaa bbb ccc ddd eee fff', insertionPoint:{x:0,y:0},
+          textHeight:1, rectWidth:0, attachmentPoint:1, rotation:0, direction:{x:1,y:0}}]);
+check('no rectangle → no wrapping', of(r,'text').length===1);
+
 /* ===== dimensions ===== */
 r = imp([{type:'DIMENSION', layer:'0', dimensionType:0,
           definitionPoint:{x:0,y:2}, subDefinitionPoint1:{x:0,y:0}, subDefinitionPoint2:{x:10,y:0}}]);

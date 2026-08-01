@@ -262,7 +262,7 @@ function toShapes(recs, blocks, m, depth, out, report){
       const h = g(r,40,2.5)*xfScale(m);
       const rot = r.p.some(([c])=>c===11) ? Math.atan2(g(r,21,0), g(r,11,1)) : D2R(g(r,50,0));
       const at = g(r,71,1);                         // 1..3 top, 4..6 middle, 7..9 bottom
-      const lines = mtextLines(raw);
+      const lines = mtextLines(raw, wrapCharsFor(g(r,41,0), g(r,40,2.5)));
       const p0 = xfPt(m, P(r,10,20));
       const dy = h*1.6, ang = rot + xfRot(m);
       const row = at<=3 ? 1 : at<=6 ? 0.5*(lines.length-1)+1 : lines.length;
@@ -361,15 +361,45 @@ function toShapes(recs, blocks, m, depth, out, report){
   }
 }
 
-/* MTEXT inline formatting: keep the text, drop the codes. */
-export function mtextLines(raw){
+/* MTEXT inline formatting: keep the text, drop the codes.
+   `wrapChars` (optional) word-wraps to the MTEXT's reference rectangle — the
+   box the author sized in CAD. Without it a long legend entry runs straight
+   out of its table cell and across the drawing. */
+export function mtextLines(raw, wrapChars = 0){
   let s = raw.replace(/\\P/g, '\n').replace(/\\~/g, ' ');
   s = s.replace(/\\S([^;]*);/g, (_,f)=>f.replace('^',' ').replace('/',' '));  // stacked fractions
   s = s.replace(/\\[A-Za-z][^\\;]*;/g, '');        // \fArial|b0;  \H2.5x;  \C1;  …
   s = s.replace(/[{}]/g, '');
   s = s.replace(/\\\\/g, '\\');
-  return s.split('\n').map(l=>l.trim());
+  const lines = s.split('\n').map(l=>l.trim());
+  if (!(wrapChars >= 2)) return lines;
+  return lines.flatMap(l => wrapWords(l, Math.floor(wrapChars)));
 }
+
+// greedy word wrap; a word longer than the box is hard-split rather than
+// allowed to overflow (part numbers and codes do get that long)
+function wrapWords(line, n){
+  if (line.length <= n) return [line];
+  const out = [];
+  let cur = '';
+  for (let word of line.split(/\s+/)){
+    while (word.length > n){
+      if (cur){ out.push(cur); cur = ''; }
+      out.push(word.slice(0, n));
+      word = word.slice(n);
+    }
+    if (!word) continue;
+    if (!cur) cur = word;
+    else if (cur.length + 1 + word.length <= n) cur += ' ' + word;
+    else { out.push(cur); cur = word; }
+  }
+  if (cur) out.push(cur);
+  return out.length ? out : [''];
+}
+
+// characters that fit across a reference rectangle, at MiniCAD's 0.62 em advance
+export const wrapCharsFor = (width, height) =>
+  (width > 0 && height > 0) ? width / (height * 0.62) : 0;
 
 /* ---------- header units ---------- */
 /* ---------- $INSUNITS → MiniCAD's unit label ----------

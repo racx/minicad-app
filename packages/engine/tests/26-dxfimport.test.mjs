@@ -174,6 +174,28 @@ check('MTEXT splits into one text per line', of(r,'text').length===2);
 check('MTEXT formatting codes stripped',
       of(r,'text')[0].str==='line one' && of(r,'text')[1].str==='line two');
 check('MTEXT lines stack downward', of(r,'text')[0].y > of(r,'text')[1].y);
+/* MTEXT wraps to its reference rectangle (group 41). Without this a long
+   legend entry runs out of its table cell and across the whole drawing —
+   715 of 728 MTEXTs in a real house plan carry a rectangle. */
+r = imp(ents('0','MTEXT','8','0','10','0','20','0','40','1','41','10','71','1',
+             '1','aaa bbb ccc ddd eee fff ggg hhh'));
+check('long MTEXT wraps instead of overflowing', of(r,'text').length > 1);
+check('every wrapped line fits the box (10 wide / 1 high → 16 chars)',
+      of(r,'text').every(t=>t.str.length <= 16));
+check('no words are lost in the wrap',
+      of(r,'text').map(t=>t.str).join(' ')==='aaa bbb ccc ddd eee fff ggg hhh');
+check('wrapped lines stack downward',
+      of(r,'text')[0].y > of(r,'text')[1].y);
+
+r = imp(ents('0','MTEXT','8','0','10','0','20','0','40','1','41','0','71','1',
+             '1','no rectangle means no wrapping at all here'));
+check('MTEXT with no reference rectangle is left on one line', of(r,'text').length===1);
+
+r = imp(ents('0','MTEXT','8','0','10','0','20','0','40','1','41','3','71','1',
+             '1','supercalifragilistic'));
+check('a word wider than the box is split, never allowed to overflow',
+      of(r,'text').length > 1 && of(r,'text').every(t=>t.str.length <= 4));
+
 check('MTEXT braces/font codes removed',
       one(imp(ents('0','MTEXT','8','0','10','0','20','0','40','2','1','{\\fArial|b1;bold} txt')),'text')
         .str==='bold txt');
