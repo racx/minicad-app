@@ -64,6 +64,7 @@ function hatchShapes(e, layer, m, out, report){
   const tag = s => { if (s){ Object.assign(s, {hatchId, pattern, solid, frozen:true}); out.push(s); } };
 
   for (const path of paths){
+    if (!path) continue;
     // polyline path: vertices carry bulges directly
     if (path.vertices && path.vertices.length >= 2){
       tag({k:'poly', layer, closed:path.isClosed !== false,
@@ -72,6 +73,7 @@ function hatchShapes(e, layer, m, out, report){
       continue;
     }
     for (const ed of (path.edges || [])){
+      if (!ed) continue;                     // real files carry null edges
       if (ed.type === 1){
         tag({k:'line', layer, a:xfPt(m,P(ed.start)), b:xfPt(m,P(ed.end))});
       } else if (ed.type === 2){

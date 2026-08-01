@@ -23,5 +23,11 @@ module MinicadApp
     #
     # config.time_zone = "Central Time (US & Canada)"
     # config.eager_load_paths << Rails.root.join("extras")
+
+    # /api/dwg returns a parsed DWG database as JSON, and a real drawing runs to
+    # ~16 MB of it (a 1 MB house plan → 22k objects). It gzips to under 1 MB, so
+    # compressing responses is the difference between a usable import over a
+    # normal connection and a painfully slow one.
+    config.middleware.use Rack::Deflater
   end
 end

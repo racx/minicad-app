@@ -124,6 +124,23 @@ err=null; try { W.dwgDocToIR(db([])); } catch(e){ err=e; }
 check('an empty model space is refused with a message',
       err instanceof W.DwgDbError && /model space/i.test(err.message));
 
+/* ===== defensive: real files carry nulls =====
+   The first real base drawing crashed the import with a null edge inside a
+   hatch boundary path. 22k objects is no use if one bad record kills the file. */
+r = imp([{type:'HATCH', layer:'0', patternName:'SOLID', boundaryPaths:[
+  null,
+  {edges:[null,
+          {type:1, start:{x:0,y:0}, end:{x:10,y:0}},
+          {type:1, start:{x:10,y:0}, end:{x:10,y:10}},
+          {type:1, start:{x:10,y:10}, end:{x:0,y:10}},
+          {type:1, start:{x:0,y:10}, end:{x:0,y:0}}]},
+]}]);
+check('a null boundary path does not crash the import', r.entities.length > 0);
+check('…and the surviving edges still chain into a filled hatch',
+      r.entities.some(e=>e.type==='hatch'));
+r = imp([{type:'HATCH', layer:'0', patternName:'SOLID', boundaryPaths:[{edges:[null,null]}]}]);
+check('an all-null path is reported, not crashed', r.report.skipped['HATCH']===1 || r.report.hatch>=0);
+
 /* ===== unresolved external references ===== */
 r = imp([{type:'LINE', layer:'0', startPoint:{x:0,y:0}, endPoint:{x:1,y:0}}],
         {x:{name:'-BASE-HNX-J-R05', flags:68, basePoint:{x:0,y:0}, entities:[]}});
