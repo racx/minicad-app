@@ -36,7 +36,7 @@ browser CAD engine at `packages/engine` (imported with full git history —
     `app/javascript/entrypoints/editor.js` — which bundles the engine. The editor
     keeps the engine's own CSS untouched; do not Tailwind-ify engine UI.
 - Engine package: npm workspace `@minicad/engine` at `packages/engine`
-  (`npm test -w packages/engine` runs its 30 suites; wired into bin/ci —
+  (`npm test -w packages/engine` runs its 31 suites; wired into bin/ci —
   engine failures fail the build).
 - Converter package: npm workspace `@minicad/dwg` at `packages/dwg` — GPL-3.0,
   subprocess only, behind `POST /api/dwg` (`DwgConverter`). Needs `node` on the

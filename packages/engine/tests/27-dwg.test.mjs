@@ -16,6 +16,18 @@ const DXF = ['0','SECTION','2','ENTITIES',
              '0','LINE','8','walls','10','0','20','0','11','100','21','0',
              '0','ENDSEC','0','EOF'].join('\n');
 
+/* The endpoint returns the parsed DWG database as JSON, not DXF — libredwg's
+   DXF writer crashes on real drawings (see packages/dwg/README.md). */
+const dwgJSON = (ents = [{type:'LINE', layer:'walls',
+                          startPoint:{x:0,y:0}, endPoint:{x:100,y:0}}]) => JSON.stringify({
+  header: {},
+  tables: {
+    LAYER: {entries: {a:{name:'walls', colorIndex:7}}},
+    BLOCK_RECORD: {entries: {ms:{name:'*Model_Space', basePoint:{x:0,y:0}, entities:ents}}},
+  },
+  entities: [],
+});
+
 const settle = ()=>new Promise(r=>setTimeout(r,0));   // openDWG's onload is async
 
 /* ===== the DWG magic check ===== */
@@ -66,18 +78,18 @@ check('errors never leak HTML at the user',
 S.setEntities([]); S.undoStack.length=0; dom.logs.length=0;
 C.startCommand('L'); C.handleEnter('0,0'); C.handleEnter('5,5'); C.handleEnter('');
 S.undoStack.length=0;
-stubFetch(()=>({status:200, body:DXF}));
+stubFetch(()=>({status:200, body:dwgJSON()}));
 IO.openDWG(fakeBinFile('plan.dwg', dwgBytes()));
 await settle();
 check('openDWG loads the converted drawing', S.entities.length===1 && S.entities[0].type==='line');
-check('openDWG keeps layers from the DXF', S.entities[0].layer==='walls');
+check('openDWG keeps layers from the database', S.entities[0].layer==='walls');
 check('openDWG is one undo step', S.undoStack.length===1);
 check('openDWG says which file it opened', dom.logs.some(l=>/plan\.dwg/.test(l)));
 check('openDWG tells the user it is converting', dom.logs.some(l=>/converting/i.test(l)));
 
 // a file that isn't a DWG never reaches the network
 let reached = false;
-stubFetch(()=>{ reached = true; return {status:200, body:DXF}; });
+stubFetch(()=>{ reached = true; return {status:200, body:dwgJSON()}; });
 dom.logs.length=0;
 IO.openDWG(fakeBinFile('notes.dwg', new TextEncoder().encode('just some text')));
 await settle();
@@ -94,13 +106,23 @@ check('a failed conversion leaves the drawing untouched', S.entities.length===be
 check('a failed conversion reports the reason', dom.logs.some(l=>/damaged/i.test(l)));
 check('a failed conversion is not an undo step', S.undoStack.length===1);
 
-// the server can convert a DWG that yields nothing drawable
-stubFetch(()=>({status:200, body:['0','SECTION','2','ENTITIES','0','ENDSEC','0','EOF'].join('\n')}));
+// a DWG whose model space is empty
+stubFetch(()=>({status:200, body:dwgJSON([])}));
 dom.logs.length=0;
 IO.openDWG(fakeBinFile('empty.dwg', dwgBytes()));
 await settle();
-check('an empty DWG is reported as such, mentioning DWG not DXF',
-      dom.logs.some(l=>/DWG/.test(l) && /nothing/i.test(l)));
+check('an empty DWG is reported in plain language',
+      dom.logs.some(l=>/model space|nothing/i.test(l)));
+
+// a malformed payload must not wipe the drawing
+const keep = S.entities.length;
+stubFetch(()=>({status:200, body:'{not json'}));
+dom.logs.length=0;
+IO.openDWG(fakeBinFile('bad.dwg', dwgBytes()));
+await settle();
+check('an unparseable payload leaves the drawing alone', S.entities.length===keep);
+check('…and says so without leaking a parser error',
+      dom.logs.some(l=>/could not read that DWG/i.test(l)));
 
 /* ===== the GPL boundary is structural, not a comment =====
    packages/dwg is GPL-3.0; @minicad/engine is not. If the engine ever imports

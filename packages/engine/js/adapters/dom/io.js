@@ -11,6 +11,7 @@ import { connectUI } from '../../core/bus.js';
 import { parseDXF, DxfError } from '../../core/dxf.js';
 import { importDoc, reportLines } from '../../core/cadimport.js';
 import { dwgToDxf, looksLikeDWG, DwgError } from '../../core/dwg.js';
+import { dwgDocToIR, DwgDbError } from '../../core/dwgdb.js';
 
 export function download(name, data, mime){
   const a=document.createElement('a');
@@ -39,11 +40,8 @@ export function openJSON(f){
   r.readAsText(f);
 }
 
-/* Shared tail of every CAD import: DXF text → the drawing on screen. */
-function loadDxfText(text, name, what='DXF'){
-  let doc;
-  try{ doc = parseDXF(text); }
-  catch(e){ log(e instanceof DxfError ? e.message : `Could not read that ${what} file.`, 'e'); return false; }
+/* Shared tail of every CAD import: an IR doc → the drawing on screen. */
+function loadDoc(doc, name, what){
   const res = importDoc(doc);
   if (!res.entities.length){ log(`That ${what} has nothing MiniCAD can draw in it.`, 'e'); return false; }
   snapshot();
@@ -57,7 +55,12 @@ function loadDxfText(text, name, what='DXF'){
 
 export function openDXF(f){
   const r=new FileReader();
-  r.onload=()=>loadDxfText(String(r.result), f.name);
+  r.onload=()=>{
+    let doc;
+    try{ doc = parseDXF(String(r.result)); }
+    catch(e){ log(e instanceof DxfError ? e.message : 'Could not read that DXF file.', 'e'); return; }
+    loadDoc(doc, f.name, 'DXF');
+  };
   r.readAsText(f);
 }
 
@@ -76,7 +79,12 @@ export function openDWG(f){
     let text;
     try{ text = await dwgToDxf(bytes, {headers}); }
     catch(e){ log(e instanceof DwgError ? e.message : 'Could not convert that DWG.', 'e'); return; }
-    loadDxfText(text, f.name, 'DWG');
+    // The converter returns the parsed DWG database as JSON, not DXF:
+    // libredwg's DXF writer crashes on real drawings. See packages/dwg/README.md.
+    let doc;
+    try{ doc = dwgDocToIR(JSON.parse(text)); }
+    catch(e){ log(e instanceof DwgDbError ? e.message : 'Could not read that DWG.', 'e'); return; }
+    loadDoc(doc, f.name, 'DWG');
   };
   r.readAsArrayBuffer(f);
 }

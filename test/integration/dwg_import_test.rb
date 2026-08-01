@@ -49,28 +49,35 @@ class DwgImportTest < ActionDispatch::IntegrationTest
   end
 
   test "error responses never leak paths or stack traces at the user" do
-    post_dwg FAKE_DWG
+    post_dwg "definitely not a dwg"
     body = JSON.parse(response.body)["error"]
     assert_not_includes body, Rails.root.to_s
     assert_not_includes body, "packages/"
     assert_no_match(/#<|\.rb:|\.mjs:/, body)
   end
 
-  # The real thing: a genuine R2000 DWG must come back as parseable DXF.
-  test "converts a real DWG to DXF" do
+  # The real thing: a genuine DWG must come back as a parseable drawing database.
+  test "converts a real DWG" do
     dwg = Rails.root.join("test/fixtures/files/sample.dwg")
     skip "no sample.dwg fixture" unless dwg.exist?
 
     post_dwg dwg.binread
     assert_response :success
-    assert_equal "application/dxf", response.media_type
+    assert_equal "application/json", response.media_type
 
     body = response.body
     assert_operator body.bytesize, :>, 1000
-    # a DXF starts with a group code, and must contain the entities section —
-    # this also catches the wasm printing diagnostics into the payload
-    assert_match(/\A\s*\d+\r?\n/, body[0, 32])
-    assert_includes body, "ENTITIES"
+    # must be clean JSON from the first byte — this is what catches the wasm
+    # printing its own diagnostics into the payload
+    assert_equal "{", body[0]
     assert_not_includes body[0, 200], "error code"
+
+    db = JSON.parse(body)
+    assert db["tables"]["BLOCK_RECORD"]["entries"].present?, "no block records"
+    entries = db["tables"]["BLOCK_RECORD"]["entries"]
+    entries = entries.values if entries.is_a?(Hash)
+    model = entries.find { |r| r["name"].to_s.start_with?("*Model_Space") }
+    assert model.present?, "no model space"
+    assert_operator model["entities"].length, :>, 0, "model space is empty"
   end
 end

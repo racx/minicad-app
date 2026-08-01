@@ -21,11 +21,21 @@ Therefore:
 - If you ever bundle this into the Vite entrypoint or import it from Ruby-adjacent JS,
   you have relicensed MiniCAD. Don't.
 
+## Why JSON and not DXF
+
+The obvious design is `dwg_write_dxf()` → feed the existing DXF parser. It does not
+survive contact with real files: a 330 KB r2013 house plan crashes that call with
+`RuntimeError: memory access out of bounds`, while `dwg_read_data()` + `convert()` parse
+the same file into 593 entities across 143 layers with zero unknowns. The reader is
+solid; the writer is not (and it is not a memory limit — the wasm has 1 GB initial /
+4 GB max). So we emit the database and map it in `@minicad/engine`'s `core/dwgdb.js`.
+
 ## Contract
 
 ```
+argv[1]: path to write the output JSON to
 stdin  : raw .dwg bytes
-stdout : DXF text  — NON-EMPTY STDOUT IS THE SUCCESS SIGNAL
+output : the parsed DWG database as JSON — A NON-EMPTY OUTPUT FILE IS SUCCESS
 exit 2 : not a DWG / empty / too large   (stderr = message for the end user)
 exit 3 : unreadable DWG                  (stderr = message for the end user)
 exit 4 : converter itself is broken      (stderr = operator diagnostic)
@@ -34,7 +44,7 @@ exit 4 : converter itself is broken      (stderr = operator diagnostic)
 stderr on exit 2 and 3 is shown to end users verbatim, so it must stay in plain language
 (MiniCAD rule: every refusal needs a human message).
 
-**Why success has no exit code.** LibreDWG's wasm starts a thread pool that cannot be
+**Why success has no exit code.**  LibreDWG's wasm starts a thread pool that cannot be
 shut down cleanly from JS: after the conversion finishes the process idles ~3.7s before
 dying, even with `process.exit()`, `process.reallyExit()`, and zero active handles
 (measured — the work itself is ~200ms). So on success the script flushes stdout with

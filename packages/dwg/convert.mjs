@@ -2,12 +2,15 @@
 /* =========================================================
    DWG → DXF converter        ** GPL-3.0 — see README.md **
 
-   usage:  node convert.mjs <output.dxf>   < input.dwg
+   usage:  node convert.mjs <output.json>   < input.dwg
 
-   The DXF goes to the FILE named on argv, never to stdout: the wasm prints its
-   own diagnostics to stdout ("Convert dwg to dxf with error code: 2048"), which
-   would otherwise be prepended to the payload and corrupt it. Treat this
-   process's stdout as noise.
+   Emits the parsed DWG database as JSON (not DXF): libredwg's DXF writer
+   crashes on real drawings, while its reader handles them fine. The engine
+   turns this JSON into its own IR in core/dwgdb.js.
+
+   The payload goes to the FILE named on argv, never to stdout: the wasm prints
+   its own diagnostics to stdout, which would otherwise corrupt the payload.
+   Treat this process's stdout as noise.
 
    SUCCESS IS "THE OUTPUT FILE IS NON-EMPTY", not the exit status: the wasm
    spins up a thread pool that cannot be shut down cleanly, so a normal exit
@@ -61,18 +64,41 @@ try {
   die(4, `The DWG converter could not start: ${e}`);
 }
 
-let dxf = null;
+// Read the database rather than asking libredwg to emit DXF: its DXF *writer*
+// crashes with "memory access out of bounds" on real files (a 330 KB r2013
+// house plan) whose reader path parses cleanly. The engine maps this JSON to
+// its IR in core/dwgdb.js.
+const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+let payload = null;
 try {
-  dxf = dwg.dwg_write_dxf(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
+  const ptr = dwg.dwg_read_data(ab, 0);
+  if (ptr){
+    const db = dwg.convert(ptr);
+    // A garbage file still yields a pointer and an empty database, which would
+    // serialize to perfectly valid JSON — so check there is actually a drawing
+    // in here before calling it a success.
+    const records = Object.values(db?.tables?.BLOCK_RECORD?.entries || {});
+    const drawable = (db?.entities?.length || 0) +
+                     records.reduce((n, r) => n + ((r && r.entities && r.entities.length) || 0), 0);
+    if (!drawable)
+      die(3, 'That DWG could not be read. It may be damaged, or a newer format than we support.');
+    // handles come back as BigInt, which JSON.stringify refuses
+    const plain = (_k, v) => (typeof v === 'bigint' ? v.toString() : v);
+    payload = Buffer.from(JSON.stringify({
+      header: db.header || {},
+      tables: {LAYER: db.tables?.LAYER, BLOCK_RECORD: db.tables?.BLOCK_RECORD},
+      entities: db.entities || [],
+    }, plain));
+  }
 } catch (e) {
   process.stderr.write(`convert threw: ${e}\n`);
 }
-if (!dxf || !dxf.length)
+if (!payload || payload.length < 2)
   die(3, 'That DWG could not be read. It may be damaged, or a newer format than we support.');
 
 // writeSync is a real write(2), so the bytes are in the page cache and visible
 // to the parent the moment the loop finishes — SIGKILL cannot lose them.
-const out = Buffer.from(dxf);
+const out = payload;
 const fd = openSync(outPath, 'w');
 for (let off = 0; off < out.length; ) off += writeSync(fd, out, off, out.length - off);
 closeSync(fd);

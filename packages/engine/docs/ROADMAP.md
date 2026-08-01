@@ -2,7 +2,7 @@
 
 **Single source of truth** for what exists, how complete it is, and what comes next.
 Evidence-based: every claim below cites `file:line` in the codebase as of commit `536d7c7`.
-Verified against the test suite: `node tests/run.mjs` → **30 suites, 633 checks, all passing** (2026-08-01).
+Verified against the test suite: `node tests/run.mjs` → **31 suites, 688 checks, all passing** (2026-08-01).
 
 Update this file whenever a feature lands or a decision changes the plan.
 
@@ -119,14 +119,14 @@ unpickable + unsnappable + excluded from TRIM/EXTEND edges — `entities.js find
 | DXF import | ✅ ASCII DXF R12–R2018 via **Open** (`.dxf` dispatched by extension). Two stages: `core/dxf.js` parses group codes into a backend-neutral shape IR (BLOCK/INSERT expanded to world coords incl. rotation/scale/arrays); `core/cadimport.js` maps IR → entities. Native: LINE, CIRCLE, ARC, LWPOLYLINE/POLYLINE, TEXT/ATTRIB (with rotation), MTEXT (split per line, codes stripped), aligned DIMENSION. **Frozen** onto the locked `FROZEN` layer (visible + snappable, not editable): ELLIPSE, SPLINE (rational de Boor), bulged plines, SOLID/TRACE/3DFACE, LEADER. Layer table incl. ACI/true colour, off, locked. `$INSUNITS` sets units and scales coords. Bulge tessellation reuses `geometry.bulgeArc`, so imported and drawn curves share one definition. | `core/dxf.js`, `core/cadimport.js`, `adapters/dom/io.js`, suite 26 |
 | DXF import — HATCH | ✅ Boundary paths (polyline incl. bulges) and edge paths (line/arc/elliptic-arc/spline). A **single closed loop becomes a real filled `hatch` entity** on an editable boundary, with the material guessed from the AutoCAD pattern name (`materialFor`, falls back to concrete). Multi-loop hatches (islands) can't be expressed by one `ref`, so they stay frozen outlines — reported separately. Parsing needs an ordered cursor walk because HATCH reuses 10/20/40/50/51/72/73/93/97 between boundary and pattern data. | `core/dxf.js hatchLoops`, suite 26 |
 | DXF import — not yet | ⚠️ MLINE, MULTILEADER, ACAD_TABLE, REGION/3DSOLID, WIPEOUT, XLINE/RAY, rotated/angular DIMENSION. Binary DXF refused with a human message. All counted and named back to the user. | `core/dxf.js` SILENT/skip report |
-| **DWG import** | ✅ **Rails-side**: browser POSTs bytes to `/api/dwg`, gets DXF back, then reuses the entire DXF path — `dwg_write_dxf()` means no separate DWG→IR mapper was needed. Conversion runs in `packages/dwg` (GPL-3.0) as a **subprocess**, never linked or shipped to the browser. Reads r1.2–r2018; verified on r14/2000/2004/2018 (62 entities each, ~250 ms per file through Rails). **The licence boundary is enforced by tests**: suite 27 fails if any engine module references the GPL reader. | `packages/dwg/`, `app/services/dwg_converter.rb`, `Api::DwgController`, `core/dwg.js`, suite 27 |
+| **DWG import** | ✅ **Rails-side**: browser POSTs bytes to `/api/dwg` and gets the parsed DWG **database as JSON**, which `core/dwgdb.js` maps to the same IR `dxf.js` produces. Verified on a real 330 KB r2013 architect-drawn house: 1133 objects, 144 layers, 86 dimensions, 2 filled hatches, 0 unreadable, ~300 ms. Conversion runs in `packages/dwg` (GPL-3.0) as a **subprocess**, never linked or shipped to the browser. **NOT via `dwg_write_dxf()`** — libredwg's DXF writer dies with `memory access out of bounds` on real drawings whose reader path parses cleanly, so we read the database instead. Model space is imported; paper space (viewports onto it) is not a MiniCAD concept. **The licence boundary is enforced by tests**: suite 27 fails if any engine module references the GPL reader. | `packages/dwg/`, `app/services/dwg_converter.rb`, `Api::DwgController`, `core/dwg.js`, `core/dwgdb.js`, suites 27+29 |
 | DWG export | ❌ Absent. LibreDWG's writer is r2000-only and reportedly rejected by AutoCAD; the route is ACadSharp (MIT, writes AC1018) as a second subprocess. | — |
 | Print / PDF | ✅ PLOT/⌘P → mm-true SVG sheet (white/black print palette, footer strip) in a hidden iframe with real-mm `@page`; browser Save-as-PDF gives a scale-accurate vector PDF. Calibration test page with 100/50 mm bars. All linework is CONTINUOUS today, so the "dashes in mm" requirement is vacuously satisfied — revisit when linetypes exist. | `js/plot.js` (pure), `js/plotui.js`, suites 15–16 |
 | Units | ✅ UNITS mm/cm/m (default cm); dim text + readout formatting; persisted in JSON + autosave. | `state.js` units/unitFmt, `geometry.js formatLen`, suite 14 |
 
 ## 6. Test coverage map
 
-`tests/run.mjs`, 30 suites / 633 checks, each suite an isolated process driving the real
+`tests/run.mjs`, 31 suites / 688 checks, each suite an isolated process driving the real
 engine through a stubbed DOM (`tests/stub-dom.mjs`):
 
 | Suite | Covers |
@@ -145,6 +145,7 @@ engine through a stubbed DOM (`tests/stub-dom.mjs`):
 | 12-offset-pline | closed/open pline miters, arc offset, collapse + refusal messages |
 | 26-dxfimport | DXF parse → IR → entities: native mapping, curve tessellation onto FROZEN, HATCH boundary + edge paths (incl. the pattern-section code-reuse trap) and material inference, INSERT scale/rotation/arrays, `$INSUNITS`, layer flags, MTEXT, bad-input refusals, openDXF end-to-end, round-trip of our own export |
 | 27-dwg | DWG magic sniff, `dwgToDxf` request shape, every failure path's human message, openDWG end-to-end against a stubbed endpoint, and a **licence guard**: no engine module may reference the GPL converter |
+| 29-dwgdb | DwgDatabase → IR: every entity type, radian angles, ATTRIB's nested text record, INSERT expansion/arrays/attribs, units-not-rescaled, layer flags, bad input — plus a slice of the real house plan asserting room-sized dimensions and untouched coordinates |
 | 28-text-rotation | `rot` across bbox/hit/grips/mirror/ROTATE/SCALE, both renderers' Y-flip sign, DXF group code 50 round-trip, backwards compatibility with pre-rotation saved files |
 
 **Not covered by tests:** pixel output (rendering correctness is eyeballed / Playwright
@@ -204,7 +205,7 @@ for a household tool; revisit only on explicit demand.
 
 ```
 python3 serve.py                 # http://localhost:8000 (no-cache dev server)
-node tests/run.mjs               # 30 suites, 633 checks
+node tests/run.mjs               # 31 suites, 688 checks
 ```
 User-facing docs: `guide.html` (beginner manual), `learn.html` (8 animated command movies),
 `?` panel in-app. Keep all three in sync with feature changes — and keep **this file** in

@@ -372,8 +372,19 @@ export function mtextLines(raw){
 }
 
 /* ---------- header units ---------- */
-// $INSUNITS → [MiniCAD unit, factor applied to every coordinate]
-const INSUNITS = {1:['mm',25.4], 2:['mm',304.8], 4:['mm',1], 5:['cm',1], 6:['m',1], 14:['mm',0.1], 15:['cm',100], 16:['m',1000]};
+/* ---------- $INSUNITS → MiniCAD's unit label ----------
+   We NEVER rescale coordinates. A drawing's own numbers are its truth: an
+   architect's 3.497 must stay 3.497, and `units` only says what "1" means.
+   Rescaling on the strength of this header is actively dangerous — real files
+   carry a bogus INSUNITS=1 (inches) from a template, and a real 40x60 m house
+   plan came through 25.4x too big before this was fixed.
+   Only the three units MiniCAD actually has are mapped; anything else leaves
+   the user's current unit alone and is reported. */
+const INSUNITS = {4:'mm', 5:'cm', 6:'m'};
+// what the other common codes mean, so we can say so in plain language
+const UNIT_NAME = {1:'inches', 2:'feet', 3:'miles', 7:'kilometres', 10:'yards',
+                   14:'decimetres', 15:'decametres', 16:'hectometres'};
+
 
 export function parseDXF(text){
   if (/^\s*AutoCAD Binary DXF/.test(text))
@@ -443,17 +454,14 @@ export function parseDXF(text){
     }
   }
 
-  // Unit conversion rides along in the root matrix, so every coordinate,
-  // radius and text height picks it up for free.
-  const iu = INSUNITS[parseInt(header.$INSUNITS, 10)] || null;
-  const s = iu ? iu[1] : 1;
+  const code = parseInt(header.$INSUNITS, 10);
   const shapes = [];
-  toShapes(records(p, sec.ENTITIES[0], sec.ENTITIES[1]), blocks, [s,0,0,s,0,0], 0, shapes, report);
+  toShapes(records(p, sec.ENTITIES[0], sec.ENTITIES[1]), blocks, [1,0,0,1,0,0], 0, shapes, report);
 
   return {
     shapes, layers,
-    units: iu ? iu[0] : null,
-    scale: s,
+    units: INSUNITS[code] || null,
+    foreignUnit: (!INSUNITS[code] && UNIT_NAME[code]) || null,
     skipped: report.skipped,
     hatch: report.hatch,
   };

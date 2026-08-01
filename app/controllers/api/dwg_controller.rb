@@ -14,7 +14,7 @@ module Api
 
       if result.ok
         Rails.logger.info("dwg_convert user=#{current_user&.id} → #{result.dxf.bytesize} bytes DXF")
-        render plain: result.dxf, content_type: "application/dxf"
+        render plain: result.dxf, content_type: "application/json"
       else
         render json: { error: result.error }, status: result.status
       end

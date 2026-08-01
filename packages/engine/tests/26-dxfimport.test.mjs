@@ -97,9 +97,22 @@ check('INSERT of an undefined block is reported, not crashed',
       r.entities.length===0 && r.report.skipped['INSERT MISSING']===1);
 
 /* ===== units ===== */
+// A drawing's own numbers are its truth — we never rescale. Real files carry a
+// bogus INSUNITS=1 from a template; a 40x60 m house came through 25.4x too big
+// before this rule, so an unrepresentable unit is reported, never "corrected".
 r = imp(wrap(['9','$INSUNITS','70','1'], [], [], ['0','LINE','8','0','10','1','20','0','11','2','21','0']));
-check('inches → mm units', r.units==='mm');
-check('inch coordinates scaled by 25.4', near(one(r,'line').x1,25.4,1e-9) && near(one(r,'line').x2,50.8,1e-9));
+check('an inch file is NOT silently rescaled',
+      one(r,'line').x1===1 && one(r,'line').x2===2);
+check('…and does not claim a unit we cannot represent', r.units===null);
+check('…but says so in plain language', r.report.foreignUnit==='inches' &&
+      M.reportLines(r.report,'x.dxf').some(l=>/inches/.test(l) && /kept exactly/.test(l)));
+
+r = imp(wrap(['9','$INSUNITS','70','6'], [], [], ['0','LINE','8','0','10','1','20','0','11','2','21','0']));
+check('metres are represented directly, still unscaled',
+      r.units==='m' && one(r,'line').x2===2 && !r.report.foreignUnit);
+
+r = imp(wrap(['9','$INSUNITS','70','4'], [], [], ['0','LINE','8','0','10','1','20','0','11','2','21','0']));
+check('millimetres likewise', r.units==='mm' && one(r,'line').x2===2);
 
 r = imp(wrap(['9','$INSUNITS','70','5'], [], [], ['0','LINE','8','0','10','1','20','0','11','2','21','0']));
 check('centimetre file needs no scaling', r.units==='cm' && one(r,'line').x1===1);
@@ -206,6 +219,52 @@ check('ANSI31 → concrete',    matOf('ANSI31')==='concrete');
 check('an unknown pattern falls back to concrete rather than guessing',
       matOf('SOMETHING-ODD')==='concrete');
 
+/* ----- edge-path boundaries get chained into one fillable ring -----
+   AutoCAD usually writes hatch boundaries as loose edges, so this is the
+   common real-world case, not an exotic one. */
+// a square from 4 line edges, deliberately out of order and some reversed
+r = imp(ents('0','HATCH','8','walls','2','AR-CONC','91','1','92','1','93','4',
+             '72','1','10','10','20','0','11','10','21','10',      // right, forwards
+             '72','1','10','10','21','10','11','0','20','10',      // top, reversed pair order
+             '72','1','10','0','20','0','11','10','21','0',        // bottom
+             '72','1','10','0','20','10','11','0','21','0',        // left
+             '97','0','75','0'));
+const cb = one(r,'pline'), cf = one(r,'hatch');
+check('4 loose line edges chain into ONE boundary', of(r,'pline').length===1);
+check('the chained ring is closed with 4 corners', cb.closed===true && cb.pts.length===4);
+check('the chained ring is a real filled hatch', !!cf && cf.ref===cb.id);
+check('a chained boundary is editable, not frozen',
+      cb.layer==='walls' && r.report.frozen===0);
+check('AR-CONC → concrete', cf.mat==='concrete');
+check('the ring covers the right square',
+      near(Math.min(...cb.pts.map(p=>p.x)),0,1e-9) && near(Math.max(...cb.pts.map(p=>p.x)),10,1e-9) &&
+      near(Math.min(...cb.pts.map(p=>p.y)),0,1e-9) && near(Math.max(...cb.pts.map(p=>p.y)),10,1e-9));
+
+// line + arc edges: a "stadium" shape, arc must be walked in travel order
+r = imp(ents('0','HATCH','8','0','2','GRASS','91','1','92','1','93','2',
+             '72','1','10','0','20','0','11','0','21','10',
+             '72','2','10','0','20','5','40','5','50','90','51','270','73','0',
+             '97','0','75','0'));
+check('mixed line+arc edges chain', of(r,'hatch').length===1 && of(r,'pline').length===1);
+check('the arc edge is tessellated into the ring', one(r,'pline').pts.length>8);
+check('GRASS still drives the material', one(r,'hatch').mat==='green');
+
+// a gap in the chain must NOT be silently welded shut
+r = imp(ents('0','HATCH','8','0','2','SOLID','91','1','92','1','93','3',
+             '72','1','10','0','20','0','11','10','21','0',
+             '72','1','10','10','20','0','11','10','21','10',
+             '72','1','10','10','20','10','11','5','21','50',   // flies off, never closes
+             '97','0','75','0'));
+check('an open chain is refused rather than force-closed', of(r,'hatch').length===0);
+check('…and its edges survive as frozen outlines',
+      of(r,'line').length===3 && of(r,'line').every(l=>l.layer===M.FROZEN_LAYER));
+
+// chainLoop directly: ordering and reversal
+check('chainLoop returns null on a gap',
+      M.chainLoop([[{x:0,y:0},{x:1,y:0}], [{x:5,y:5},{x:6,y:5}]])===null);
+check('chainLoop closes a triangle given reversed edges',
+      M.chainLoop([[{x:0,y:0},{x:2,y:0}], [{x:0,y:2},{x:0,y:0}], [{x:2,y:0},{x:0,y:2}]])?.length===3);
+
 // two loops can't be expressed as one filled boundary → frozen outlines
 r = imp(ents('0','HATCH','8','0','2','SOLID','91','2',
              '92','3','72','0','73','1','93','3','10','0','20','0','10','9','20','0','10','0','20','9',
@@ -217,18 +276,20 @@ check('…its loops are kept as frozen outlines',
 check('…and the user is told why',
       M.reportLines(r.report,'x.dxf').some(l=>/too complex to fill/.test(l)));
 
-// edge-type boundary: line + arc edges (92 without bit 2, 93 = edge count)
+// edge-type boundary: line + arc edges (92 without bit 2, 93 = edge count).
+// These two close into a half-disc, so they chain and fill.
 r = imp(ents('0','HATCH','8','0','2','ANSI31','70','0','91','1',
              '92','1','93','2',
              '72','1','10','0','20','0','11','10','21','0',
              '72','2','10','5','20','0','40','5','50','0','51','180','73','1',
              '97','0','75','1','76','1','52','0','41','1','78','0'));
-check('HATCH line edge imported', of(r,'line').length===1 && of(r,'line')[0].x2===10);
-check('HATCH arc edge imported with its angles',
-      of(r,'arc').length===1 && near(of(r,'arc')[0].r,5,1e-6) &&
-      near(of(r,'arc')[0].a1,Math.PI,1e-6));
-check('HATCH edges are frozen', of(r,'line')[0].layer===M.FROZEN_LAYER &&
-                                of(r,'arc')[0].layer===M.FROZEN_LAYER);
+const hd = one(r,'pline');
+check('line + arc edges close into one ring', of(r,'hatch').length===1 && !!hd);
+check('the ring spans the chord exactly',
+      near(Math.min(...hd.pts.map(p=>p.x)),0,1e-6) && near(Math.max(...hd.pts.map(p=>p.x)),10,1e-6));
+check('the arc half of the ring bulges to radius 5',
+      near(Math.max(...hd.pts.map(p=>p.y)),5,0.02) &&
+      near(Math.min(...hd.pts.map(p=>p.y)),0,1e-6));
 
 // a clockwise arc edge (73 = 0) must not come in reversed
 r = imp(ents('0','HATCH','8','0','91','1','92','1','93','1',

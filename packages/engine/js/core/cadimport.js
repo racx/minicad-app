@@ -97,6 +97,63 @@ export function splinePts(s){
   return out;
 }
 
+/* ---------- edge-path hatch boundaries ----------
+   AutoCAD usually writes a hatch boundary as a *chain of separate edges*
+   (line, arc, elliptic arc, spline) rather than one polyline. Those edges are
+   emitted in file order, which is not necessarily travel order, and any edge
+   may run backwards. Walking them into one closed loop is what lets a real
+   architectural poché come in filled instead of as grey outlines. */
+
+// polyline approximation of a single IR shape, in travel order
+function shapeRun(s){
+  if (s.k==='line')    return [{x:s.a.x, y:s.a.y}, {x:s.b.x, y:s.b.y}];
+  if (s.k==='arc'){
+    const sweep = normAng(s.a1 - s.a0) || TAU;
+    const n = steps(sweep), out = [];
+    for (let i=0; i<=n; i++) out.push(arcPt({cx:s.c.x, cy:s.c.y, r:s.r}, s.a0 + sweep*i/n));
+    return out;
+  }
+  if (s.k==='ellipse') return ellipsePts(s).pts;
+  if (s.k==='poly')    return polyPts(s.pts, s.closed);
+  if (s.k==='spline')  return splinePts(s);
+  return null;
+}
+
+// Chain runs head-to-tail into one closed loop, reversing edges as needed.
+// Returns the loop's points (open — the closing segment is implicit), or null
+// if the edges don't form exactly one closed ring.
+export function chainLoop(runs){
+  if (!runs.length || runs.some(r => !r || r.length < 2)) return null;
+
+  let lo = Infinity, hi = -Infinity;
+  for (const r of runs) for (const p of r){
+    lo = Math.min(lo, p.x, p.y); hi = Math.max(hi, p.x, p.y);
+  }
+  const tol = Math.max((hi - lo) * 1e-6, 1e-9);
+  const near = (a, b) => Math.abs(a.x-b.x) <= tol && Math.abs(a.y-b.y) <= tol;
+
+  const used = runs.map(() => false);
+  used[0] = true;
+  const loop = runs[0].slice();
+
+  for (let placed = 1; placed < runs.length; placed++){
+    const tail = loop[loop.length-1];
+    let hit = -1;
+    for (let i=0; i<runs.length && hit<0; i++){
+      if (used[i]) continue;
+      const r = runs[i];
+      if (near(tail, r[0]))               { loop.push(...r.slice(1)); hit = i; }
+      else if (near(tail, r[r.length-1])) { loop.push(...r.slice(0,-1).reverse()); hit = i; }
+    }
+    if (hit < 0) return null;             // a gap: not one continuous ring
+    used[hit] = true;
+  }
+
+  if (!near(loop[0], loop[loop.length-1])) return null;   // ring never closed
+  loop.pop();                                             // closing segment is implicit
+  return loop.length >= 3 ? loop : null;
+}
+
 /* ---------- AutoCAD pattern name → one of our materials ----------
    Deliberately conservative: architects name patterns for the material, so the
    obvious ones map well and everything else falls back to concrete (the neutral
@@ -121,7 +178,7 @@ export function importDoc(doc){
   const seen = new Map();                          // layer name → layer object
   let id = 1;
   const report = {native:0, frozen:0, skipped:{...doc.skipped}, layers:0,
-                  hatch:doc.hatch || 0, filled:0};
+                  hatch:doc.hatch || 0, filled:0, foreignUnit:doc.foreignUnit || null};
 
   for (const l of doc.layers) if (!seen.has(l.name)) seen.set(l.name, {...l});
 
@@ -164,15 +221,35 @@ export function importDoc(doc){
     byHatch.get(s.hatchId).push(s);
   }
   const fillable = new Map();                      // hatchId → the single shape to fill
+  const chained  = new Map();                      // hatchId → {pts, seed, mat} assembled from edges
+  const consumed = new Set();                      // edge shapes replaced by their assembled loop
   for (const [hid, group] of byHatch){
     const only = group.length===1 ? group[0] : null;
     if (only && only.k==='poly' && only.closed && only.pts.length>=3){
       fillable.set(hid, only);
       only.frozen = false;                         // it becomes ordinary editable geometry
+      continue;
     }
+    // several edges: walk them into one ring if we can
+    const loop = chainLoop(group.map(shapeRun));
+    if (!loop) continue;                           // islands / gaps stay frozen outlines
+    chained.set(hid, {pts:loop, seed:group[0], mat:materialFor(group[0])});
+    for (const s of group) consumed.add(s);
   }
 
   for (const s of doc.shapes){
+    // this edge was absorbed into an assembled hatch ring — emit the ring once,
+    // at the position of its first edge, and skip the rest
+    if (consumed.has(s)){
+      const plan = chained.get(s.hatchId);
+      if (plan && plan.seed===s){
+        const b = add({type:'pline', layer:layerFor(s.layer), pts:plan.pts, closed:true});
+        add({type:'hatch', layer:b.layer, ref:b.id, mat:plan.mat});
+        report.filled++;
+      }
+      continue;
+    }
+
     if (s.k==='line'){
       if (dist(s.a, s.b) < 1e-12) continue;
       add({type:'line', layer:place(s), x1:s.a.x, y1:s.a.y, x2:s.b.x, y2:s.b.y}, s.frozen);
@@ -273,6 +350,9 @@ export function reportLines(r, name){
   if (r.frozen)
     out.push(`${r.frozen} curved/complex objects are on the locked "${FROZEN_LAYER}" layer — you can see and snap to them, but not edit them. ` +
              `To change or delete them, pick ${FROZEN_LAYER} in the layer box and press 🔒; press 👁 to hide them instead.`);
+  if (r.foreignUnit)
+    out.push(`That file says it is drawn in ${r.foreignUnit}, which MiniCAD doesn't have — ` +
+             `the numbers were kept exactly as they are. Type UNITS to say what 1 unit means.`)
   if (r.turnedOn)
     out.push('Every layer in that file was switched off — turned them back on so you can see the drawing.');
   if (r.filled)
