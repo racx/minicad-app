@@ -159,14 +159,19 @@ export function chainLoop(runs){
    obvious ones map well and everything else falls back to concrete (the neutral
    grey) rather than guessing something colourful and wrong. */
 const PATTERN_MAT = [
+  // SOLID is a flat colour wash, not a hatch pattern. It is also the single
+  // most common fill in a real drawing (1044 of 1121 in one house plan), so
+  // mapping it to a line pattern blankets the whole sheet in diagonals.
+  [/^SOLID\b|^SOLID,/i,                             'solid'],
   [/GRASS|GRAVEL|EARTH|SWAMP|AR-SAND|GARDEN|LAND/i, 'green'],
   [/BRICK|AR-B\d|AR-BRSTD|AR-BRELM|MASON|BLOCK/i,   'brick'],
   [/GLASS|AR-RSHKE|WINDOW/i,                        'glass'],
   [/WOOD|AR-PARQ|PLAST|TIMBER|DOLMIT/i,             'wood'],
   [/WATER|AR-HBONE|LIQUID/i,                        'water'],
-  [/CONC|AR-CONC|ANSI3[123]|STEEL|NET|CROSS|SOLID/i,'concrete'],
+  [/CONC|AR-CONC|ANSI3[123]|STEEL|NET|CROSS/i,      'concrete'],
 ];
 export function materialFor(s){
+  if (s.solid) return 'solid';                       // the flag beats the name
   const name = s.pattern || '';
   for (const [re, mat] of PATTERN_MAT) if (re.test(name)) return mat;
   return 'concrete';

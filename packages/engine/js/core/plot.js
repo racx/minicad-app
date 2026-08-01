@@ -81,7 +81,11 @@ export function buildPlotSVG({entities, layers=[], settings, filename='drawing',
     const bl = layerOf(b.layer);
     if (bl && bl.off) continue;
     usedMats.add(e.mat);
-    const fill = `fill="url(#hpat-${e.mat})" stroke="none"`;
+    // a SOLID fill prints as a flat wash, not a pattern — keep it light so the
+    // linework on top stays readable on paper
+    const fill = mat.pattern.solid
+      ? `fill="${colors ? mat.color : '#000'}" fill-opacity="0.22" stroke="none"`
+      : `fill="url(#hpat-${e.mat})" stroke="none"`;
     if (b.type==='circle')
       out.push(`<circle cx="${X(b.cx)}" cy="${Y(b.cy)}" r="${f(b.r*mmu)}" ${fill}/>`);
     else out.push(`<path d="${plineD(b)}" ${fill}/>`);
@@ -90,6 +94,7 @@ export function buildPlotSVG({entities, layers=[], settings, filename='drawing',
     const defs=['<defs>'];
     for (const key of usedMats){
       const mat = materialByKey(key);
+      if (mat.pattern.solid) continue;                // filled directly, no pattern needed
       const col = colors ? mat.color : '#000';
       const inner=[];
       for (const fam of mat.pattern.lines||[]){

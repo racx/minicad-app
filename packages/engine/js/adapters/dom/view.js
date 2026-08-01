@@ -213,6 +213,12 @@ function drawHatch(e){
   ctx.strokeStyle = ctx.fillStyle = sel ? '#4db8ff' : mat.color;
   ctx.globalAlpha = sel ? 0.95 : 0.6;
   ctx.lineWidth = 1;
+  if (mat.pattern.solid){
+    // already clipped to the boundary, so filling the bbox fills the shape
+    ctx.globalAlpha = sel ? 0.5 : 0.28;      // a wash: linework must stay readable on top
+    ctx.fillRect(Math.min(p0.x,p1.x), Math.min(p0.y,p1.y),
+                 Math.abs(p1.x-p0.x), Math.abs(p1.y-p0.y));
+  }
   for (const fam of mat.pattern.lines || []) hatchLines(p0, p1, fam);
   if (mat.pattern.dots) hatchDots(p0, p1, mat.pattern.dots);
   ctx.globalAlpha = 1;

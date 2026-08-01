@@ -205,7 +205,9 @@ const hf = one(r,'hatch');
 check('a real hatch entity is created', !!hf);
 check('the hatch references its boundary', hf.ref===hp.id);
 check('the hatch lands on the boundary layer', hf.layer==='walls');
-check('SOLID maps to the neutral material', hf.mat==='concrete');
+// A SOLID hatch is a flat colour wash, not a line pattern. Mapping it to one
+// blanketed a real house plan in diagonals — 1044 of its 1121 hatches are SOLID.
+check('SOLID maps to the solid-fill material, not a line pattern', hf.mat==='solid');
 check('the fill is reported, not silently invented',
       M.reportLines(r.report,'x.dxf').some(l=>/came in filled/.test(l)));
 
@@ -216,6 +218,8 @@ const matOf = pat => one(imp(ents('0','HATCH','8','0','2',pat,'91','1',
 check('GRASS → green area',   matOf('GRASS')==='green');
 check('AR-B816 → brick',      matOf('AR-B816')==='brick');
 check('ANSI31 → concrete',    matOf('ANSI31')==='concrete');
+check('SOLID → solid fill',   matOf('SOLID')==='solid');
+check('SOLID,_O (a solid variant) → solid fill', matOf('SOLID,_O')==='solid');
 check('an unknown pattern falls back to concrete rather than guessing',
       matOf('SOMETHING-ODD')==='concrete');
 

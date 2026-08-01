@@ -2,9 +2,13 @@
    MiniCAD — hatch material catalog (pure data)
    Pattern spacing is VISUAL (screen px on canvas, mm on paper),
    like lineweights — hatches read well at every zoom and scale.
-   lines: families of parallel lines {ang°, gap, dash?}; dots: {gap}.
+   lines: families of parallel lines {ang°, gap, dash?}; dots: {gap};
+   solid: a flat wash — what CAD calls a SOLID fill, by far the most common
+   thing in a real architectural drawing (poché, floor finishes, site areas).
    ========================================================= */
 export const MATERIALS = [
+  { key:'solid',    name:'Solid fill',   color:'#8d949c',
+    pattern:{ solid:true } },
   { key:'concrete', name:'Concrete',     color:'#9aa6b2',
     pattern:{ lines:[ {ang:45, gap:11} ] } },
   { key:'brick',    name:'Brick / masonry', color:'#c98a6b',
