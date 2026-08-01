@@ -127,7 +127,10 @@ export function buildPlotSVG({entities, layers=[], settings, filename='drawing',
       out.push(`<path d="${plineD(e)}" ${st}/>`);
     }
     else if (e.type==='text'){
-      out.push(`<text x="${X(e.x)}" y="${Y(e.y)}" font-size="${f(e.h*mmu)}" font-family="monospace" fill="${col(e)}">${esc(e.str)}</text>`);
+      const x=X(e.x), y=Y(e.y);
+      // world CCW → paper CW (Y flip), same convention as the screen renderer
+      const rot = e.rot ? ` transform="rotate(${f(-e.rot*180/Math.PI)} ${x} ${y})"` : '';
+      out.push(`<text x="${x}" y="${y}" font-size="${f(e.h*mmu)}" font-family="monospace" fill="${col(e)}"${rot}>${esc(e.str)}</text>`);
     }
     else if (e.type==='dim'){
       const g=dimGeom(e), hmm=f(dimH(e)*mmu);

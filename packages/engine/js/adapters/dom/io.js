@@ -8,6 +8,9 @@ import { entities, setEntities, layers, setLayers, getIdSeq, setIdSeq,
 import { zoomExtents } from './view.js';
 import { log, refreshLayers } from './ui.js';
 import { connectUI } from '../../core/bus.js';
+import { parseDXF, DxfError } from '../../core/dxf.js';
+import { importDoc, reportLines } from '../../core/cadimport.js';
+import { dwgToDxf, looksLikeDWG, DwgError } from '../../core/dwg.js';
 
 export function download(name, data, mime){
   const a=document.createElement('a');
@@ -34,6 +37,48 @@ export function openJSON(f){
     }catch(e){ log('Could not read that file.', 'e'); }
   };
   r.readAsText(f);
+}
+
+/* Shared tail of every CAD import: DXF text → the drawing on screen. */
+function loadDxfText(text, name, what='DXF'){
+  let doc;
+  try{ doc = parseDXF(text); }
+  catch(e){ log(e instanceof DxfError ? e.message : `Could not read that ${what} file.`, 'e'); return false; }
+  const res = importDoc(doc);
+  if (!res.entities.length){ log(`That ${what} has nothing MiniCAD can draw in it.`, 'e'); return false; }
+  snapshot();
+  setLayers(res.layers); setEntities(res.entities); setIdSeq(res.idSeq);
+  if (res.units) setUnits(res.units);
+  setCurrentLayer((res.layers.find(l=>!l.locked && !l.off) || res.layers[0]).name);
+  refreshLayers(); selection.clear(); zoomExtents();
+  for (const line of reportLines(res.report, name)) log(line, 'r');
+  return true;
+}
+
+export function openDXF(f){
+  const r=new FileReader();
+  r.onload=()=>loadDxfText(String(r.result), f.name);
+  r.readAsText(f);
+}
+
+/* DWG: converted to DXF server-side, then down the same path.
+   See core/dwg.js — the engine never loads the GPL reader itself. */
+export function openDWG(f){
+  const r=new FileReader();
+  r.onload=async ()=>{
+    const bytes = new Uint8Array(r.result);
+    if (!looksLikeDWG(bytes)){ log('That does not look like a DWG file.', 'e'); return; }
+    log(`Converting ${f.name}…`, 'r');
+    // Rails-style hosts want their CSRF token echoed back; core is DOM-free,
+    // so reading the meta tag happens here in the adapter.
+    const meta = document.querySelector('meta[name="csrf-token"]');
+    const headers = meta && meta.content ? {'X-CSRF-Token': meta.content} : {};
+    let text;
+    try{ text = await dwgToDxf(bytes, {headers}); }
+    catch(e){ log(e instanceof DwgError ? e.message : 'Could not convert that DWG.', 'e'); return; }
+    loadDxfText(text, f.name, 'DWG');
+  };
+  r.readAsArrayBuffer(f);
 }
 
 /* ---------- autosave (localStorage) ---------- */
@@ -90,8 +135,10 @@ export function dxfExport(){
       }
       push('0','SEQEND');
     }
-    else if (e.type==='text')
+    else if (e.type==='text'){
       push('0','TEXT','8',e.layer,'10',e.x,'20',e.y,'30','0','40',e.h,'1',e.str);
+      if (e.rot) push('50', normAng(e.rot)*180/Math.PI);
+    }
     else if (e.type==='dim'){
       // exported as plain lines + text so it opens everywhere without block definitions
       const g=dimGeom(e);

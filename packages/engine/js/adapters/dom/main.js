@@ -14,7 +14,7 @@ import { startCommand, handleEnter, cancelCmd, applyModifiers, eraseWithDependen
          doUndo, doRedo, setTog, clickSelect, boxSelect, onPoint, startEditText } from '../../core/commands.js';
 import { cmdInput, coordRead, layerSel, layerColor, btnLayerOff, btnLayerLock, log, setPrompt,
          toggleHelp, refreshLayers } from './ui.js';
-import { saveJSON, openJSON, dxfExport, autosaveTick, restoreAutosave } from './io.js';
+import { saveJSON, openJSON, openDXF, openDWG, dxfExport, autosaveTick, restoreAutosave } from './io.js';
 
 let panning = null;
 let spaceHeld = false;
@@ -260,7 +260,7 @@ document.getElementById('btnSave').addEventListener('click', saveJSON);
 document.getElementById('btnOpen').addEventListener('click', ()=>document.getElementById('fileIn').click());
 document.getElementById('fileIn').addEventListener('change', ev=>{
   const f=ev.target.files[0]; if(!f) return;
-  openJSON(f);
+  (/\.dwg$/i.test(f.name) ? openDWG : /\.dxf$/i.test(f.name) ? openDXF : openJSON)(f);
   ev.target.value='';
 });
 document.getElementById('btnDxf').addEventListener('click', dxfExport);

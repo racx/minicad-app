@@ -27,6 +27,31 @@ export function mirrorPt(p, a, b){
   return {x:2*(a.x+t*dx)-p.x, y:2*(a.y+t*dy)-p.y};
 }
 
+/* ---------- text ----------
+   Text sits on a baseline from its insertion point, rotated CCW by `rot`
+   (radians, optional — absent/0 means horizontal, so old drawings still load).
+   Width is monospace-derived, matching the 0.62 em advance the renderer uses. */
+export const textW = e => e.str.length * e.h * 0.62;
+// the four baseline-box corners in world space, CCW from the insertion point
+export function textCorners(e){
+  const a = e.rot || 0, c = Math.cos(a), s = Math.sin(a);
+  const w = textW(e), h = e.h;
+  return [[0,0],[w,0],[w,h],[0,h]].map(([u,v]) =>
+    ({x: e.x + u*c - v*s, y: e.y + u*s + v*c}));
+}
+// p expressed in the text's own frame (insertion point at the origin, baseline along +x)
+export function textLocal(e, p){
+  const a = e.rot || 0, c = Math.cos(a), s = Math.sin(a);
+  const dx = p.x - e.x, dy = p.y - e.y;
+  return {x: dx*c + dy*s, y: -dx*s + dy*c};
+}
+// keep text right-way-up: fold angles that would render upside down
+export function readableAng(a){
+  a = normAng(a);
+  if (a > Math.PI/2 + 1e-9 && a <= 3*Math.PI/2 + 1e-9) a = normAng(a + Math.PI);
+  return a;
+}
+
 /* ---------- arcs (a0→a1 counter-clockwise, radians) ---------- */
 export const TAU = Math.PI*2;
 export const normAng = a => ((a % TAU) + TAU) % TAU;

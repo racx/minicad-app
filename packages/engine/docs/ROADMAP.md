@@ -2,7 +2,7 @@
 
 **Single source of truth** for what exists, how complete it is, and what comes next.
 Evidence-based: every claim below cites `file:line` in the codebase as of commit `536d7c7`.
-Verified against the test suite: `node tests/run.mjs` → **16 suites, 278 checks, all passing** (2026-07-06).
+Verified against the test suite: `node tests/run.mjs` → **30 suites, 633 checks, all passing** (2026-08-01).
 
 Update this file whenever a feature lands or a decision changes the plan.
 
@@ -116,13 +116,17 @@ unpickable + unsnappable + excluded from TRIM/EXTEND edges — `entities.js find
 | JSON save/open | ✅ Round-trips everything incl. layer states. | `io.js saveJSON/openJSON` |
 | Autosave | ✅ localStorage every 5 s + beforeunload; restore on boot (skips empty saves); NEW clears. Real-browser round-trip verified. | `io.js:38–64`, `main.js:242–243`, boot restore `main.js` boot() |
 | DXF export | ✅ R12/AC1009 (`io.js:69`). LINE/CIRCLE/ARC/POLYLINE/TEXT native; **DIM decomposed to 3 LINEs + rotated TEXT** (`io.js:90–99`) — a deliberate simplification (no block defs). Layer off/lock flags exported (`62` negative / `70`=4). ezdxf audit: 0 errors. | `io.js:66–104` |
-| DXF import | ❌ Absent. Export is one-way. | — |
+| DXF import | ✅ ASCII DXF R12–R2018 via **Open** (`.dxf` dispatched by extension). Two stages: `core/dxf.js` parses group codes into a backend-neutral shape IR (BLOCK/INSERT expanded to world coords incl. rotation/scale/arrays); `core/cadimport.js` maps IR → entities. Native: LINE, CIRCLE, ARC, LWPOLYLINE/POLYLINE, TEXT/ATTRIB (with rotation), MTEXT (split per line, codes stripped), aligned DIMENSION. **Frozen** onto the locked `FROZEN` layer (visible + snappable, not editable): ELLIPSE, SPLINE (rational de Boor), bulged plines, SOLID/TRACE/3DFACE, LEADER. Layer table incl. ACI/true colour, off, locked. `$INSUNITS` sets units and scales coords. Bulge tessellation reuses `geometry.bulgeArc`, so imported and drawn curves share one definition. | `core/dxf.js`, `core/cadimport.js`, `adapters/dom/io.js`, suite 26 |
+| DXF import — HATCH | ✅ Boundary paths (polyline incl. bulges) and edge paths (line/arc/elliptic-arc/spline). A **single closed loop becomes a real filled `hatch` entity** on an editable boundary, with the material guessed from the AutoCAD pattern name (`materialFor`, falls back to concrete). Multi-loop hatches (islands) can't be expressed by one `ref`, so they stay frozen outlines — reported separately. Parsing needs an ordered cursor walk because HATCH reuses 10/20/40/50/51/72/73/93/97 between boundary and pattern data. | `core/dxf.js hatchLoops`, suite 26 |
+| DXF import — not yet | ⚠️ MLINE, MULTILEADER, ACAD_TABLE, REGION/3DSOLID, WIPEOUT, XLINE/RAY, rotated/angular DIMENSION. Binary DXF refused with a human message. All counted and named back to the user. | `core/dxf.js` SILENT/skip report |
+| **DWG import** | ✅ **Rails-side**: browser POSTs bytes to `/api/dwg`, gets DXF back, then reuses the entire DXF path — `dwg_write_dxf()` means no separate DWG→IR mapper was needed. Conversion runs in `packages/dwg` (GPL-3.0) as a **subprocess**, never linked or shipped to the browser. Reads r1.2–r2018; verified on r14/2000/2004/2018 (62 entities each, ~250 ms per file through Rails). **The licence boundary is enforced by tests**: suite 27 fails if any engine module references the GPL reader. | `packages/dwg/`, `app/services/dwg_converter.rb`, `Api::DwgController`, `core/dwg.js`, suite 27 |
+| DWG export | ❌ Absent. LibreDWG's writer is r2000-only and reportedly rejected by AutoCAD; the route is ACadSharp (MIT, writes AC1018) as a second subprocess. | — |
 | Print / PDF | ✅ PLOT/⌘P → mm-true SVG sheet (white/black print palette, footer strip) in a hidden iframe with real-mm `@page`; browser Save-as-PDF gives a scale-accurate vector PDF. Calibration test page with 100/50 mm bars. All linework is CONTINUOUS today, so the "dashes in mm" requirement is vacuously satisfied — revisit when linetypes exist. | `js/plot.js` (pure), `js/plotui.js`, suites 15–16 |
 | Units | ✅ UNITS mm/cm/m (default cm); dim text + readout formatting; persisted in JSON + autosave. | `state.js` units/unitFmt, `geometry.js formatLen`, suite 14 |
 
 ## 6. Test coverage map
 
-`tests/run.mjs`, 12 suites / 206 checks, each suite an isolated process driving the real
+`tests/run.mjs`, 30 suites / 633 checks, each suite an isolated process driving the real
 engine through a stubbed DOM (`tests/stub-dom.mjs`):
 
 | Suite | Covers |
@@ -139,6 +143,9 @@ engine through a stubbed DOM (`tests/stub-dom.mjs`):
 | 10-autosave-new | tick/restore/clear, NEW confirm, empty-save guard |
 | 11-layers-editing | hide/lock filters incl. TRIM edges, CHLAYER, dblclick edit |
 | 12-offset-pline | closed/open pline miters, arc offset, collapse + refusal messages |
+| 26-dxfimport | DXF parse → IR → entities: native mapping, curve tessellation onto FROZEN, HATCH boundary + edge paths (incl. the pattern-section code-reuse trap) and material inference, INSERT scale/rotation/arrays, `$INSUNITS`, layer flags, MTEXT, bad-input refusals, openDXF end-to-end, round-trip of our own export |
+| 27-dwg | DWG magic sniff, `dwgToDxf` request shape, every failure path's human message, openDWG end-to-end against a stubbed endpoint, and a **licence guard**: no engine module may reference the GPL converter |
+| 28-text-rotation | `rot` across bbox/hit/grips/mirror/ROTATE/SCALE, both renderers' Y-flip sign, DXF group code 50 round-trip, backwards compatibility with pre-rotation saved files |
 
 **Not covered by tests:** pixel output (rendering correctness is eyeballed / Playwright
 screenshots), DXF acceptance by third-party CAD (checked with ezdxf ad hoc).
@@ -166,7 +173,10 @@ screenshots), DXF acceptance by third-party CAD (checked with ezdxf ad hoc).
   `@page`, calibration test page. Suites 14–16.
   **Pending human verification:** physical ruler check of the calibration page and a
   Chrome + Safari print of an A4-landscape 1:50 sheet (see checklist in session report).
-- **DXF import** (LINE/CIRCLE/ARC/LWPOLYLINE/TEXT subset first) — promoted per product intent.
+- ~~DXF import~~ ✅ **shipped**: R12–R2018 through Open, backend-neutral IR. Suite 26.
+- ~~DWG import~~ ✅ **shipped**: `POST /api/dwg` → `packages/dwg` GPL subprocess → the DXF path. Suite 27.
+- ~~Rotated TEXT~~ ✅ **shipped**: `rot` on the text entity (optional — absent = horizontal, so
+  old drawings load unchanged), a baseline-end rotation grip, ROTATE spins glyphs, DXF code 50. Suite 28.
   LWPOLYLINE bulge now has a native home (pline arc segments, shipped 2026-07-06).
 - **DXF HATCH export** (currently hatches stay in the JSON doc only).
 - **OFFSET for curved polylines** (arc segments offset to r±d, joint recompute) — the current
@@ -194,7 +204,7 @@ for a household tool; revisit only on explicit demand.
 
 ```
 python3 serve.py                 # http://localhost:8000 (no-cache dev server)
-node tests/run.mjs               # 12 suites, 206 checks
+node tests/run.mjs               # 30 suites, 633 checks
 ```
 User-facing docs: `guide.html` (beginner manual), `learn.html` (8 animated command movies),
 `?` panel in-app. Keep all three in sync with feature changes — and keep **this file** in

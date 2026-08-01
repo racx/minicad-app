@@ -295,7 +295,11 @@ function drawEntity(e, dx, dy, ghost){
     const s=w2s({x:e.x+dx,y:e.y+dy});
     ctx.font = `${Math.max(2, e.h*view.scale)}px ${'ui-monospace, monospace'}`;
     ctx.textBaseline = 'alphabetic';
-    ctx.fillText(e.str, s.x, s.y);
+    if (e.rot){                                   // world CCW → screen CW (Y is flipped)
+      ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(-e.rot);
+      ctx.fillText(e.str, 0, 0);
+      ctx.restore();
+    } else ctx.fillText(e.str, s.x, s.y);
     if (isSel){ const b=entBBox(e); const p0=w2s({x:b[0]+dx,y:b[3]+dy}), p1=w2s({x:b[2]+dx,y:b[1]+dy}); ctx.strokeRect(p0.x,p0.y,p1.x-p0.x,p1.y-p0.y); }
   } else if (e.type==='dim'){
     const g=dimGeom(e);

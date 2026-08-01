@@ -29,6 +29,7 @@ export function setupDOM(){
   globalThis.document = {
     getElementById(id){ if (!els.has(id)) els.set(id, makeEl()); return els.get(id); },
     createElement(){ return makeEl(); },
+    querySelector(){ return null; },      // no csrf meta tag in the stub
     querySelectorAll(){ return []; },
     activeElement: null,
   };
@@ -44,6 +45,17 @@ export function setupDOM(){
       clear: ()=>store.clear(),
     };
   }
+
+  // File / FileReader: fakeFile()/fakeBinFile() below make the objects the
+  // open* helpers expect.
+  globalThis.FileReader = class {
+    readAsText(f){ this.result = f && f._text || ''; this.onload && this.onload(); }
+    readAsArrayBuffer(f){
+      const b = f && f._bytes || new Uint8Array(0);
+      this.result = b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
+      this.onload && this.onload();
+    }
+  };
 
   const logs = [];
   document.getElementById('history').appendChild = d => { logs.push(d.textContent); };
@@ -63,6 +75,39 @@ export function setupDOM(){
       return box;
     },
   };
+}
+
+/* a File as far as openJSON/openDXF are concerned */
+export const fakeFile = (name, text)=>({name, _text:text});
+
+/* a binary File (openDWG reads bytes, not text) */
+export const fakeBinFile = (name, bytes)=>({name, _bytes:bytes});
+
+/* raw bytes that pass the "AC" + 4 digits DWG version stamp */
+export const dwgBytes = (ver='AC1018', pad=64)=>{
+  const b = new Uint8Array(ver.length + pad);
+  for (let i=0;i<ver.length;i++) b[i] = ver.charCodeAt(i);
+  return b;
+};
+
+/* Install a fake fetch. `handler(url, opts)` returns {status, body} —
+   body a string, or an object which is sent as JSON. */
+export function stubFetch(handler){
+  const calls = [];
+  globalThis.fetch = async (url, opts)=>{
+    calls.push({url, opts});
+    const r = await handler(url, opts);
+    if (r && r.networkError) throw new Error('network down');
+    const {status=200, body=''} = r || {};
+    const text = typeof body === 'string' ? body : JSON.stringify(body);
+    return {
+      ok: status>=200 && status<300,
+      status,
+      async text(){ return text; },
+      async json(){ return JSON.parse(text); },
+    };
+  };
+  return calls;
 }
 
 /* shared assertion helpers */

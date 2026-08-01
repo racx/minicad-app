@@ -633,7 +633,7 @@ function applyRotate(ang){
     else if (e.type==='circle'){ const p=rotPt({x:e.cx,y:e.cy},cmd.base,c,s); e.cx=p.x;e.cy=p.y; }
     else if (e.type==='arc'){ const p=rotPt({x:e.cx,y:e.cy},cmd.base,c,s); e.cx=p.x;e.cy=p.y; e.a0=normAng(e.a0+ang); e.a1=normAng(e.a1+ang); }
     else if (e.type==='pline'){ e.pts=e.pts.map(p=>{ const q=rotPt(p,cmd.base,c,s); return p.bulge?{...q,bulge:p.bulge}:q; }); }
-    else if (e.type==='text'){ const p=rotPt({x:e.x,y:e.y},cmd.base,c,s); e.x=p.x;e.y=p.y; }
+    else if (e.type==='text'){ const p=rotPt({x:e.x,y:e.y},cmd.base,c,s); e.x=p.x;e.y=p.y; e.rot=normAng((e.rot||0)+ang); }
     else if (e.type==='dim'){ const a=rotPt({x:e.x1,y:e.y1},cmd.base,c,s), b=rotPt({x:e.x2,y:e.y2},cmd.base,c,s); e.x1=a.x;e.y1=a.y;e.x2=b.x;e.y2=b.y; }
   }
   log(`Rotated ${cmd.sel.length} by ${fmt(ang*180/Math.PI)}°.`, 'r');

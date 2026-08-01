@@ -17,6 +17,12 @@ browser CAD engine at `packages/engine` (imported with full git history —
 - `packages/engine` stays standalone: its pages (index.html, guide.html,
   learn.html, serve.py) must keep working from inside the package directory, and
   its test suite must run with no Rails/app dependency.
+- **Licence boundary (`packages/dwg`):** that package is **GPL-3.0**; the engine
+  and the app are not. It is invoked as a **subprocess** (`node
+  packages/dwg/convert.mjs <out.dxf>` reading stdin), never imported, never
+  bundled, never shipped to a browser — any of those relicenses MiniCAD as
+  GPLv3. Engine suite 27 fails the build if an engine module so much as names
+  it. Read `packages/dwg/README.md` before touching DWG anything.
 - Stop for review after Stage 2 (auth) and Stage 4 (editor mount).
 - No new gems without asking.
 
@@ -30,8 +36,11 @@ browser CAD engine at `packages/engine` (imported with full git history —
     `app/javascript/entrypoints/editor.js` — which bundles the engine. The editor
     keeps the engine's own CSS untouched; do not Tailwind-ify engine UI.
 - Engine package: npm workspace `@minicad/engine` at `packages/engine`
-  (`npm test -w packages/engine` runs its 19+ suites; wired into bin/ci —
+  (`npm test -w packages/engine` runs its 30 suites; wired into bin/ci —
   engine failures fail the build).
+- Converter package: npm workspace `@minicad/dwg` at `packages/dwg` — GPL-3.0,
+  subprocess only, behind `POST /api/dwg` (`DwgConverter`). Needs `node` on the
+  server; it is already there for Vite.
 - No deploy tooling yet (no Kamal, no SSL config) — but keep the `/up` healthcheck
   and 12-factor ENV discipline so deploy later is config, not surgery.
 

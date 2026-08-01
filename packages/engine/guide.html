@@ -166,9 +166,30 @@
   <table>
     <tr><td>Save</td><td>Downloads <code>drawing.json</code> — this is <b>your file</b>, reopen it with the Open button.</td></tr>
     <tr><td>Autosave</td><td>The app quietly saves your work in the browser every few seconds. Close the tab, reopen — your drawing comes back on its own. Type <span class="say">NEW</span> for a fresh sheet. (Still press Save for a real file you can keep or share.)</td></tr>
-    <tr><td>Open</td><td>Loads a previously saved <code>drawing.json</code></td></tr>
+    <tr><td>Open</td><td>Loads a previously saved <code>drawing.json</code> — <b>or a <code>.dxf</code> / <code>.dwg</code> file somebody sent you</b> (see below).</td></tr>
     <tr><td>Export DXF</td><td>Makes a <code>.dxf</code> file that opens in AutoCAD, LibreCAD, or any professional CAD program — for when you need to send your plan to an architect or a kitchen company.</td></tr>
   </table>
+
+  <h2>Opening a DXF or DWG somebody sent you</h2>
+  <p>Press <b>Open</b> and pick the file — an architect's plan, a kitchen supplier's drawing, a
+  floor plan from the internet. Both <code>.dxf</code> and <code>.dwg</code> (AutoCAD's own
+  format) work. It replaces what's on screen, so save your own work first. The app tells you in
+  the command history exactly what it found.</p>
+  <p>Most things arrive as normal MiniCAD objects you can move, trim and dimension. Shaded
+  (hatched) areas come in <b>filled</b> where we can manage it — the material is a best guess from
+  the drawing, so type <span class="say">HATCH</span> on one to change it.</p>
+  <p>But real CAD files also contain shapes MiniCAD doesn't have — curvy splines, ovals. Those
+  still <b>appear</b>, drawn in grey on a locked layer called <b>FROZEN</b>. You can see them and
+  snap to them, so you can measure and draw off them, but clicks and selection boxes pass straight
+  through, which keeps them out of your way. To get at them anyway, pick <b>FROZEN</b> in the
+  layer box and press <b>🔒</b> to unlock (now they behave like anything else) or <b>👁</b> to hide
+  them.</p>
+  <p>A few things can't be read at all (tables, 3D solids). The app lists those by name and count
+  rather than pretending — so you always know what's missing before you start measuring.</p>
+  <div class="box warn"><b>DWG needs a connection.</b> DXF files are read by MiniCAD itself and
+  work offline; DWG files are converted first by the server, so opening one needs to be online.
+  If it says the converter isn't available, ask whoever sent the file for a DXF instead — every
+  CAD program can export one.</div>
 
   <h2>Printing to scale</h2>
   <p>First tell the app what your numbers mean: type <span class="say">UNITS</span> and answer

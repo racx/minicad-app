@@ -3,7 +3,8 @@
    snap candidates, transforms
    ========================================================= */
 import { dist, ptSegDist, arcPt, arcSweep, angleOnArc, normAng, mirrorPt,
-         plineParts, bulgeApex, bulgeFromApex, tessellateBoundary, pointInPoly } from './geometry.js';
+         plineParts, bulgeApex, bulgeFromApex, tessellateBoundary, pointInPoly,
+         textW, textCorners, textLocal, readableAng } from './geometry.js';
 import { entities, view, layerVisible, layerUnlocked } from './state.js';
 
 // text height of a dim: explicit e.h, else automatic (4% of measured length)
@@ -53,13 +54,15 @@ export function entHitDist(ent, p){
     return pointInPoly(p, tessellateBoundary(b)) ? 6/view.scale : Infinity;
   }
   if (ent.type==='text'){
-    const w = ent.str.length * ent.h * 0.62, h = ent.h;
-    if (p.x>=ent.x && p.x<=ent.x+w && p.y>=ent.y && p.y<=ent.y+h) return 0;
+    // work in the text's own frame, so rotation costs nothing here
+    const q = textLocal(ent, p);
+    const w = textW(ent), h = ent.h;
+    if (q.x>=0 && q.x<=w && q.y>=0 && q.y<=h) return 0;
     return Math.min(
-      ptSegDist(p,{x:ent.x,y:ent.y},{x:ent.x+w,y:ent.y}),
-      ptSegDist(p,{x:ent.x,y:ent.y+h},{x:ent.x+w,y:ent.y+h}),
-      ptSegDist(p,{x:ent.x,y:ent.y},{x:ent.x,y:ent.y+h}),
-      ptSegDist(p,{x:ent.x+w,y:ent.y},{x:ent.x+w,y:ent.y+h}));
+      ptSegDist(q,{x:0,y:0},{x:w,y:0}),
+      ptSegDist(q,{x:0,y:h},{x:w,y:h}),
+      ptSegDist(q,{x:0,y:0},{x:0,y:h}),
+      ptSegDist(q,{x:w,y:0},{x:w,y:h}));
   }
   return Infinity;
 }
@@ -95,7 +98,11 @@ export function entBBox(e){
     const b = entities.find(z=>z.id===e.ref);
     return b ? entBBox(b) : [0,0,0,0];
   }
-  if (e.type==='text'){ const w=e.str.length*e.h*0.62; return [e.x,e.y,e.x+w,e.y+e.h]; }
+  if (e.type==='text'){
+    const c = textCorners(e);
+    return [Math.min(...c.map(p=>p.x)), Math.min(...c.map(p=>p.y)),
+            Math.max(...c.map(p=>p.x)), Math.max(...c.map(p=>p.y))];
+  }
   if (e.type==='dim'){
     const g=dimGeom(e);
     return [Math.min(e.x1,e.x2,g.a.x,g.b.x), Math.min(e.y1,e.y2,g.a.y,g.b.y),
@@ -168,7 +175,10 @@ export function entGrips(e){
     });
     return out;
   }
-  if (e.type==='text') return [{x:e.x, y:e.y, g:'ins'}];
+  if (e.type==='text'){
+    const c = textCorners(e);
+    return [{x:e.x, y:e.y, g:'ins'}, {x:c[1].x, y:c[1].y, g:'rot'}];   // insertion + baseline end
+  }
   if (e.type==='dim'){
     const g=dimGeom(e);
     return [{x:e.x1, y:e.y1, g:'p1'}, {x:e.x2, y:e.y2, g:'p2'},
@@ -203,7 +213,12 @@ export function applyGrip(e, g, p){
       }
     }
   }
-  else if (e.type==='text'){ e.x=p.x; e.y=p.y; }
+  else if (e.type==='text'){
+    if (g==='rot'){                                  // drag the baseline end to spin the text
+      const a = Math.atan2(p.y-e.y, p.x-e.x);
+      if (dist(p,{x:e.x,y:e.y}) > 1e-9) e.rot = normAng(a);
+    } else { e.x=p.x; e.y=p.y; }
+  }
   else if (e.type==='dim'){
     if (g==='p1'){ e.x1=p.x; e.y1=p.y; }
     else if (g==='p2'){ e.x2=p.x; e.y2=p.y; }
@@ -239,7 +254,13 @@ export function mirrorEnt(e, a, b){
   }
   else if (e.type==='pline'){ e.pts=e.pts.map(p=>{ const q=mirrorPt(p,a,b);
     return p.bulge ? {x:q.x, y:q.y, bulge:-p.bulge} : q; }); }   // reflection flips arc direction
-  else if (e.type==='text'){ const p=mirrorPt({x:e.x,y:e.y},a,b); e.x=p.x; e.y=p.y; }  // like MIRRTEXT=0: stays readable
+  else if (e.type==='text'){                        // like MIRRTEXT=0: moves, stays readable
+    const p=mirrorPt({x:e.x,y:e.y},a,b); e.x=p.x; e.y=p.y;
+    if (e.rot){
+      const phi=Math.atan2(b.y-a.y, b.x-a.x);
+      e.rot = readableAng(2*phi - e.rot);           // reflect the angle, then keep it right-way-up
+    }
+  }
   else if (e.type==='dim'){
     const g=dimGeom(e);
     const D=mirrorPt(g.a, a, b);                  // a point on the mirrored dim line

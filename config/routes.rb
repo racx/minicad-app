@@ -18,6 +18,9 @@ Rails.application.routes.draw do
 
   namespace :api do
     post "drawings/:id/ai_commands", to: "ai_commands#create", as: :drawing_ai_commands
+    # DWG→DXF conversion (GPL subprocess — see packages/dwg/README.md).
+    # Reachable signed-out too, because /try lets anyone open a drawing.
+    post "dwg", to: "dwg#create", as: :dwg
   end
 
   resources :drawings, except: [ :new, :show ] do

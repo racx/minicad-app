@@ -1,0 +1,13 @@
+{
+  "name": "@minicad/dwg",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DWG→DXF converter subprocess. GPL-3.0 — deliberately isolated from @minicad/engine and the Rails app. See README.md.",
+  "license": "GPL-3.0",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "bin": { "minicad-dwg2dxf": "./convert.mjs" },
+  "dependencies": {
+    "@mlightcad/libredwg-web": "^0.7.9"
+  }
+}
