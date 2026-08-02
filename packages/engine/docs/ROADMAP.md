@@ -2,7 +2,7 @@
 
 **Single source of truth** for what exists, how complete it is, and what comes next.
 Evidence-based: every claim below cites `file:line` in the codebase as of commit `536d7c7`.
-Verified against the test suite: `node tests/run.mjs` → **31 suites, 735 checks, all passing** (2026-08-01).
+Verified against the test suite: `node tests/run.mjs` → **32 suites, 749 checks, all passing** (2026-08-01).
 
 Update this file whenever a feature lands or a decision changes the plan.
 
@@ -124,12 +124,13 @@ unpickable + unsnappable + excluded from TRIM/EXTEND edges — `entities.js find
 | **DWG import** | ✅ **Rails-side**: browser POSTs bytes to `/api/dwg` and gets the parsed DWG **database as JSON**, which `core/dwgdb.js` maps to the same IR `dxf.js` produces. Verified on a real 330 KB r2013 architect-drawn house: 1133 objects, 144 layers, 86 dimensions, 2 filled hatches, 0 unreadable, ~300 ms. Conversion runs in `packages/dwg` (GPL-3.0) as a **subprocess**, never linked or shipped to the browser. **NOT via `dwg_write_dxf()`** — libredwg's DXF writer dies with `memory access out of bounds` on real drawings whose reader path parses cleanly, so we read the database instead. Model space is imported; paper space (viewports onto it) is not a MiniCAD concept. **Unresolved external references are detected and named** (block-record flag bit 4 with no geometry) — a layout file that xrefs its base drawing otherwise opens as annotation-only and looks broken; suites 26+29 cover it. **The licence boundary is enforced by tests**: suite 27 fails if any engine module references the GPL reader. | `packages/dwg/`, `app/services/dwg_converter.rb`, `Api::DwgController`, `core/dwg.js`, `core/dwgdb.js`, suites 27+29 |
 | DWG export | ❌ Absent. LibreDWG's writer is r2000-only and reportedly rejected by AutoCAD; the route is ACadSharp (MIT, writes AC1018) as a second subprocess. | — |
 | Lineweight | ✅ Imported per layer (DXF group 370 = 1/100 mm; DWG = index into AutoCAD's standard ladder) and per entity, which wins. Stored as real mm in `layer.lw` / `entity.lw`. Paper uses the millimetres directly; screen uses a clamped px ramp (`lwPx`, 1–6 px) so heavy walls stay heavy at any zoom instead of ballooning — AutoCAD's LWDISPLAY behaviour. **Caveat:** most architectural drawings leave everything BYLAYER/default and get their printed weights from a CTB/STB plot-style table keyed on colour, which is an external file not present in the DWG — in the sample house only 9% of objects carry an author-set weight. | `state.js lwOf/lwPx`, `dxf.js lwFromIndex/lwFromHundredths`, suite 26 |
+| Performance | ✅ Uniform spatial grid (`core/spatial.js`) behind hit-testing, snapping and rendering, plus viewport culling. On the 22,177-entity house: `findEntityAt` 14.2 → **0.018 ms**, `snapCandidates` 33 → **0.030 ms**, entities drawn per frame 22,177 → **1,341** at room zoom; a mouse move went from ~100 ms to **0.08 ms**. Index rebuilds on a geometry epoch (`state.bumpGeom`, fired by `setEntities`/`snapshot`); between bumps extra candidates are harmless and the only possible misses are the objects being edited, which every query unions in from the selection. | `core/spatial.js`, suite 30 |
 | Print / PDF | ✅ PLOT/⌘P → mm-true SVG sheet (white/black print palette, footer strip) in a hidden iframe with real-mm `@page`; browser Save-as-PDF gives a scale-accurate vector PDF. Calibration test page with 100/50 mm bars. All linework is CONTINUOUS today, so the "dashes in mm" requirement is vacuously satisfied — revisit when linetypes exist. | `js/plot.js` (pure), `js/plotui.js`, suites 15–16 |
 | Units | ✅ UNITS mm/cm/m (default cm); dim text + readout formatting; persisted in JSON + autosave. | `state.js` units/unitFmt, `geometry.js formatLen`, suite 14 |
 
 ## 6. Test coverage map
 
-`tests/run.mjs`, 31 suites / 735 checks, each suite an isolated process driving the real
+`tests/run.mjs`, 32 suites / 749 checks, each suite an isolated process driving the real
 engine through a stubbed DOM (`tests/stub-dom.mjs`):
 
 | Suite | Covers |
@@ -148,6 +149,7 @@ engine through a stubbed DOM (`tests/stub-dom.mjs`):
 | 12-offset-pline | closed/open pline miters, arc offset, collapse + refusal messages |
 | 26-dxfimport | DXF parse → IR → entities: native mapping, curve tessellation onto FROZEN, HATCH boundary + edge paths (incl. the pattern-section code-reuse trap) and material inference, INSERT scale/rotation/arrays, `$INSUNITS`, layer flags, MTEXT, bad-input refusals, openDXF end-to-end, round-trip of our own export |
 | 27-dwg | DWG magic sniff, `dwgToDxf` request shape, every failure path's human message, openDWG end-to-end against a stubbed endpoint, and a **licence guard**: no engine module may reference the GPL converter |
+| 30-spatial | Spatial index: 200 probes agreeing with brute force, superset-not-subset queries, mid-drag staleness covered by the selection union, add/move/delete visibility, degenerate inputs, bounded `snapCandidates`, and a sub-ms hit-test assertion at 3600 entities |
 | 29-dwgdb | DwgDatabase → IR: every entity type, radian angles, ATTRIB's nested text record, INSERT expansion/arrays/attribs, units-not-rescaled, layer flags, bad input — plus a slice of the real house plan asserting room-sized dimensions and untouched coordinates |
 | 28-text-rotation | `rot` across bbox/hit/grips/mirror/ROTATE/SCALE, both renderers' Y-flip sign, DXF group code 50 round-trip, backwards compatibility with pre-rotation saved files |
 
@@ -208,7 +210,7 @@ for a household tool; revisit only on explicit demand.
 
 ```
 python3 serve.py                 # http://localhost:8000 (no-cache dev server)
-node tests/run.mjs               # 31 suites, 735 checks
+node tests/run.mjs               # 32 suites, 749 checks
 ```
 User-facing docs: `guide.html` (beginner manual), `learn.html` (8 animated command movies),
 `?` panel in-app. Keep all three in sync with feature changes — and keep **this file** in

@@ -12,6 +12,7 @@ import { entities, setEntities, nextId, layers, setLayers, currentLayer, setCurr
          selRect, setSelRect, plotWin, setPlotWin, units, setUnits,
          setTrackGuides, layerVisible, layerUnlocked } from './state.js';
 import { findEntityAt, entInWindow, entBBox, snapCandidates, translateEnt, translateIds, mirrorEnt } from './entities.js';
+import { query as spatialQuery } from './spatial.js';
 import { sink } from './bus.js';
 import { gridStep, s2w } from './viewport.js';
 
@@ -139,9 +140,10 @@ export function applyModifiers(rawW, excludeId){
       if (d >= tol) return;
       if (!buckets[c.k] || d < buckets[c.k].d) buckets[c.k] = {c, d};
     };
-    for (const c of snapCandidates(excludeId)) consider(c);
+    const near = [rawW.x-tol, rawW.y-tol, rawW.x+tol, rawW.y+tol];
+    for (const c of snapCandidates(excludeId, near)) consider(c);
     // dynamic snaps near the cursor
-    const nearEnts = entities.filter(e=>{
+    const nearEnts = spatialQuery(near[0], near[1], near[2], near[3]).filter(e=>{
       if (e.id===excludeId || e.type==='text' || !layerVisible(e.layer)) return false;
       const b = entBBox(e);
       return rawW.x>=b[0]-tol && rawW.x<=b[2]+tol && rawW.y>=b[1]-tol && rawW.y<=b[3]+tol;
@@ -177,7 +179,11 @@ export function applyModifiers(rawW, excludeId){
     // dashed guide + snap onto the alignment (both axes can engage at once)
     if (cmd && SNAP_FLAGS.tracking){
       let tx=null, txd=tol, txs=null, ty=null, tyd=tol, tys=null;
-      for (const c of snapCandidates(excludeId)){
+      // tracking looks for points aligned h/v with the cursor, so the region of
+      // interest is a cross — approximate it with the visible area
+      const vw = 1200/view.scale, vh = 900/view.scale;
+      const tb = [rawW.x-vw, rawW.y-vh, rawW.x+vw, rawW.y+vh];
+      for (const c of snapCandidates(excludeId, tb)){
         if (!SNAP_ACTIVE.has(c.k)) continue;      // track off active snap points only
         const ddx=Math.abs(c.p.x-rawW.x), ddy=Math.abs(c.p.y-rawW.y);
         if (ddx<txd){ txd=ddx; tx=c.p.x; txs=c.p; }

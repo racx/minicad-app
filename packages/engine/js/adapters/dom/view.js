@@ -4,6 +4,7 @@
 import { dist, fmt, arcFrom3, bulgeArc, tangentBulge, bulgeFrom3, plineEndTangent } from '../../core/geometry.js';
 import { entities, view, T, cmd, curPt, snapMark, trackGuides, boxSel, mouse, selection, layerOf, layerVisible, hoverSel, hotGrip, unitFmt, units, lwOf, lwPx } from '../../core/state.js';
 import { entBBox, entGrips, dimGeom, dimH } from '../../core/entities.js';
+import { query as spatialQuery } from '../../core/spatial.js';
 import { materialByKey } from '../../core/materials.js';
 import { log } from './ui.js';
 
@@ -47,9 +48,12 @@ export function draw(){
     ctx.beginPath(); ctx.moveTo(0,Math.round(ax.y)+.5); ctx.lineTo(W,Math.round(ax.y)+.5); ctx.stroke();
   }
 
-  // entities (hidden layers skipped); hatches first, under the linework
-  for (const e of entities) if (e.type==='hatch' && layerVisible(e.layer)) drawHatch(e);
-  for (const e of entities) if (e.type!=='hatch' && layerVisible(e.layer)) drawEntity(e, 0, 0, false);
+  // Only what the viewport can actually show. A real drawing is 22k entities
+  // and most of them are off screen at any useful zoom; without this every
+  // frame pays for all of them.
+  const vis = spatialQuery(tl.x, br.y, br.x, tl.y);   // tl/br from s2w above
+  for (const e of vis) if (e.type==='hatch' && layerVisible(e.layer)) drawHatch(e);
+  for (const e of vis) if (e.type!=='hatch' && layerVisible(e.layer)) drawEntity(e, 0, 0, false);
 
   // move/copy ghost preview
   if (cmd && (cmd.name==='MOVE'||cmd.name==='COPY') && cmd.step==='dest'){

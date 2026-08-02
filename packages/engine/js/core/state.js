@@ -7,7 +7,13 @@
 
 /* ---------- document state ---------- */
 export let entities = [];
-export function setEntities(a){ entities = a; }
+export function setEntities(a){ entities = a; bumpGeom(); }
+
+/* Bumped whenever geometry changes shape or membership. The spatial index
+   watches this to know when to rebuild — see spatial.js for why a little
+   staleness between bumps is safe. */
+export let geomEpoch = 0;
+export function bumpGeom(){ geomEpoch++; }
 
 let idSeq = 1;
 export function nextId(){ return idSeq++; }
@@ -42,6 +48,7 @@ export function layerUnlocked(name){ return !layerOf(name).locked; }
 
 export const undoStack = [], redoStack = [];
 export function snapshot(){
+  bumpGeom();                       // a user action is about to change geometry
   undoStack.push(JSON.stringify(entities));
   if (undoStack.length > 200) undoStack.shift();
   redoStack.length = 0;

@@ -6,6 +6,9 @@ import { dist, ptSegDist, arcPt, arcSweep, angleOnArc, normAng, mirrorPt,
          plineParts, bulgeApex, bulgeFromApex, tessellateBoundary, pointInPoly,
          textW, textCorners, textLocal, readableAng } from './geometry.js';
 import { entities, view, layerVisible, layerUnlocked } from './state.js';
+// runtime-only cycle with spatial.js (it needs entBBox, we need query) — both
+// sides call across at query time, never at module init, so ESM is happy
+import { query, queryPoint } from './spatial.js';
 
 // text height of a dim: explicit e.h, else automatic (4% of measured length)
 export function dimH(e){ return e.h || dimGeom(e).L*0.04 || 1; }
@@ -69,7 +72,7 @@ export function entHitDist(ent, p){
 export function findEntityAt(p){
   const tol = 8/view.scale;
   let best=null, bd=tol;
-  for (const e of entities){
+  for (const e of queryPoint(p, tol)){
     // hidden / locked layer, or an imported approximation: hands off
     if (!layerVisible(e.layer) || !layerUnlocked(e.layer) || e.frozen) continue;
     const d=entHitDist(e,p); if (d<=bd){ bd=d; best=e; }
@@ -120,9 +123,13 @@ export function entInWindow(e, r, crossing){ // r = [x0,y0,x1,y1] world
 }
 
 /* ---------- object snap candidates ---------- */
-export function snapCandidates(excludeId){
+/* Snap points. `bounds` ([x0,y0,x1,y1]) restricts the search to a region —
+   always pass it on a hot path: over a real drawing the unbounded call builds
+   171,557 candidates and is the single most expensive thing a mouse move does. */
+export function snapCandidates(excludeId, bounds){
   const out=[];
-  for (const e of entities){
+  const list = bounds ? query(bounds[0], bounds[1], bounds[2], bounds[3]) : entities;
+  for (const e of list){
     if (e.id===excludeId) continue;              // grip drags don't snap to themselves
     if (!layerVisible(e.layer)) continue;        // hidden layers don't snap (locked ones do)
     if (e.type==='line'){
