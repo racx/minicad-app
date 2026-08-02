@@ -2,7 +2,7 @@
 
 **Single source of truth** for what exists, how complete it is, and what comes next.
 Evidence-based: every claim below cites `file:line` in the codebase as of commit `536d7c7`.
-Verified against the test suite: `node tests/run.mjs` → **31 suites, 719 checks, all passing** (2026-08-01).
+Verified against the test suite: `node tests/run.mjs` → **31 suites, 728 checks, all passing** (2026-08-01).
 
 Update this file whenever a feature lands or a decision changes the plan.
 
@@ -47,6 +47,7 @@ point steps accept `x,y` / `@dx,dy` / `@d<a` / direct-distance via `parsePoint`
 | MIRROR | `MI` | ✅ Complete. Two-point axis (rubber line), `Erase source? [Y/N] <N>` (`:783`). Arc reflected CCW-correct, text insertion-only (MIRRTEXT=0 style). One snapshot. | `:275`, doMirror `:571`, mirrorEnt `entities.js:195` |
 | STRETCH | `S` | ✅ Complete. Forces fresh crossing-box selection (`:151`, box rect captured in `boxSelect` via `selRect`); vertices inside box move, circles/arcs/text move iff center/insertion inside; dims stretch per-defpoint. One snapshot. | `:283`, stretchEnt `:585` |
 | ERASE | `E` `DEL` | ✅ Complete. Also Delete/Backspace key when idle (`main.js:164–170`). One snapshot. | afterSelect `:180–186` |
+| LAYDEL | `LAYDEL` `LAYDELETE` `LADEL` | ✅ Deletes matching layers and every object on them, ignoring the file's lock flag (client drawings ship scratch layers locked). Trailing/embedded `*` matches a family — `EXCLUIR*` cleared 13 layers / 4460 objects (20% of a real plan) in one command. Layer `0` protected; hatches orphaned by a deleted boundary go too; one snapshot. | `commands.js` LAYDEL, suite 11 |
 | THAW | `THAW` | ✅ Clears the `frozen` flag on every imported approximation, making them editable. One snapshot; says how many it released; no-ops with a message when nothing is frozen. | `commands.js` THAW, suite 26 |
 | CHLAYER | `CH` | ✅ Complete. Requires prior selection (`:127–131`), validates layer name and lists layers on typo (`:749–758`). One snapshot. | `:749` |
 
@@ -127,7 +128,7 @@ unpickable + unsnappable + excluded from TRIM/EXTEND edges — `entities.js find
 
 ## 6. Test coverage map
 
-`tests/run.mjs`, 31 suites / 719 checks, each suite an isolated process driving the real
+`tests/run.mjs`, 31 suites / 728 checks, each suite an isolated process driving the real
 engine through a stubbed DOM (`tests/stub-dom.mjs`):
 
 | Suite | Covers |
@@ -189,7 +190,7 @@ screenshots), DXF acceptance by third-party CAD (checked with ezdxf ad hoc).
 
 ### Tier 2 — wants, not needs
 - **ARRAY** (rectangular/polar copies).
-- **Layer rename/delete**, per-entity color.
+- ~~Layer delete~~ ✅ shipped (`LAYDEL`, wildcards). **Layer rename**, per-entity color.
 - **ZOOM window / previous** (PAN command shipped 2026-07-06).
 - SCALE by reference length; FILLET for arcs/plines; CHAMFER.
 
@@ -206,7 +207,7 @@ for a household tool; revisit only on explicit demand.
 
 ```
 python3 serve.py                 # http://localhost:8000 (no-cache dev server)
-node tests/run.mjs               # 31 suites, 719 checks
+node tests/run.mjs               # 31 suites, 728 checks
 ```
 User-facing docs: `guide.html` (beginner manual), `learn.html` (8 animated command movies),
 `?` panel in-app. Keep all three in sync with feature changes — and keep **this file** in

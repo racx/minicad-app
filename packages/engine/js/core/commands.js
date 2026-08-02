@@ -7,7 +7,7 @@ import { dist, fmt, deep, rotPt, ptSegDist, TAU, normAng, arcSweep, arcPt, arcFr
          tessellateBoundary, pointInPoly } from './geometry.js';
 import { materialByKey } from './materials.js';
 import { entIntersections, lineEntT, lineLine, perpFoot, tangentPts, nearestOnEnt } from './intersect.js';
-import { entities, setEntities, nextId, layers, currentLayer, undoStack, redoStack, snapshot,
+import { entities, setEntities, nextId, layers, setLayers, currentLayer, setCurrentLayer, undoStack, redoStack, snapshot,
          view, T, cmd, setCmd, lastCmdName, setLastCmdName, selection, curPt, setSnapMark,
          selRect, setSelRect, plotWin, setPlotWin, units, setUnits,
          setTrackGuides, layerVisible, layerUnlocked } from './state.js';
@@ -28,6 +28,7 @@ export const ALIASES = {
   L:'LINE', LINE:'LINE', PL:'PLINE', PLINE:'PLINE', REC:'RECTANG', RECT:'RECTANG', RECTANG:'RECTANG', RECTANGLE:'RECTANG',
   C:'CIRCLE', CIRCLE:'CIRCLE', A:'ARC', ARC:'ARC', T:'TEXT', TEXT:'TEXT', DT:'TEXT',
   CH:'CHLAYER', CHLAYER:'CHLAYER', NEW:'NEW', THAW:'THAW',
+  LAYDEL:'LAYDEL', LAYDELETE:'LAYDEL', LADEL:'LAYDEL',
   M:'MOVE', MOVE:'MOVE', CO:'COPY', CP:'COPY', COPY:'COPY', RO:'ROTATE', ROTATE:'ROTATE', SC:'SCALE', SCALE:'SCALE',
   O:'OFFSET', OFFSET:'OFFSET', E:'ERASE', ERASE:'ERASE', DEL:'ERASE', TR:'TRIM', TRIM:'TRIM',
   EX:'EXTEND', EXTEND:'EXTEND', F:'FILLET', FILLET:'FILLET',
@@ -259,6 +260,10 @@ export function startCommand(raw){
   if (name==='LINE'){ cmd.base=null; setPrompt('LINE — Specify first point:'); }
   else if (name==='ARC') setPrompt('ARC — Specify start point:');
   else if (name==='NEW'){ cmd.step='confirm'; setPrompt('NEW — Start a new drawing? Unsaved work is lost [Y/N] <N>:'); }
+  else if (name==='LAYDEL'){
+    cmd.step='layer';
+    setPrompt('LAYDEL — Layer to delete (wildcards ok, e.g. EXCLUIR*):');
+  }
   else if (name==='CHLAYER'){
     if (!selection.size){ log('Select objects first, then CHLAYER.', 'e'); cancelCmd(true); return; }
     cmd.step='layer';
@@ -1160,6 +1165,36 @@ export function handleEnter(text){
     let moved=0;
     for (const e of entities) if (selection.has(e.id)){ e.layer=name; moved++; }
     log(`Moved ${moved} object${moved>1?'s':''} to layer "${name}".`, 'r');
+    endCmd(); return;
+  }
+  if (n==='LAYDEL' && cmd.step==='layer'){
+    if (!text){ cancelCmd(); return; }
+    // A drawing arrives with scratch layers you want gone, and there can be
+    // dozens of them, so a trailing * matches a family in one go.
+    const rx = new RegExp('^' + text.trim()
+      .replace(/[.+?^${}()|[\]\\]/g, '\\$&')     // escape regex, keep *
+      .replace(/\*/g, '.*') + '$', 'i');
+    const hit = layers.filter(l=>rx.test(l.name) && l.name!=='0');
+    if (!hit.length){
+      const zero = /^0$/.test(text.trim());
+      log(zero ? 'Layer "0" is the default layer and cannot be deleted.'
+               : `No layer matches "${text}". Layers: ${layers.map(l=>l.name).join(', ')}`, 'e');
+      return;
+    }
+    const names = new Set(hit.map(l=>l.name));
+    const doomed = entities.filter(e=>names.has(e.layer));
+    snapshot();
+    // hatches whose boundary is going would be left dangling
+    const goneIds = new Set(doomed.map(e=>e.id));
+    const orphans = entities.filter(e=>e.type==='hatch' && goneIds.has(e.ref));
+    for (const e of orphans) goneIds.add(e.id);
+    setEntities(entities.filter(e=>!goneIds.has(e.id)));
+    setLayers(layers.filter(l=>!names.has(l.name)));
+    if (names.has(currentLayer)) setCurrentLayer(layers[0].name);
+    selection.clear();
+    log(`Deleted ${hit.length} layer${hit.length>1?'s':''} and ${goneIds.size} object${goneIds.size===1?'':'s'}` +
+        (hit.length<=4 ? ` (${hit.map(l=>l.name).join(', ')}).` : '.'), 'r');
+    sink.layersChanged();
     endCmd(); return;
   }
   if (n==='EDITTEXT' && cmd.step==='string'){

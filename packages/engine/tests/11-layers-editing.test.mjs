@@ -79,4 +79,51 @@ check('text updated', txt.str==='hello world' && S.cmd===null);
 C.doUndo();
 check('text edit undoes', S.entities[0].str==='hello wrold');
 
+
+/* ===== LAYDEL — delete a layer and everything on it =====
+   Real client drawings arrive with scratch layers ("EXCLUIR 1…17" in one
+   house plan) that arrive LOCKED, so you cannot even select them to erase.
+   Wildcards matter: hiding seventeen layers one at a time is not a workflow. */
+S.setEntities([]); S.setIdSeq(1); S.undoStack.length=0;
+S.setLayers([{name:'0',color:'#fff'},{name:'keep',color:'#fff'},
+             {name:'EXCLUIR 1',color:'#fff',locked:true},
+             {name:'EXCLUIR 2',color:'#fff',locked:true}]);
+S.setCurrentLayer('EXCLUIR 1');
+const mk=(layer,x)=>{ S.setCurrentLayer(layer); return add(x,0,x+1,0); };
+mk('keep',0); mk('EXCLUIR 1',10); mk('EXCLUIR 1',20); mk('EXCLUIR 2',30);
+S.setCurrentLayer('EXCLUIR 1');
+const n0 = S.entities.length;
+
+dom.logs.length=0;
+C.startCommand('LAYDEL'); C.handleEnter('EXCLUIR*');
+check('wildcard deletes the whole family', !S.layers.some(l=>/^EXCLUIR/.test(l.name)));
+check('…and their objects go with them',
+      S.entities.length===1 && S.entities[0].layer==='keep');
+check('…even though the layers were locked', true);
+check('…reporting what it did', dom.logs.some(l=>/Deleted 2 layers and 3 objects/.test(l)));
+check('current layer moves off the deleted one', S.currentLayer==='0' || S.currentLayer==='keep');
+
+C.startCommand('U');
+check('LAYDEL is one undo step', S.entities.length===n0);
+
+dom.logs.length=0;
+C.startCommand('LAYDEL'); C.handleEnter('0');
+check('layer 0 is protected', S.layers.some(l=>l.name==='0') &&
+      dom.logs.some(l=>/cannot be deleted/i.test(l)));
+
+dom.logs.length=0;
+C.startCommand('LAYDEL'); C.handleEnter('nosuchlayer');
+check('an unknown layer is refused and lists what exists',
+      dom.logs.some(l=>/No layer matches/.test(l) && /keep/.test(l)));
+
+// a hatch whose boundary is deleted must not linger as an orphan
+S.setEntities([]); S.setIdSeq(1);
+S.setLayers([{name:'0',color:'#fff'},{name:'gone',color:'#fff'}]);
+S.setCurrentLayer('gone');
+C.startCommand('REC'); C.handleEnter('0,0'); C.handleEnter('10,10');
+const b = S.entities[S.entities.length-1];
+S.entities.push({id:S.nextId(), type:'hatch', ref:b.id, mat:'solid', layer:'gone'});
+C.startCommand('LAYDEL'); C.handleEnter('gone');
+check('deleting a boundary takes its hatch with it', S.entities.length===0);
+
 finish();
