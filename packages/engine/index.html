@@ -230,7 +230,10 @@
         <span class="close" id="layersClose">✕</span>
       </header>
       <div id="layerFindWrap">
-        <input id="layerFind" placeholder="filter — try EXCLUIR or *hatch" autocomplete="off">
+        <input id="layerFind" type="text" name="minicad-layer-filter"
+               placeholder="filter — try EXCLUIR or *hatch" autocomplete="off"
+               autocorrect="off" autocapitalize="off" spellcheck="false"
+               data-1p-ignore data-lpignore="true" data-form-type="other">
       </div>
       <div id="layerList"></div>
       <footer>
@@ -314,7 +317,10 @@
     <div id="history"></div>
     <div id="cmdRow">
       <span id="prompt">Command:</span>
-      <input id="cmdInput" autocomplete="off" spellcheck="false" aria-label="Command input">
+      <input id="cmdInput" type="text" name="minicad-command" autocomplete="off"
+             autocorrect="off" autocapitalize="off" spellcheck="false"
+             data-1p-ignore data-lpignore="true" data-form-type="other"
+             aria-label="Command input">
     </div>
     <div id="statusRow">
       <span class="tog" id="tGrid">GRID</span>

@@ -56,4 +56,25 @@ check('typing in the layer filter does not start a command',
       S.cmd===null && S.entities.length===before);
 document.activeElement = null;
 
+
+/* ===== browsers must not offer autofill on our text inputs =====
+   Safari offered a saved CREDIT CARD on the command line. autocomplete="off"
+   alone does not stop it — the field also needs a name that does not read as
+   a payment field, an explicit type, and the password-manager opt-outs.
+   The Rails editor injects this same markup, so guarding the HTML guards both. */
+const html = await (await import('node:fs')).promises.readFile(
+  new URL('../index.html', import.meta.url), 'utf8');
+for (const id of ['cmdInput', 'layerFind']){
+  const i = html.indexOf(`id="${id}"`);
+  const tag = html.slice(i, html.indexOf('>', i));
+  check(`${id}: autocomplete off`,        /autocomplete="off"/.test(tag));
+  check(`${id}: explicit text type`,      /type="text"/.test(tag));
+  check(`${id}: named, and not like a payment field`,
+        /name="minicad-/.test(tag) && !/card|number|cc-|tel|email/i.test(tag));
+  check(`${id}: password managers told to skip it`,
+        /data-1p-ignore/.test(tag) && /data-lpignore="true"/.test(tag));
+  check(`${id}: no autocorrect or autocapitalise on a command line`,
+        /autocorrect="off"/.test(tag) && /autocapitalize="off"/.test(tag));
+}
+
 finish();

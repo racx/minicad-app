@@ -2,7 +2,7 @@
 
 **Single source of truth** for what exists, how complete it is, and what comes next.
 Evidence-based: every claim below cites `file:line` in the codebase as of commit `536d7c7`.
-Verified against the test suite: `node tests/run.mjs` → **33 suites, 817 checks, all passing** (2026-08-01).
+Verified against the test suite: `node tests/run.mjs` → **33 suites, 827 checks, all passing** (2026-08-01).
 
 Update this file whenever a feature lands or a decision changes the plan.
 
@@ -131,7 +131,7 @@ unpickable + unsnappable + excluded from TRIM/EXTEND edges — `entities.js find
 
 ## 6. Test coverage map
 
-`tests/run.mjs`, 33 suites / 817 checks, each suite an isolated process driving the real
+`tests/run.mjs`, 33 suites / 827 checks, each suite an isolated process driving the real
 engine through a stubbed DOM (`tests/stub-dom.mjs`):
 
 | Suite | Covers |
@@ -212,7 +212,7 @@ for a household tool; revisit only on explicit demand.
 
 ```
 python3 serve.py                 # http://localhost:8000 (no-cache dev server)
-node tests/run.mjs               # 33 suites, 817 checks
+node tests/run.mjs               # 33 suites, 827 checks
 ```
 User-facing docs: `guide.html` (beginner manual), `learn.html` (8 animated command movies),
 `?` panel in-app. Keep all three in sync with feature changes — and keep **this file** in
