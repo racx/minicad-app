@@ -68,7 +68,9 @@ for (const id of ['cmdInput', 'layerFind']){
   const i = html.indexOf(`id="${id}"`);
   const tag = html.slice(i, html.indexOf('>', i));
   check(`${id}: autocomplete off`,        /autocomplete="off"/.test(tag));
-  check(`${id}: explicit text type`,      /type="text"/.test(tag));
+  // Safari offers saved cards on type="text" however it is labelled; it does
+  // not on type="search". That is the attribute doing the real work here.
+  check(`${id}: type=search, which Safari will not card-autofill`, /type="search"/.test(tag));
   check(`${id}: named, and not like a payment field`,
         /name="minicad-/.test(tag) && !/card|number|cc-|tel|email/i.test(tag));
   check(`${id}: password managers told to skip it`,

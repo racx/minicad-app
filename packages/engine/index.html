@@ -105,6 +105,12 @@
   #history .e{color:#ef7b7b}
   #cmdRow{display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:5px 10px}
   #prompt{color:var(--warn);white-space:nowrap;font-size:13px}
+  /* type="search" is what stops Safari offering saved credit cards on a bare
+     text input; these strip the native search chrome that comes with it */
+  #cmdInput,#layerFind{-webkit-appearance:none;appearance:none}
+  #cmdInput::-webkit-search-decoration,#cmdInput::-webkit-search-cancel-button,
+  #layerFind::-webkit-search-decoration,#layerFind::-webkit-search-cancel-button{
+    -webkit-appearance:none;appearance:none;display:none}
   #cmdInput{flex:1;background:transparent;border:none;outline:none;color:var(--text);font-family:var(--mono);font-size:13px}
   #statusRow{display:flex;gap:6px;margin-top:6px;align-items:center}
   .tog{font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--line);color:var(--dim);cursor:pointer;user-select:none;font-family:var(--mono)}
@@ -230,7 +236,7 @@
         <span class="close" id="layersClose">✕</span>
       </header>
       <div id="layerFindWrap">
-        <input id="layerFind" type="text" name="minicad-layer-filter"
+        <input id="layerFind" type="search" name="minicad-layer-filter"
                placeholder="filter — try EXCLUIR or *hatch" autocomplete="off"
                autocorrect="off" autocapitalize="off" spellcheck="false"
                data-1p-ignore data-lpignore="true" data-form-type="other">
@@ -317,7 +323,7 @@
     <div id="history"></div>
     <div id="cmdRow">
       <span id="prompt">Command:</span>
-      <input id="cmdInput" type="text" name="minicad-command" autocomplete="off"
+      <input id="cmdInput" type="search" name="minicad-command" autocomplete="off"
              autocorrect="off" autocapitalize="off" spellcheck="false"
              data-1p-ignore data-lpignore="true" data-form-type="other"
              aria-label="Command input">
