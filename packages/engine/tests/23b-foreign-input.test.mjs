@@ -46,4 +46,14 @@ document.activeElement = cmdInput;
 dom.fireWin('keydown', { key: 'x' });
 check('command line itself never counts as foreign', focused === 1);
 
+
+// the layer panel's filter box is an ordinary input and must be shielded too
+const find = dom.els.get('layerFind');
+document.activeElement = find;
+const before = S.entities.length;
+dom.fireWin('keydown', {key:'l'});
+check('typing in the layer filter does not start a command',
+      S.cmd===null && S.entities.length===before);
+document.activeElement = null;
+
 finish();

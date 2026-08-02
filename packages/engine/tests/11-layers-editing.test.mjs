@@ -126,4 +126,53 @@ S.entities.push({id:S.nextId(), type:'hatch', ref:b.id, mat:'solid', layer:'gone
 C.startCommand('LAYDEL'); C.handleEnter('gone');
 check('deleting a boundary takes its hatch with it', S.entities.length===0);
 
+
+/* ===== the layer panel =====
+   A client DWG arrives with 130 layers; the dropdown alone is unusable.
+   The panel is a filtered list, so the filter is the part worth testing. */
+const U = await import('../js/adapters/dom/ui.js');
+const find = dom.els.get('layerFind');
+const list = dom.els.get('layerList');
+
+S.setEntities([]); S.setIdSeq(1);
+S.setLayers([{name:'0',color:'#fff'},{name:'walls',color:'#fff'},
+             {name:'EXCLUIR 1',color:'#fff'},{name:'EXCLUIR 2',color:'#fff'},
+             {name:'RED-Piso hatch',color:'#fff'},{name:'RED-Forro hatch',color:'#fff'}]);
+S.setCurrentLayer('walls');
+
+find.value = '';
+U.renderLayerPanel();
+check('panel lists every layer when unfiltered', list.children.length===6);
+check('…and says how many', dom.els.get('layerCount').textContent==='6');
+
+find.value = 'excluir';
+U.renderLayerPanel();
+check('a bare word matches case-insensitively', list.children.length===2);
+check('…and the count shows the filter', dom.els.get('layerCount').textContent==='2/6');
+
+find.value = '*hatch';
+U.renderLayerPanel();
+check('a wildcard matches the tail', list.children.length===2);
+
+find.value = 'walls';
+U.renderLayerPanel();
+check('an exact name matches just it', list.children.length===1);
+
+find.value = 'nothinglikethis';
+U.renderLayerPanel();
+check('no match shows an empty list rather than everything', list.children.length===0);
+
+find.value = '';
+U.renderLayerPanel();
+check('clearing the filter restores the list', list.children.length===6);
+
+// a layer name must never be able to inject markup
+S.setLayers([{name:'<img src=x onerror=1>', color:'#fff'}]);
+S.setCurrentLayer('<img src=x onerror=1>');
+U.renderLayerPanel();
+const row0 = list.children[0];
+const nm = row0.children.find(c=>c.className==='nm');
+check('a hostile layer name is set as text, not markup',
+      !!nm && nm.textContent==='<img src=x onerror=1>' && row0._html==='');
+
 finish();

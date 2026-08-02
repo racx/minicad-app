@@ -2,7 +2,7 @@
 
 **Single source of truth** for what exists, how complete it is, and what comes next.
 Evidence-based: every claim below cites `file:line` in the codebase as of commit `536d7c7`.
-Verified against the test suite: `node tests/run.mjs` → **32 suites, 749 checks, all passing** (2026-08-01).
+Verified against the test suite: `node tests/run.mjs` → **32 suites, 759 checks, all passing** (2026-08-01).
 
 Update this file whenever a feature lands or a decision changes the plan.
 
@@ -81,6 +81,7 @@ Enter/Esc exits — alongside the existing middle-drag/space-drag. Suite 17.)
 
 | Feature | Behavior | Evidence |
 |---|---|---|
+| Layer panel | ✅ `☰` opens a filtered list of every layer — a client DWG brings 130 and the `<select>` alone is unusable. Filter matches substrings or `*` wildcards; each row shows colour, object count, and per-layer 👁 / 🔒 / 🗑 (delete routes through LAYDEL, so it is one undoable step). "Isolate current" / "Show all" for the common case. Rows are built with `createElement` — a layer name is untrusted text and must never become markup. | `ui.js renderLayerPanel`, `main.js`, suite 11 |
 | Click / box select | Click toggles; L→R window (fully inside), R→L crossing (touching). | `clickSelect commands.js` (~`:836`), `boxSelect` (+`selRect` capture), `main.js` mouseup |
 | Drag-to-move | Press on selected body, drag. 4-px threshold, one snapshot, Esc aborts. ✥ hover glyph. | `main.js:44–52`, `:88–95`, Esc `:155` |
 | Grips | Blue squares on selection: line ends/mid, circle cen/quad, arc ends/mid(radius), pline vertices, text insertion, dim p1/p2/off-slide. Osnap-aware **excluding self**; hot grip red; one snapshot; Esc reverts. | `entGrips entities.js:131`, `applyGrip :154`, wiring `main.js:24–38`, `:54–60`, `:82–87` |
@@ -130,7 +131,7 @@ unpickable + unsnappable + excluded from TRIM/EXTEND edges — `entities.js find
 
 ## 6. Test coverage map
 
-`tests/run.mjs`, 32 suites / 749 checks, each suite an isolated process driving the real
+`tests/run.mjs`, 32 suites / 759 checks, each suite an isolated process driving the real
 engine through a stubbed DOM (`tests/stub-dom.mjs`):
 
 | Suite | Covers |
@@ -210,7 +211,7 @@ for a household tool; revisit only on explicit demand.
 
 ```
 python3 serve.py                 # http://localhost:8000 (no-cache dev server)
-node tests/run.mjs               # 32 suites, 749 checks
+node tests/run.mjs               # 32 suites, 759 checks
 ```
 User-facing docs: `guide.html` (beginner manual), `learn.html` (8 animated command movies),
 `?` panel in-app. Keep all three in sync with feature changes — and keep **this file** in

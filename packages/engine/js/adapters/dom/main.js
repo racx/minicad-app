@@ -248,6 +248,60 @@ btnLayerLock.addEventListener('click', ()=>{
   log(`Layer "${currentLayer}" ${l.locked?'locked — visible and snappable, but can\'t be selected or changed.':'unlocked.'}`);
   refreshLayers(); draw();
 });
+/* ---- layer panel ---- */
+const layersPanel = document.getElementById('layers');
+const layerListEl = document.getElementById('layerList');
+const layerFindEl = document.getElementById('layerFind');
+const setPanel = open => {
+  layersPanel.classList.toggle('open', open);
+  if (open){ refreshLayers(); layerFindEl.focus(); layerFindEl.select(); }
+  else cmdInput.focus();
+};
+document.getElementById('btnLayerPanel').addEventListener('click', ()=>
+  setPanel(!layersPanel.classList.contains('open')));
+document.getElementById('layersClose').addEventListener('click', ()=>setPanel(false));
+layerFindEl.addEventListener('input', refreshLayers);
+layerFindEl.addEventListener('keydown', ev=>{
+  ev.stopPropagation();                       // the canvas listens for bare keys
+  if (ev.key==='Escape') setPanel(false);
+});
+
+layerListEl.addEventListener('click', ev=>{
+  const row = ev.target.closest('.row'); if (!row) return;
+  const name = row.dataset.layer, l = layerOf(name);
+  const act = ev.target.dataset && ev.target.dataset.act;
+
+  if (act==='off'){
+    l.off = !l.off;
+    if (l.off) for (const e of entities) if (e.layer===name) selection.delete(e.id);
+    log(`Layer "${name}" ${l.off?'hidden':'visible again'}.`, 'r');
+  } else if (act==='lock'){
+    l.locked = !l.locked;
+    if (l.locked) for (const e of entities) if (e.layer===name) selection.delete(e.id);
+    log(`Layer "${name}" ${l.locked?'locked':'unlocked'}.`, 'r');
+  } else if (act==='del'){
+    if (name==='0'){ log('Layer "0" is the default layer and cannot be deleted.', 'e'); return; }
+    const n = entities.filter(e=>e.layer===name).length;
+    if (n && !confirm(`Delete layer "${name}" and its ${n} object${n>1?'s':''}?`)) return;
+    startCommand('LAYDEL'); handleEnter(name);   // one snapshot, undoable, hatches handled
+  } else {
+    setCurrentLayer(name);                        // clicking the row picks the layer
+  }
+  refreshLayers(); draw();
+});
+
+document.getElementById('layAllOn').addEventListener('click', ()=>{
+  let n=0; for (const l of layers) if (l.off){ l.off=false; n++; }
+  log(n ? `Turned ${n} layer${n>1?'s':''} back on.` : 'Every layer is already visible.', 'r');
+  refreshLayers(); draw();
+});
+document.getElementById('layIsolate').addEventListener('click', ()=>{
+  let n=0; for (const l of layers) if (l.name!==currentLayer && !l.off){ l.off=true; n++; }
+  for (const e of entities) if (e.layer!==currentLayer) selection.delete(e.id);
+  log(`Isolated "${currentLayer}" — hid ${n} other layer${n===1?'':'s'}. "Show all" brings them back.`, 'r');
+  refreshLayers(); draw();
+});
+
 document.getElementById('btnAddLayer').addEventListener('click', ()=>{
   const name=prompt('New layer name:');
   if (!name||layers.some(l=>l.name===name)) return;

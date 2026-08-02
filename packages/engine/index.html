@@ -36,6 +36,28 @@
 
   /* ---------- help ---------- */
   #help{position:absolute;top:10px;right:10px;width:320px;max-height:calc(100% - 20px);overflow:auto;background:rgba(28,31,37,.97);border:1px solid var(--line);border-radius:8px;padding:14px 16px;display:none;z-index:5}
+  #layers{position:absolute;top:10px;right:10px;width:340px;max-height:calc(100% - 20px);
+    display:none;flex-direction:column;background:rgba(28,31,37,.97);border:1px solid var(--line);
+    border-radius:8px;z-index:6;font-size:12px}
+  #layers.open{display:flex}
+  #layers header{display:flex;align-items:center;gap:8px;padding:10px 12px 8px;border-bottom:1px solid var(--line)}
+  #layers header h2{font-size:13px;color:var(--accent);font-family:var(--mono);margin:0;flex:1}
+  #layers .close{cursor:pointer;color:var(--dim);font-size:14px;line-height:1}
+  #layerFind{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:5px;
+    color:var(--text);font-family:var(--mono);font-size:12px;padding:5px 8px}
+  #layerFindWrap{padding:8px 12px;border-bottom:1px solid var(--line)}
+  #layerList{overflow:auto;flex:1;padding:4px 0}
+  #layerList .row{display:flex;align-items:center;gap:6px;padding:3px 12px;cursor:pointer;white-space:nowrap}
+  #layerList .row:hover{background:var(--panel2)}
+  #layerList .row.cur{background:rgba(77,184,255,.14)}
+  #layerList .sw{width:11px;height:11px;border-radius:2px;border:1px solid #0006;flex:none}
+  #layerList .nm{flex:1;overflow:hidden;text-overflow:ellipsis;font-family:var(--mono)}
+  #layerList .row.off .nm{opacity:.42;text-decoration:line-through}
+  #layerList .n{color:var(--dim);font-size:10px;flex:none}
+  #layerList .t{background:none;border:0;cursor:pointer;font-size:11px;padding:0 2px;opacity:.75;flex:none}
+  #layerList .t:hover{opacity:1}
+  #layers footer{display:flex;gap:6px;padding:8px 12px;border-top:1px solid var(--line);color:var(--dim);font-size:11px}
+  #layers footer button{flex:1}
   #help h2{font-size:13px;color:var(--accent);margin-bottom:8px;font-family:var(--mono)}
   #help h3{font-size:11px;color:var(--dim);margin:10px 0 4px;text-transform:uppercase;letter-spacing:.08em}
   #help table{width:100%;border-collapse:collapse}
@@ -130,6 +152,7 @@
       <button class="btn" id="btnLayerOff" title="Hide/show this layer">👁</button>
       <button class="btn" id="btnLayerLock" title="Lock/unlock this layer">🔓</button>
       <button class="btn" id="btnAddLayer" title="New layer">+</button>
+      <button class="btn" id="btnLayerPanel" title="All layers">☰</button>
     </div>
   </div>
 
@@ -194,6 +217,22 @@
       </div>
     </div>
     <div id="coordRead">0.00, 0.00</div>
+    <div id="layers">
+      <header>
+        <h2>Layers</h2>
+        <span id="layerCount" style="color:var(--dim);font-size:11px"></span>
+        <span class="close" id="layersClose">✕</span>
+      </header>
+      <div id="layerFindWrap">
+        <input id="layerFind" placeholder="filter — try EXCLUIR or *hatch" autocomplete="off">
+      </div>
+      <div id="layerList"></div>
+      <footer>
+        <button class="btn" id="layAllOn">Show all</button>
+        <button class="btn" id="layIsolate">Isolate current</button>
+      </footer>
+    </div>
+
     <div id="help">
       <span class="close" id="helpClose">✕</span>
       <h2>Commands &amp; shortcuts</h2>

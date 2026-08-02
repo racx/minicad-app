@@ -12,7 +12,12 @@ export function setupDOM(){
   }
   function makeEl(){
     const el = {
-      style:{}, dataset:{}, children:[], value:'', textContent:'', innerHTML:'', listeners:{},
+      style:{}, dataset:{}, children:[], value:'', textContent:'', listeners:{},
+      // real elements drop their children when innerHTML is assigned; code that
+      // rebuilds a list relies on that, so the stub has to honour it
+      _html:'',
+      get innerHTML(){ return el._html + el.children.map(c=>c.innerHTML||c.textContent||'').join(''); },
+      set innerHTML(v){ el._html = v; if (v === '') el.children.length = 0; },
       classList:{ toggle(){}, add(){}, remove(){} },
       addEventListener(type,fn){ (el.listeners[type] ||= []).push(fn); },
       appendChild(c){ el.children.push(c); return c; },
