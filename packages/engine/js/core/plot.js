@@ -118,7 +118,12 @@ export function buildPlotSVG({entities, layers=[], settings, filename='drawing',
   for (const e of entities){
     const l = layerOf(e.layer);
     if (l && l.off) continue;                            // hidden layers don't print
-    const st = `stroke="${col(e)}" stroke-width="${weight}" fill="none"`;
+    // the author's own lineweight wins; `weight` is the fallback for layers
+    // that never set one (and for drawings made in MiniCAD)
+    const ll = layerOf(e.layer);
+    const mm = e.lw || (ll && ll.lw);              // entity beats layer
+    const w = (typeof mm === 'number' && mm > 0) ? f(mm) : weight;
+    const st = `stroke="${col(e)}" stroke-width="${w}" fill="none"`;
     if (e.type==='line')
       out.push(`<line x1="${X(e.x1)}" y1="${Y(e.y1)}" x2="${X(e.x2)}" y2="${Y(e.y2)}" ${st}/>`);
     else if (e.type==='circle')

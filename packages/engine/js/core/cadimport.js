@@ -198,8 +198,9 @@ export function importDoc(doc){
     return name;
   };
 
-  const add = (e, frozen) => {
+  const add = (e, frozen, src) => {
     e.id = id++;
+    if (src && src.lw) e.lw = src.lw;              // author's own lineweight, in mm
     if (frozen) e.frozen = true;                   // non-editable, but keeps its layer
     entities.push(e);
     if (frozen) report.frozen++; else report.native++;
@@ -255,16 +256,16 @@ export function importDoc(doc){
 
     if (s.k==='line'){
       if (dist(s.a, s.b) < 1e-12) continue;
-      add({type:'line', layer:place(s), x1:s.a.x, y1:s.a.y, x2:s.b.x, y2:s.b.y}, s.frozen);
+      add({type:'line', layer:place(s), x1:s.a.x, y1:s.a.y, x2:s.b.x, y2:s.b.y}, s.frozen, s);
     }
     else if (s.k==='circle'){
       if (s.r <= 1e-12) continue;
-      add({type:'circle', layer:place(s), cx:s.c.x, cy:s.c.y, r:s.r}, s.frozen);
+      add({type:'circle', layer:place(s), cx:s.c.x, cy:s.c.y, r:s.r}, s.frozen, s);
     }
     else if (s.k==='arc'){
       if (s.r <= 1e-12) continue;
       add({type:'arc', layer:place(s), cx:s.c.x, cy:s.c.y, r:s.r,
-           a0:normAng(s.a0), a1:normAng(s.a1)}, s.frozen);
+           a0:normAng(s.a0), a1:normAng(s.a1)}, s.frozen, s);
     }
     else if (s.k==='poly'){
       const straight = s.pts.every(p=>!p.bulge);
@@ -273,7 +274,7 @@ export function importDoc(doc){
       const fill = s.hatchId && fillable.get(s.hatchId)===s;
       if (straight || fill){
         // a fillable hatch boundary keeps its curves tessellated but stays editable
-        const b = add({type:'pline', layer:place(s), pts, closed:!!s.closed && pts.length>2}, s.frozen);
+        const b = add({type:'pline', layer:place(s), pts, closed:!!s.closed && pts.length>2}, s.frozen, s);
         if (fill && b.closed){
           add({type:'hatch', layer:b.layer, ref:b.id, mat:materialFor(s)});
           report.filled++;

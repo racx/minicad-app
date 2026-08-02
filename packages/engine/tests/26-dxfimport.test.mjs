@@ -406,6 +406,33 @@ check('round-trip: rectangle survives closed', rp.closed===true && rp.pts.length
 check('round-trip: text survives', one(back,'text').str==='label' && near(one(back,'text').h,2.5,1e-9));
 check('round-trip: layer names survive', of(back,'line')[0].layer==='walls');
 
+/* ===== lineweight: the author's own pen widths =====
+   DXF group 370 is hundredths of a millimetre; negative means by-layer or
+   default, i.e. no opinion. Without this every wall draws like a chair leg. */
+r = imp(wrap([], ['0','TABLE','2','LAYER',
+                  '0','LAYER','2','heavy','62','7','70','0','370','50',
+                  '0','LAYER','2','plain','62','7','70','0','370','-3',
+                  '0','ENDTAB'], [],
+             ['0','LINE','8','heavy','10','0','20','0','11','1','21','0',
+              '0','LINE','8','plain','10','0','20','0','11','1','21','0',
+              '0','LINE','8','plain','370','13','10','0','20','1','11','1','21','1']));
+check('layer lineweight imported as millimetres',
+      r.layers.find(l=>l.name==='heavy').lw===0.5);
+check('a by-layer/default layer carries no weight',
+      r.layers.find(l=>l.name==='plain').lw===undefined);
+check('an entity may set its own weight', of(r,'line')[2].lw===0.13);
+check('entities without one stay unset', of(r,'line')[0].lw===undefined);
+
+const G2 = await import('../js/core/geometry.js');
+const D2 = await import('../js/core/dxf.js');
+check('the DWG side reads an index into the standard ladder',
+      D2.lwFromIndex(11)===0.5 && D2.lwFromIndex(4)===0.15);
+check('by-layer / by-block / default indexes mean no opinion',
+      D2.lwFromIndex(29)===null && D2.lwFromIndex(31)===null && D2.lwFromIndex(0)===null);
+
+check('screen px ramp keeps hairlines visible and heavies bounded',
+      S.lwPx(0.05)===1 && S.lwPx(0.25)===1 && S.lwPx(0.5)===2 && S.lwPx(5)===6);
+
 /* ===== frozen objects still obey their layer =====
    The whole point of keeping the source layer: an architect navigates by
    switching layers on and off, and half a real drawing arrives frozen. */

@@ -2,7 +2,7 @@
    MiniCAD — canvas, view transform, grid, rendering
    ========================================================= */
 import { dist, fmt, arcFrom3, bulgeArc, tangentBulge, bulgeFrom3, plineEndTangent } from '../../core/geometry.js';
-import { entities, view, T, cmd, curPt, snapMark, trackGuides, boxSel, mouse, selection, layerOf, layerVisible, hoverSel, hotGrip, unitFmt, units } from '../../core/state.js';
+import { entities, view, T, cmd, curPt, snapMark, trackGuides, boxSel, mouse, selection, layerOf, layerVisible, hoverSel, hotGrip, unitFmt, units, lwOf, lwPx } from '../../core/state.js';
 import { entBBox, entGrips, dimGeom, dimH } from '../../core/entities.js';
 import { materialByKey } from '../../core/materials.js';
 import { log } from './ui.js';
@@ -281,7 +281,7 @@ function drawEntity(e, dx, dy, ghost){
   const isSel = !ghost && selection.has(e.id);
   ctx.strokeStyle = isSel ? '#4db8ff' : col;
   ctx.fillStyle = ctx.strokeStyle;
-  ctx.lineWidth = isSel ? 1.8 : 1.3;
+  ctx.lineWidth = isSel ? 1.8 : lwPx(e.lw || lwOf(e.layer));
   ctx.setLineDash(isSel ? [6,4] : []);
   ctx.beginPath();
   if (e.type==='hatch'){ ctx.setLineDash([]); return; }   // rendered by drawHatch (under linework)

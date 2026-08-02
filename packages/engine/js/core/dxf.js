@@ -65,6 +65,21 @@ function hsv(h,s,v){
   const f = n => { const k=(n+h/60)%6; return Math.round(255*(v - v*s*Math.max(0,Math.min(k,4-k,1)))); };
   return '#' + [f(5),f(3),f(1)].map(n=>n.toString(16).padStart(2,'0')).join('');
 }
+/* ---------- lineweight ----------
+   DXF group 370 is the weight in 1/100 mm; the DWG database instead hands back
+   an INDEX into AutoCAD's fixed ladder of standard weights. Both funnel here.
+   Negative codes mean by-block / by-layer / default — i.e. "no opinion". */
+export const LW_LADDER = [0, 0.05, 0.09, 0.13, 0.15, 0.18, 0.20, 0.25, 0.30, 0.35,
+                          0.40, 0.50, 0.53, 0.60, 0.70, 0.80, 0.90, 1.00, 1.06,
+                          1.20, 1.40, 1.58, 2.00, 2.11];
+export function lwFromIndex(i){                    // DWG database
+  return (Number.isInteger(i) && i >= 0 && i < LW_LADDER.length && LW_LADDER[i] > 0)
+    ? LW_LADDER[i] : null;
+}
+export function lwFromHundredths(v){               // DXF group 370
+  return (typeof v === 'number' && v > 0) ? v/100 : null;
+}
+
 export function aciColor(i){
   if (i>=0 && i<=9) return ACI_BASE[i] || '#e8e8e8';
   if (i>=250 && i<=255){ const v=Math.round(255*(0.2+0.16*(i-250))); const h=v.toString(16).padStart(2,'0'); return `#${h}${h}${h}`; }
@@ -211,7 +226,8 @@ function toShapes(recs, blocks, m, depth, out, report){
     const r = recs[i];
     const layer = g(r, 8, '0');
     const t = r.t;
-    const push = s => { if (s) out.push(s); };
+    const elw = lwFromHundredths(g(r, 370, -3));   // negative = by-layer/default
+    const push = s => { if (s){ if (elw) s.lw = elw; out.push(s); } };
 
     if (t==='LINE'){
       push({k:'line', layer, a:xfPt(m, P(r,10,20)), b:xfPt(m, P(r,11,21))});
@@ -459,8 +475,10 @@ export function parseDXF(text){
       if (!inLayerTable || r.t!=='LAYER') continue;
       const name = g(r,2,''); if (!name) continue;
       const ci = g(r,62,7), flags = g(r,70,0), tc = g(r,420,null);
+      const lw = lwFromHundredths(g(r,370,-3));
       layers.push({
         name,
+        ...(lw ? {lw} : {}),
         color: tc!==null ? '#'+((tc|0)&0xffffff).toString(16).padStart(6,'0') : aciColor(Math.abs(ci)),
         off: ci<0 || !!(flags&1),
         locked: !!(flags&4),

@@ -21,6 +21,19 @@ export let layers = [
   {name:'annot', color:'#ef7b7b'},
 ];
 export function setLayers(a){ layers = a; }
+
+/* A layer may carry `lw` — its lineweight in real millimetres, as the author
+   set it in CAD. Absent means "default", which is what MiniCAD always drew.
+   Screen and paper interpret it differently: on paper it IS millimetres, on
+   screen it is a fixed pixel ramp (like AutoCAD's LWDISPLAY) so heavy walls
+   stay heavy at every zoom instead of ballooning. */
+export const LW_DEFAULT_MM = 0.25;
+export function lwOf(name){
+  const v = layerOf(name).lw;
+  return (typeof v === 'number' && v > 0) ? v : LW_DEFAULT_MM;
+}
+// mm → screen px, clamped so nothing vanishes or turns into a slab
+export const lwPx = mm => Math.max(1, Math.min(6, mm / LW_DEFAULT_MM));
 export let currentLayer = '0';
 export function setCurrentLayer(n){ currentLayer = n; }
 export function layerOf(name){ return layers.find(l=>l.name===name) || layers[0]; }

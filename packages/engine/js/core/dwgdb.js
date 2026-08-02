@@ -14,7 +14,7 @@
    degrees — that is the main difference from `dxf.js`.
    ========================================================= */
 import { arcFrom3, normAng, TAU } from './geometry.js';
-import { mtextLines, wrapCharsFor, aciColor } from './dxf.js';
+import { mtextLines, wrapCharsFor, aciColor, lwFromIndex } from './dxf.js';
 
 export class DwgDbError extends Error {}
 
@@ -104,7 +104,10 @@ function toShapes(ents, blocks, m, depth, out, report){
     if (!e || !e.type) continue;
     const layer = e.layer || '0';
     const t = e.type;
-    const push = s => { if (s) out.push(s); };
+    // an entity may override its layer's weight; 29/30/31 mean by-layer/
+    // by-block/default, i.e. "no opinion", and lwFromIndex returns null there
+    const elw = lwFromIndex(e.lineweight);
+    const push = s => { if (s){ if (elw) s.lw = elw; out.push(s); } };
 
     if (t === 'LINE'){
       push({k:'line', layer, a:xfPt(m,P(e.startPoint)), b:xfPt(m,P(e.endPoint))});
@@ -225,8 +228,10 @@ export function dwgDocToIR(db){
   for (const l of Object.values(db.tables.LAYER?.entries || {})){
     if (!l || !l.name) continue;
     const tc = (typeof l.color === 'number' && l.color !== 16777215) ? l.color : null;
+    const lw = lwFromIndex(l.lineweight);
     layers.push({
       name: l.name,
+      ...(lw ? {lw} : {}),
       color: tc !== null ? '#'+((tc|0)&0xffffff).toString(16).padStart(6,'0')
                          : aciColor(Math.abs(l.colorIndex ?? 7)),
       off:    !!l.off || !!l.frozen || (l.colorIndex ?? 7) < 0,
