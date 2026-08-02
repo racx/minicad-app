@@ -347,6 +347,67 @@ function dedupe(pts, closed){
   return out;
 }
 
+/* ---------- what is one unit? ----------
+   A CAD file's INSUNITS is often a template default and simply wrong — a real
+   house plan declared inches while being drawn in metres. We refuse to rescale
+   on the strength of it, which left MiniCAD assuming centimetres and printing
+   the drawing as 0.02 mm crumbs. Guessing badly is bad; staying silent turned
+   out to be worse, so: infer from the geometry, say why, and let the user
+   correct it in one keystroke.
+
+   A dimension an architect drew is the strongest evidence there is — it is a
+   room or a wall, so a few metres. Failing that, the overall extent of a
+   building drawing is tens of metres. */
+const M_PER = {mm:0.001, cm:0.01, m:1};
+
+export function suggestUnits(entities = []){
+  const pick = (value, targetM) => {
+    let best = null;
+    for (const u of ['mm','cm','m']){
+      // score by how far the interpretation is from a plausible size, in octaves
+      const d = Math.abs(Math.log2((value * M_PER[u]) / targetM));
+      if (!best || d < best.d) best = {u, d};
+    }
+    return best;
+  };
+
+  const dims = entities.filter(e => e.type === 'dim')
+    .map(e => Math.hypot(e.x2 - e.x1, e.y2 - e.y1))
+    .filter(v => v > 0)
+    .sort((a, b) => a - b);
+  if (dims.length){
+    // the 90th percentile, not the median: a drawing is full of small detail
+    // dimensions, and it is the big ones that say how large the building is
+    const big = dims[Math.min(dims.length - 1, Math.floor(dims.length * 0.9))];
+    const {u} = pick(big, 3);                       // a room or wall: ~3 m
+    return {units:u, why:`its largest dimensions read about ${round(big)}, which is ${round(big * M_PER[u])} m`};
+  }
+
+  let x0=Infinity, y0=Infinity, x1=-Infinity, y1=-Infinity;
+  for (const e of entities){
+    const b = bboxOf(e);
+    if (!b) continue;
+    x0=Math.min(x0,b[0]); y0=Math.min(y0,b[1]); x1=Math.max(x1,b[2]); y1=Math.max(y1,b[3]);
+  }
+  if (!Number.isFinite(x0)) return null;
+  const span = Math.max(x1-x0, y1-y0);
+  if (!(span > 0)) return null;
+  const {u} = pick(span, 40);                       // a building drawing: tens of metres
+  return {units:u, why:`it is ${round(span)} units across, which is ${round(span * M_PER[u])} m`};
+}
+const round = v => Math.round(v * 100) / 100;
+function bboxOf(e){
+  if (e.type==='line') return [Math.min(e.x1,e.x2),Math.min(e.y1,e.y2),Math.max(e.x1,e.x2),Math.max(e.y1,e.y2)];
+  if (e.type==='pline' && e.pts.length){
+    const xs=e.pts.map(p=>p.x), ys=e.pts.map(p=>p.y);
+    return [Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys)];
+  }
+  if (e.cx!==undefined) return [e.cx-(e.r||0), e.cy-(e.r||0), e.cx+(e.r||0), e.cy+(e.r||0)];
+  if (e.type==='text') return [e.x,e.y,e.x,e.y];
+  if (e.type==='dim') return [Math.min(e.x1,e.x2),Math.min(e.y1,e.y2),Math.max(e.x1,e.x2),Math.max(e.y1,e.y2)];
+  return null;
+}
+
 /* ---------- human-readable summary ---------- */
 export function reportLines(r, name){
   const out = [`Opened ${name} — ${r.native + r.frozen} objects on ${r.layers} layers.`];

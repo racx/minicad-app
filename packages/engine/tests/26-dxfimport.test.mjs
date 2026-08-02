@@ -464,4 +464,48 @@ C.startCommand('THAW');
 check('THAW on a clean drawing says so, without a snapshot',
       dom.logs.some(l=>/already editable/i.test(l)));
 
+
+/* ===== units: infer, explain, and ask =====
+   Staying silent about an unknown unit is what produced a print of 0.02 mm
+   crumbs. The file's own header can't be trusted, so read the geometry. */
+const room = k => [
+  {id:1,type:'dim',layer:'0',x1:0,y1:0,x2:3.5*k,y2:0,off:1},
+  {id:2,type:'dim',layer:'0',x1:0,y1:0,x2:4.2*k,y2:0,off:1},
+  {id:3,type:'dim',layer:'0',x1:0,y1:0,x2:2.8*k,y2:0,off:1}];
+check('a building drawn in metres is recognised',      M.suggestUnits(room(1)).units==='m');
+check('…in centimetres',                                M.suggestUnits(room(100)).units==='cm');
+check('…in millimetres',                                M.suggestUnits(room(1000)).units==='mm');
+check('the reason quotes a real measurement a person can check',
+      /largest dimensions read about 4\.2\b/.test(M.suggestUnits(room(1)).why));
+
+// big detail-dimension noise must not drag the answer around
+const noisy = [...room(1), ...Array.from({length:20},(_,i)=>
+  ({id:100+i,type:'dim',layer:'0',x1:0,y1:0,x2:0.02+i*0.001,y2:0,off:0.1}))];
+check('a pile of tiny detail dims does not fool it', M.suggestUnits(noisy).units==='m');
+
+// no dimensions at all: fall back to overall size
+const big = [{id:1,type:'line',layer:'0',x1:0,y1:0,x2:30,y2:20}];
+check('with no dimensions it uses the overall extent', M.suggestUnits(big).units==='m');
+check('an empty drawing has no opinion', M.suggestUnits([])===null);
+
+// and the whole path: an import that cannot name its unit asks
+S.setEntities([]); S.setIdSeq(1); dom.logs.length=0; S.setUnits('cm');
+IO.openDXF(fakeFile('u.dxf', wrap(['9','$INSUNITS','70','1'], [], [],
+  ['0','LINE','8','0','10','0','20','0','11','4.2','21','0',
+   '0','DIMENSION','8','0','70','1','10','0','20','1','13','0','23','0','14','3.5','24','0'])));
+check('an unknown unit is guessed rather than left wrong', S.units==='m');
+check('…the guess is explained', dom.logs.some(l=>/Guessing 1 unit = 1 m/.test(l)));
+check('…with its evidence', dom.logs.some(l=>/because .*dimensions read/.test(l)));
+check('…and the UNITS prompt is left open to confirm or correct',
+      S.cmd && S.cmd.name==='UNITS');
+C.handleEnter('cm');
+check('typing a different unit overrides the guess', S.units==='cm');
+
+// a file that DOES declare a usable unit is trusted and not second-guessed
+S.setEntities([]); S.setIdSeq(1); dom.logs.length=0;
+IO.openDXF(fakeFile('v.dxf', wrap(['9','$INSUNITS','70','4'], [], [],
+  ['0','LINE','8','0','10','0','20','0','11','4200','21','0'])));
+check('a declared mm file is taken at its word', S.units==='mm');
+check('…and is not asked about', !(S.cmd && S.cmd.name==='UNITS'));
+
 finish();

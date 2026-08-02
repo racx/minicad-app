@@ -6,10 +6,11 @@ import { dimGeom, dimH } from '../../core/entities.js';
 import { entities, setEntities, layers, setLayers, getIdSeq, setIdSeq,
          setCurrentLayer, snapshot, selection, units, setUnits } from '../../core/state.js';
 import { zoomExtents } from './view.js';
+import { startCommand } from '../../core/commands.js';
 import { log, refreshLayers } from './ui.js';
 import { connectUI } from '../../core/bus.js';
 import { parseDXF, DxfError } from '../../core/dxf.js';
-import { importDoc, reportLines } from '../../core/cadimport.js';
+import { importDoc, reportLines, suggestUnits } from '../../core/cadimport.js';
 import { buildDXF } from '../../core/dxfwrite.js';
 import { dwgToDxf, looksLikeDWG, DwgError } from '../../core/dwg.js';
 import { dwgDocToIR, DwgDbError } from '../../core/dwgdb.js';
@@ -51,6 +52,19 @@ function loadDoc(doc, name, what){
   setCurrentLayer((res.layers.find(l=>!l.locked && !l.off) || res.layers[0]).name);
   refreshLayers(); selection.clear(); zoomExtents();
   for (const line of reportLines(res.report, name)) log(line, 'r');
+
+  // The file could not tell us what one unit means, and assuming wrong makes
+  // every measurement and every printout wrong. Infer it, say why, and leave
+  // the UNITS prompt open so one keystroke confirms or corrects it.
+  if (!res.units){
+    const g = suggestUnits(res.entities);
+    if (g){
+      setUnits(g.units);
+      log(`Guessing 1 unit = 1 ${g.units}, because ${g.why}. ` +
+          `Press Enter to accept, or type mm / cm / m.`, 'r');
+      startCommand('UNITS');
+    }
+  }
   return true;
 }
 
