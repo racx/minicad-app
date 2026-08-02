@@ -44,6 +44,43 @@ import { dimGeom, dimH } from './entities.js';
 const f = v => Math.round(v*1000)/1000;
 const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
+/* Will this actually be readable on paper?
+   A 690-unit site printed at 1:50 fits the sheet and is still useless: every
+   line lands 0.02 mm long under a 0.35 mm pen, so the drawing prints as black
+   crumbs. Nothing in the dialog said so. These are the checks that would
+   have. */
+export function plotWarnings({entities = [], settings}){
+  const {paper='A4', landscape=true, scaleN=50, win, units='cm'} = settings || {};
+  const out = [];
+  if (!win) return out;
+  const mmu = (UNIT_MM[units] || 10) / scaleN;
+  const area = contentArea(paper, landscape);
+  const wmm = (win[2]-win[0]) * mmu, hmm = (win[3]-win[1]) * mmu;
+
+  if (wmm > area.w * 1.02 || hmm > area.h * 1.02)
+    out.push(`At 1:${scaleN} the drawing is ${Math.round(wmm)}×${Math.round(hmm)} mm — bigger than the ` +
+             `${Math.round(area.w)}×${Math.round(area.h)} mm printable area, so the edges will be cut off. ` +
+             `Choose "fit" or a larger number.`);
+  else if (wmm < area.w * 0.25 && hmm < area.h * 0.25)
+    out.push(`At 1:${scaleN} the drawing uses only a corner of the page. Choose "fit" for a bigger view.`);
+
+  // the killer: text too small to read. 1.5 mm is about the floor for print.
+  const hs = [];
+  for (const e of entities){
+    if (e.type === 'text') hs.push(e.h * mmu);
+    else if (e.type === 'dim') hs.push(dimH(e) * mmu);
+  }
+  if (hs.length){
+    hs.sort((a,b)=>a-b);
+    const med = hs[hs.length >> 1];
+    if (med < 1.5)
+      out.push(`Text will print about ${med.toFixed(2)} mm tall — too small to read. ` +
+               `Either print a smaller area (Pick window), or check UNITS: if this drawing came ` +
+               `from a CAD file, 1 unit may not be a ${units}.`);
+  }
+  return out;
+}
+
 export function buildPlotSVG({entities, layers=[], settings, filename='drawing', date=''}){
   const {paper='A4', landscape=true, scaleN=50, win, weight=0.35, colors=false, units='cm'} = settings;
   const p = paperSize(paper, landscape);

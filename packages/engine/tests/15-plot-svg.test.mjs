@@ -88,4 +88,32 @@ const vbars = grab(svg, /<line x1="([\d.]+)" y1="([\d.]+)" x2="([\d.]+)" y2="([\
 check('vertical 100mm bar exact', vbars.some(b=>near(Math.abs(b[3]-b[1]),100)));
 check('instruction present', svg.includes('100%') && svg.includes('ruler'));
 
+
+/* ===== legibility warnings =====
+   A 690-unit site printed at 1:50 fits the page and is still black crumbs:
+   0.02 mm text under a 0.35 mm pen. The dialog said nothing. Now it does. */
+const tiny = {paper:'A4', landscape:true, scaleN:50, win:[0,0,690,250],
+              weight:0.35, colors:false, units:'cm'};
+const txt = [{id:1,type:'text',layer:'0',x:0,y:0,h:0.18,str:'SUÍTE'}];
+let w = P.plotWarnings({entities:txt, settings:tiny});
+check('warns when text would print unreadably small', w.some(t=>/too small to read/.test(t)));
+check('…quoting the actual size', w.some(t=>/0\.0\d mm/.test(t)));
+check('…and pointing at UNITS, the usual cause on an imported file',
+      w.some(t=>/UNITS/.test(t)));
+
+const big = {...tiny, scaleN:1, win:[0,0,690,250]};
+w = P.plotWarnings({entities:txt, settings:big});
+check('warns when the drawing overflows the sheet', w.some(t=>/cut off/.test(t)));
+
+const corner = {...tiny, scaleN:5000, win:[0,0,690,250]};
+w = P.plotWarnings({entities:[], settings:corner});
+check('warns when the drawing uses only a corner', w.some(t=>/corner of the page/.test(t)));
+
+const sane = {paper:'A4', landscape:true, scaleN:50, win:[0,0,1000,700],
+              weight:0.35, colors:false, units:'cm'};
+w = P.plotWarnings({entities:[{id:1,type:'text',layer:'0',x:0,y:0,h:20,str:'ROOM'}], settings:sane});
+check('a sensible plot warns about nothing', w.length===0);
+
+check('no window means no opinion', P.plotWarnings({entities:txt, settings:{...tiny, win:null}}).length===0);
+
 finish();

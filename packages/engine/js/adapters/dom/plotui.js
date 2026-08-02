@@ -1,7 +1,7 @@
 /* =========================================================
    MiniCAD — PLOT dialog wiring (DOM side of js/plot.js)
    ========================================================= */
-import { paperSize, computeFitScale, buildPlotSVG, buildTestPageSVG } from '../../core/plot.js';
+import { paperSize, computeFitScale, buildPlotSVG, buildTestPageSVG, plotWarnings } from '../../core/plot.js';
 import { entities, layers, units, unitFmt, plotWin, layerVisible } from '../../core/state.js';
 import { entBBox } from '../../core/entities.js';
 import { registerPlotDialog, startCommand } from '../../core/commands.js';
@@ -67,6 +67,13 @@ function refresh(){
   $('plotWinLabel').textContent = w
     ? `${unitFmt(w[2]-w[0])} × ${unitFmt(w[3]-w[1])} ${units}`
     : 'whole drawing';
+
+  // tell them before they print, not after they look at the PDF
+  const box = $('plotWarn');
+  const warns = s ? plotWarnings({entities, settings:s}) : [];
+  box.innerHTML = '';
+  for (const t of warns){ const d = document.createElement('div'); d.textContent = t; box.appendChild(d); }
+  box.style.display = warns.length ? '' : 'none';
 }
 
 /* ---------- print pipeline ---------- */
@@ -111,6 +118,9 @@ $('plotPrint').addEventListener('click', ()=>{
   if (!cur){ log('Nothing to print — the drawing is empty.', 'e'); return; }
   printSVG(cur.svg, cur.size);
   log(`Printing 1:${cur.settings.scaleN} on ${cur.settings.paper} — in the browser dialog, keep 100% scale (or Save as PDF).`, 'r');
+  // say it after sending too: the sheet is already in the print dialog and the
+  // user needs to know why it looks like that before they hit save
+  for (const w of plotWarnings({entities, settings:cur.settings})) log(w, 'e');
 });
 $('plotTest').addEventListener('click', ()=>{
   printSVG(buildTestPageSVG(), {w:210, h:297});

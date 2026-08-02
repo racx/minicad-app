@@ -58,6 +58,9 @@
   #layerList .t:hover{opacity:1}
   #layers footer{display:flex;gap:6px;padding:8px 12px;border-top:1px solid var(--line);color:var(--dim);font-size:11px}
   #layers footer button{flex:1}
+  #plotWarn{margin:8px 0 0;padding:8px 10px;border-radius:6px;font-size:11px;line-height:1.45;
+    background:rgba(239,123,123,.12);border:1px solid var(--warn);color:var(--text)}
+  #plotWarn div + div{margin-top:5px}
   #help h2{font-size:13px;color:var(--accent);margin-bottom:8px;font-family:var(--mono)}
   #help h3{font-size:11px;color:var(--dim);margin:10px 0 4px;text-transform:uppercase;letter-spacing:.08em}
   #help table{width:100%;border-collapse:collapse}
@@ -176,6 +179,9 @@
       <div class="row"><label>Window</label>
         <button class="btn" id="plotPickWin">Pick window</button>
         <span id="plotWinLabel">whole drawing</span>
+      </div>
+      <div id="plotWarn" style="display:none"></div>
+      <div style="display:none">
       </div>
       <div class="row"><label>Lines</label>
         <select id="plotWeight"><option value="0.35">0.35 mm</option><option value="0.1">hairline</option></select>
