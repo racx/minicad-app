@@ -38,11 +38,21 @@ function pairs(text){
     if (Number.isNaN(c)) continue;                 // tolerate stray blank lines
     let v = L[i+1];
     if (isNum(c)){ v = parseFloat(v); if (Number.isNaN(v)) v = 0; }
-    else v = v.replace(/\s+$/, '');
+    else v = unesc(v.replace(/\s+$/, ''));
     out.push([c, v]);
   }
   return out;
 }
+
+/* \U+XXXX is how DXF carries anything outside plain ASCII — AutoCAD writes it
+   for accented text and layer names, and so do we on export. Decoding here
+   means every downstream consumer sees real characters. */
+export const unesc = s => s.includes('\\U+')
+  ? s.replace(/\\U\+([0-9A-Fa-f]{4,6})/g, (_, hx) => {
+      const c = parseInt(hx, 16);
+      return Number.isFinite(c) ? String.fromCodePoint(c) : _;
+    })
+  : s;
 
 const g  = (r, c, d) => { for (const [k,v] of r.p) if (k===c) return v; return d; };
 const ga = (r, c)    => { const o=[]; for (const [k,v] of r.p) if (k===c) o.push(v); return o; };
