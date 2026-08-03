@@ -61,6 +61,24 @@ Rails.application.configure do
   # Suppress logger output for asset requests.
   config.assets.quiet = true
 
+  # Keep one log line to one screen.
+  #
+  # The editor autosaves the whole drawing, and an imported house plan is
+  # 22,000 entities of JSON. Filtering the request parameters is only half of
+  # it: ActiveRecord logs the UPDATE and the snapshot INSERT with the doc
+  # column inlined, so every save still scrolled the terminal off the screen.
+  # Truncate the middle of any absurdly long SINGLE-LINE message — backtraces
+  # and anything else multi-line are left whole, because that is exactly the
+  # output you are scrolling back to find.
+  log_line_limit = 800
+  config.log_formatter = proc do |_severity, _time, _progname, msg|
+    text = msg.is_a?(String) ? msg : msg.inspect
+    if text.length > log_line_limit && !text.include?("\n")
+      text = "#{text[0, log_line_limit]} …[#{text.length - log_line_limit} more chars]"
+    end
+    "#{text}\n"
+  end
+
   # Raises error for missing translations.
   # config.i18n.raise_on_missing_translations = true
 
