@@ -2,7 +2,7 @@
 
 **Single source of truth** for what exists, how complete it is, and what comes next.
 Evidence-based: every claim below cites `file:line` in the codebase as of commit `536d7c7`.
-Verified against the test suite: `node tests/run.mjs` → **34 suites, 847 checks, all passing** (2026-08-03).
+Verified against the test suite: `node tests/run.mjs` → **34 suites, 853 checks, all passing** (2026-08-03).
 
 Update this file whenever a feature lands or a decision changes the plan.
 
@@ -222,8 +222,12 @@ nobody has confirmed it in a browser:
 **Rules learned the hard way, all encoded in code or tests now:** never rescale
 a drawing on the strength of a header (`INSUNITS` lies); a file may be only an
 annotation sheet whose geometry lives in an unresolved xref; frozen-ness is a
-property of an object, not a layer to park it on; and a layer name from someone
-else's file is untrusted text.
+property of an object, not a layer to park it on; a layer name from someone
+else's file is untrusted text; and **the DWG database is not DXF with different
+syntax** — the same concept is flagged differently (LWPOLYLINE closes on 512,
+the heavy POLYLINE2D/3D on 1), so a mapper ported across from the DXF reader
+can be wrong in a way that still parses, still audits clean, and only shows up
+as a shape one segment short of shut.
 
 ### Tier 1 — next up
 - ~~Print / PDF at scale~~ ✅ **shipped 2026-07-06**: UNITS (mm/cm/m, persisted), PLOT

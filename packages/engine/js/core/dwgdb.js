@@ -40,6 +40,17 @@ function arcShape(layer, c, r, a0, a1, m){
 }
 
 // entities consumed with their owner, or carrying nothing drawable
+/* Is this polyline closed? The DWG database does NOT use the DXF group-70
+   convention, and the two polyline families disagree with each other:
+   LWPOLYLINE carries its own bitmask where **512** means closed (bit 1 there
+   means "extrusion present"), while the heavy POLYLINE2D/3D flag is the DXF 70
+   value with bit 1 = closed. Reading bit 1 on an LWPOLYLINE — which is what
+   nearly every polyline in a real drawing is — silently opens every closed
+   shape in the file: a triangular section marker imports as two of its three
+   sides. libredwg's own consumers test `flag & 512`; so do we. */
+const dwgClosed = (type, flag) =>
+  !!((flag || 0) & (type === 'LWPOLYLINE' ? 512 : 1));
+
 const SILENT = new Set(['ATTDEF','VERTEX','SEQEND','VIEWPORT','POINT','LIGHT','SUN','IMAGEDEF']);
 
 /* ---------- one text-ish sub-record → IR ---------- */
@@ -131,13 +142,13 @@ function toShapes(ents, blocks, m, depth, out, report){
     else if (t === 'LWPOLYLINE' || t === 'POLYLINE2D'){
       const v = e.vertices || [];
       if (v.length < 2) continue;
-      push({k:'poly', layer, closed:!!((e.flag || 0) & 1),
+      push({k:'poly', layer, closed:dwgClosed(t, e.flag),
             pts:v.map(q => ({...xfPt(m,P(q)), bulge:(q.bulge||0) * (xfDet(m)<0 ? -1 : 1)}))});
     }
     else if (t === 'POLYLINE3D'){
       const v = e.vertices || [];
       if (v.length < 2) continue;
-      push({k:'poly', layer, closed:!!((e.flag || 0) & 1),
+      push({k:'poly', layer, closed:dwgClosed(t, e.flag),
             pts:v.map(q => ({...xfPt(m,P(q)), bulge:0}))});
     }
     else if (t === 'TEXT' || t === 'ATTRIB'){

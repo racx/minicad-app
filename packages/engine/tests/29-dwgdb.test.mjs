@@ -36,13 +36,40 @@ check('CIRCLE mapped', of(r,'circle')[0].cx===1 && of(r,'circle')[0].r===3);
 check('ARC angles are already radians — no degree conversion',
       near(of(r,'arc')[0].a1, Math.PI/2, 1e-9) && near(of(r,'arc')[0].r, 4, 1e-9));
 
-r = imp([{type:'LWPOLYLINE', layer:'0', flag:1,
-          vertices:[{x:0,y:0,bulge:0},{x:4,y:0,bulge:0},{x:4,y:3,bulge:0}]}]);
-check('LWPOLYLINE → closed pline', of(r,'pline')[0].closed===true && of(r,'pline')[0].pts.length===3);
+/* The closed bit is NOT the DXF one, and the two polyline families disagree:
+   LWPOLYLINE says closed with 512, the heavy POLYLINE2D/3D with 1. Reading
+   bit 1 on an LWPOLYLINE opened every closed shape in a real drawing —
+   triangular section markers arrived with two of their three sides. */
+const tri = [{x:0,y:0,bulge:0},{x:4,y:0,bulge:0},{x:4,y:3,bulge:0}];
+r = imp([{type:'LWPOLYLINE', layer:'0', flag:512, vertices:tri}]);
+check('LWPOLYLINE → closed pline (flag 512, the DWG bit)',
+      of(r,'pline')[0].closed===true && of(r,'pline')[0].pts.length===3);
+
+r = imp([{type:'LWPOLYLINE', layer:'0', flag:528, vertices:tri}]);
+check('…512 alongside other bits still reads as closed', of(r,'pline')[0].closed===true);
+
+r = imp([{type:'LWPOLYLINE', layer:'0', flag:1, vertices:tri}]);
+check('…and bit 1 on an LWPOLYLINE does NOT mean closed', of(r,'pline')[0].closed===false);
+
+r = imp([{type:'LWPOLYLINE', layer:'0', flag:0, vertices:tri}]);
+check('an open LWPOLYLINE stays open', of(r,'pline')[0].closed===false);
+
+r = imp([{type:'POLYLINE2D', layer:'0', flag:1, vertices:tri}]);
+check('the heavy POLYLINE2D does use bit 1', of(r,'pline')[0].closed===true);
 
 r = imp([{type:'POLYLINE2D', layer:'0', flag:0,
           vertices:[{x:0,y:0,bulge:0},{x:5,y:0,bulge:0}]}]);
 check('POLYLINE2D mapped as an open pline', of(r,'pline')[0].closed===false);
+
+r = imp([{type:'POLYLINE3D', layer:'0', flag:1,
+          vertices:[{x:0,y:0},{x:4,y:0},{x:4,y:3}]}]);
+check('POLYLINE3D uses bit 1 too', of(r,'pline')[0].closed===true);
+
+// however the flag reads, a repeated last vertex means the author closed it
+r = imp([{type:'LWPOLYLINE', layer:'0', flag:0,
+          vertices:[...tri, {x:0,y:0,bulge:0}]}]);
+check('a polyline that ends where it started is closed regardless of the flag',
+      of(r,'pline')[0].closed===true && of(r,'pline')[0].pts.length===3);
 
 /* ===== text: TEXT is flat, ATTRIB nests under .text ===== */
 r = imp([{type:'TEXT', layer:'0', text:'hello', startPoint:{x:1,y:2}, textHeight:0.5, rotation:0}]);

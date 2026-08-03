@@ -268,19 +268,20 @@ export function importDoc(doc){
            a0:normAng(s.a0), a1:normAng(s.a1)}, s.frozen, s);
     }
     else if (s.k==='poly'){
+      const closed = polyClosed(s);
       const straight = s.pts.every(p=>!p.bulge);
-      const pts = dedupe(straight ? s.pts.map(p=>({x:p.x, y:p.y})) : polyPts(s.pts, s.closed), s.closed);
+      const pts = dedupe(straight ? s.pts.map(p=>({x:p.x, y:p.y})) : polyPts(s.pts, closed), closed);
       if (pts.length < 2) continue;
       const fill = s.hatchId && fillable.get(s.hatchId)===s;
       if (straight || fill){
         // a fillable hatch boundary keeps its curves tessellated but stays editable
-        const b = add({type:'pline', layer:place(s), pts, closed:!!s.closed && pts.length>2}, s.frozen, s);
+        const b = add({type:'pline', layer:place(s), pts, closed:closed && pts.length>2}, s.frozen, s);
         if (fill && b.closed){
           add({type:'hatch', layer:b.layer, ref:b.id, mat:materialFor(s)});
           report.filled++;
         }
       }
-      else freezePoly(pts, s.closed, s.layer);
+      else freezePoly(pts, closed, s.layer);
     }
     else if (s.k==='text'){
       const e = {type:'text', layer:place(s), x:s.p.x, y:s.p.y, h:s.h || 2.5, str:s.s};
@@ -336,6 +337,17 @@ function bumpSkip(report, t){ report.skipped[t] = (report.skipped[t]||0) + 1; }
 // Drop consecutive duplicates — tessellation and sloppy files both produce them.
 // On a closed shape the repeated first point is the closing segment MiniCAD
 // draws itself, so it goes too.
+/* A polyline whose last vertex repeats its first IS closed, whatever the flag
+   says — plenty of exporters draw the closing segment by hand instead of
+   setting the bit, and the flag itself is encoded differently in DXF and DWG
+   (see dwgClosed in dwgdb.js). Believing only the flag leaves the shape one
+   segment short of shut, which on a filled boundary means no fill at all. */
+function polyClosed(s){
+  if (s.closed) return true;
+  const p = s.pts, n = p.length;
+  return n > 2 && Math.abs(p[0].x - p[n-1].x) < 1e-9 && Math.abs(p[0].y - p[n-1].y) < 1e-9;
+}
+
 function dedupe(pts, closed){
   const out = [];
   for (const p of pts){
