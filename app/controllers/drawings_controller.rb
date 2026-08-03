@@ -27,12 +27,25 @@ class DrawingsController < ApplicationController
     @sheet_number = sheet_numbers[@drawing.id]
   end
 
+  # Renamed from two places: the dashboard's turbo-frame form (html) and the
+  # editor's title, which is edited in place (json).
   def update
     if @drawing.update(params.expect(drawing: [ :title ]))
-      render partial: "drawing", locals: { drawing: @drawing, sheet_number: sheet_numbers[@drawing.id] }
+      respond_to do |format|
+        format.html { render partial: "drawing", locals: { drawing: @drawing, sheet_number: sheet_numbers[@drawing.id] } }
+        format.json { render json: { title: @drawing.title } }
+      end
     else
-      @sheet_number = sheet_numbers[@drawing.id]
-      render :rename, status: :unprocessable_content
+      respond_to do |format|
+        format.html do
+          @sheet_number = sheet_numbers[@drawing.id]
+          render :rename, status: :unprocessable_content
+        end
+        format.json do
+          render json: { error: @drawing.errors.full_messages.to_sentence },
+                 status: :unprocessable_content
+        end
+      end
     end
   end
 

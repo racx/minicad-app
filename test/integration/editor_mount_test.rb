@@ -14,6 +14,8 @@ class EditorMountTest < ActionDispatch::IntegrationTest
     assert_select "#editor-mount[data-updated-at=?]", @drawing.updated_at.iso8601
     assert_select "#editor-mount[data-autosave-url=?]", autosave_drawing_path(@drawing)
     assert_select "#editor-mount[data-copy-url=?]", drawings_path
+    # the title renames in place from the editor bar
+    assert_select "#editor-mount[data-update-url=?]", drawing_path(@drawing)
     assert_select "script#drawing-doc"
     # editor layout: Vite bundle, no Tailwind stylesheet
     assert_match "vite", response.body
@@ -57,6 +59,29 @@ class EditorMountTest < ActionDispatch::IntegrationTest
     assert_equal "mm", copy.units
     assert_equal doc, copy.doc
     assert_equal edit_drawing_path(copy), JSON.parse(response.body)["edit_url"]
+  end
+
+  # Renaming used to be dashboard-only, which is the wrong way round: you learn
+  # what a sheet is called while you are drawing it.
+  test "the editor renames a drawing over JSON" do
+    patch drawing_path(@drawing), params: { drawing: { title: "Ground floor" } }, as: :json
+    assert_response :success
+    assert_equal "Ground floor", JSON.parse(response.body)["title"]
+    assert_equal "Ground floor", @drawing.reload.title
+  end
+
+  test "a blank title is refused with a message, not a 500" do
+    before = @drawing.title
+    patch drawing_path(@drawing), params: { drawing: { title: "  " } }, as: :json
+    assert_response :unprocessable_content
+    assert_match(/title/i, JSON.parse(response.body)["error"])
+    assert_equal before, @drawing.reload.title
+  end
+
+  test "renaming someone else's drawing over JSON is refused" do
+    other = drawings(:guest_plan)
+    patch drawing_path(other), params: { drawing: { title: "Mine now" } }, as: :json
+    assert_not_equal "Mine now", other.reload.title
   end
 
   test "/try is public and renders the anonymous mount" do

@@ -31,6 +31,14 @@ const shellCss = `
   #saas-bar a{color:var(--accent);text-decoration:none}
   #saas-bar a:hover{text-decoration:underline}
   #saas-bar .title{color:var(--text)}
+  /* the title renames in place. contenteditable rather than an <input>: Safari
+     offers saved cards on a lone text field (see the engine's command line),
+     and the engine's own key handling already leaves contenteditable alone. */
+  #saas-title{border-bottom:1px dashed transparent;outline:none;cursor:text;
+    max-width:32ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #saas-title:hover{border-bottom-color:var(--line)}
+  #saas-title:focus{border-bottom-color:var(--accent);color:var(--text);
+    max-width:none;overflow:visible;text-overflow:clip}
   #saas-bar .spacer{flex:1}
   #saas-status{color:var(--dim)}
   #saas-status.dirty{color:var(--warn)}
@@ -73,7 +81,10 @@ function injectEngine() {
     bar.appendChild(h(`<a href="${cfg.signInUrl}">Sign in with Google to save</a>`))
   } else {
     bar.appendChild(h(`<a href="${cfg.drawingsUrl}">&larr; Drawings</a>`))
-    const title = h(`<span class="title"></span>`)
+    const title = h(`<span class="title" id="saas-title" contenteditable="plaintext-only"
+                           role="textbox" spellcheck="false" autocorrect="off"
+                           aria-label="Drawing title — edit to rename"
+                           title="Click to rename"></span>`)
     title.textContent = cfg.drawingTitle
     bar.appendChild(title)
     bar.appendChild(h(`<span class="spacer"></span>`))
@@ -117,7 +128,7 @@ async function boot() {
         engine.ui.log('Loaded the demo studio plan to play with — type NEW to start fresh.', 'r')
       }
     }
-  } else startAdapter()
+  } else { startAdapter(); wireRename() }
 }
 
 /* ---------- Rails persistence adapter ---------- */
@@ -241,6 +252,63 @@ async function saveAsCopy() {
   } else {
     setStatus('copy failed', 'err')
   }
+}
+
+/* ---------- rename, in place, in the bar ----------
+   The dashboard could rename a drawing and the editor could not, which is the
+   wrong way round: you learn what a sheet is called while you are drawing it.
+   Enter or clicking away commits, Escape puts the old name back. */
+function wireRename() {
+  const el = document.getElementById('saas-title')
+  if (!el) return                                   // anonymous /try owns no drawing
+  let committed = cfg.drawingTitle
+
+  const revert = () => { el.textContent = committed }
+
+  async function commit() {
+    const name = el.textContent.replace(/\s+/g, ' ').trim()
+    if (name === committed) { el.textContent = committed; return }   // also tidies whitespace
+    if (!name) { revert(); setStatus('a drawing needs a name', 'err'); return }
+
+    setStatus('renaming…', 'dirty')
+    let res
+    try {
+      res = await fetch(cfg.updateUrl, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content
+        },
+        body: JSON.stringify({ drawing: { title: name } })
+      })
+    } catch {
+      revert(); setStatus('rename failed — check your connection', 'err'); return
+    }
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      revert(); setStatus(body.error || 'rename failed', 'err'); return
+    }
+    const { title } = await res.json()
+    committed = title
+    el.textContent = title
+    cfg.drawingTitle = title             // save-as-copy names itself from this
+    document.title = `${title} — MiniCAD`
+    setStatus('renamed')
+  }
+
+  el.addEventListener('keydown', ev => {
+    // the board must not see these: Enter would end a command, Escape cancel one
+    if (ev.key === 'Enter') { ev.preventDefault(); ev.stopPropagation(); el.blur() }
+    else if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); revert(); el.blur() }
+  })
+  el.addEventListener('blur', commit)
+  el.addEventListener('paste', ev => {              // a title is one line
+    const text = ev.clipboardData?.getData('text')
+    if (text == null) return
+    ev.preventDefault()
+    document.execCommand('insertText', false, text.replace(/\s+/g, ' '))
+  })
 }
 
 function readCrashCopy() {
