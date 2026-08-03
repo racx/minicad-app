@@ -248,6 +248,21 @@ btnLayerLock.addEventListener('click', ()=>{
   log(`Layer "${currentLayer}" ${l.locked?'locked — visible and snappable, but can\'t be selected or changed.':'unlocked.'}`);
   refreshLayers(); draw();
 });
+/* ---- keep browser autofill off the command line ----
+   Safari decides for itself that a lone text field taking things like "100,50"
+   might be a card number, and offers saved credit cards. autocomplete="off",
+   a non-payment name, the password-manager opt-outs and type="search" were all
+   ignored on a real machine. It does skip a field that is READONLY at the
+   moment it gains focus, so the field ships readonly and drops it in the focus
+   handler — synchronously, so typing is never blocked. Restored on blur so the
+   next focus gets the same treatment. */
+for (const el of [cmdInput, document.getElementById('layerFind')]){
+  if (!el || typeof el.setAttribute !== 'function') continue;   // test stubs
+  el.setAttribute('readonly', '');
+  el.addEventListener('focus', ()=>el.removeAttribute('readonly'));
+  el.addEventListener('blur',  ()=>el.setAttribute('readonly', ''));
+}
+
 /* ---- layer panel ---- */
 const layersPanel = document.getElementById('layers');
 const layerListEl = document.getElementById('layerList');
