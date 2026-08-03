@@ -138,7 +138,6 @@ GEM
       logger
     i18n (1.15.2)
       concurrent-ruby (~> 1.0)
-    image_processing (2.0.2)
     importmap-rails (2.2.3)
       actionpack (>= 6.0.0)
       activesupport (>= 6.0.0)
@@ -445,7 +444,6 @@ DEPENDENCIES
   debug
   devise
   dry-initializer
-  image_processing (~> 2.0)
   importmap-rails
   omniauth (~> 2.1.4)
   omniauth-google-oauth2 (~> 1.2.2)
