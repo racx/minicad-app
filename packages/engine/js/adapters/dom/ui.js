@@ -40,10 +40,8 @@ export const cmdInput = asTextField(document.getElementById('cmdInput'));
 export const promptEl = document.getElementById('prompt');
 export const historyEl = document.getElementById('history');
 export const coordRead = document.getElementById('coordRead');
-export const layerSel = document.getElementById('layerSel');
+export const layerCur = document.getElementById('layerCur');
 export const layerColor = document.getElementById('layerColor');
-export const btnLayerOff = document.getElementById('btnLayerOff');
-export const btnLayerLock = document.getElementById('btnLayerLock');
 export const layersPanel = document.getElementById('layers');
 export const layerList   = document.getElementById('layerList');
 export const layerFind   = document.getElementById('layerFind');
@@ -115,17 +113,15 @@ export function renderLayerPanel(){
 
 export function refreshLayers(){
   renderLayerPanel();
-  layerSel.innerHTML='';
-  for (const l of layers){
-    const o=document.createElement('option'); o.value=l.name;
-    o.textContent = l.name + (l.off?' ·off':'') + (l.locked?' 🔒':'');
-    layerSel.appendChild(o);
-  }
-  layerSel.value=currentLayer;
   const cur = layerOf(currentLayer);
-  layerColor.value=cur.color;
-  btnLayerOff.textContent = cur.off ? '🚫' : '👁';
-  btnLayerLock.textContent = cur.locked ? '🔒' : '🔓';
+  // the chip is a readout, not a control: name, plus the two states that would
+  // otherwise surprise you — you can draw on a hidden layer, and a locked one
+  // refuses selection
+  layerCur.textContent = cur.name + (cur.off ? ' 🚫' : '') + (cur.locked ? ' 🔒' : '');
+  layerCur.title = `Drawing on "${cur.name}"` +
+    (cur.off ? ' — hidden, so nothing you draw will show' : '') +
+    (cur.locked ? ' — locked' : '') + '. Click for all layers.';
+  layerColor.value = cur.color;
 }
 
 /* the command-line adapter implements the core's UI sink */

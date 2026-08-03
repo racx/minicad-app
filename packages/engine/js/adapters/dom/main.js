@@ -12,7 +12,7 @@ import { findEntityAt, translateIds, entGrips, applyGrip } from '../../core/enti
 import { cv, s2w, w2s, draw, resize, zoomExtents, RULER_PX, W, H } from './view.js';
 import { startCommand, handleEnter, cancelCmd, applyModifiers, eraseWithDependents,
          doUndo, doRedo, setTog, clickSelect, boxSelect, onPoint, startEditText } from '../../core/commands.js';
-import { cmdInput, caretToEnd, coordRead, layerSel, layerColor, btnLayerOff, btnLayerLock, log, setPrompt,
+import { cmdInput, caretToEnd, coordRead, layerCur, layerColor, log, setPrompt,
          toggleHelp, refreshLayers } from './ui.js';
 import { saveJSON, openJSON, openDXF, openDWG, dxfExport, autosaveTick, restoreAutosave } from './io.js';
 
@@ -255,25 +255,9 @@ document.getElementById('btnUndo').addEventListener('click', doUndo);
 document.getElementById('btnHelp').addEventListener('click', ()=>toggleHelp());
 document.getElementById('helpClose').addEventListener('click', ()=>toggleHelp(false));
 
-/* layers */
-layerSel.addEventListener('change', ()=>{ setCurrentLayer(layerSel.value); layerColor.value=layerOf(currentLayer).color; focusCmd(); });
+/* layers — the bar is a readout plus a colour and a +; everything else is the
+   panel, so there is exactly one place to hide, lock, delete or switch a layer */
 layerColor.addEventListener('input', ()=>{ layerOf(currentLayer).color=layerColor.value; draw(); });
-btnLayerOff.addEventListener('click', ()=>{
-  const l = layerOf(currentLayer);
-  l.off = !l.off;
-  if (l.off){
-    for (const e of entities) if (e.layer===currentLayer) selection.delete(e.id);
-    log(`Layer "${currentLayer}" hidden — objects on it are invisible and untouchable. Note: you're still drawing on it!`);
-  } else log(`Layer "${currentLayer}" visible again.`, 'r');
-  refreshLayers(); draw();
-});
-btnLayerLock.addEventListener('click', ()=>{
-  const l = layerOf(currentLayer);
-  l.locked = !l.locked;
-  if (l.locked) for (const e of entities) if (e.layer===currentLayer) selection.delete(e.id);
-  log(`Layer "${currentLayer}" ${l.locked?'locked — visible and snappable, but can\'t be selected or changed.':'unlocked.'}`);
-  refreshLayers(); draw();
-});
 /* ---- keep browser autofill off the layer filter ----
    Safari offers saved credit cards on a lone text field. It does skip a field
    that is READONLY at the moment it gains focus, so this one ships readonly and
@@ -299,7 +283,7 @@ const setPanel = open => {
   if (open){ refreshLayers(); layerFindEl.focus(); layerFindEl.select(); }
   else focusCmd();
 };
-document.getElementById('btnLayerPanel').addEventListener('click', ()=>
+layerCur.addEventListener('click', ()=>
   setPanel(!layersPanel.classList.contains('open')));
 document.getElementById('layersClose').addEventListener('click', ()=>setPanel(false));
 layerFindEl.addEventListener('input', refreshLayers);

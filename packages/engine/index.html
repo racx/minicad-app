@@ -26,6 +26,9 @@
   .btn kbd{color:var(--dim);margin-left:4px;font-size:10px}
   .sep{width:1px;height:20px;background:var(--line);margin:0 4px}
   #layerBox{display:flex;align-items:center;gap:5px;margin-left:auto}
+  /* an imported layer is called "RED-CLI-Climatização equipamentos" — the chip
+     shows what fits and carries the full name in its tooltip */
+  #layerCur{max-width:15rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   select,input[type=color]{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:5px;padding:3px 6px;font-size:12px}
   input[type=color]{padding:1px;width:26px;height:24px;cursor:pointer}
 
@@ -162,12 +165,14 @@
     <button class="btn" id="btnHelp">?</button>
     <div id="layerBox">
       <label style="color:var(--dim);font-size:11px">LAYER</label>
-      <select id="layerSel"></select>
-      <input type="color" id="layerColor" title="Layer color">
-      <button class="btn" id="btnLayerOff" title="Hide/show this layer">👁</button>
-      <button class="btn" id="btnLayerLock" title="Lock/unlock this layer">🔓</button>
+      <!-- The bar says WHERE YOU ARE DRAWING and nothing else. Hiding, locking,
+           deleting, isolating and switching all live in the panel this opens —
+           one place, per layer. A 130-layer import made the old <select>
+           useless, and the bar's 👁/🔒 only ever acted on the current layer,
+           which is how you end up drawing in invisible ink. -->
+      <button class="btn" id="layerCur" title="Current layer — click for all layers">0</button>
+      <input type="color" id="layerColor" title="Colour of the current layer">
       <button class="btn" id="btnAddLayer" title="New layer">+</button>
-      <button class="btn" id="btnLayerPanel" title="All layers">☰</button>
     </div>
   </div>
 
@@ -318,7 +323,7 @@
         <tr><td>NEW</td><td>Start a fresh drawing (asks first)</td></tr>
         <tr><td>UNITS</td><td>What 1 drawing unit means: mm / cm / m (affects dims &amp; readout)</td></tr>
         <tr><td>PLOT / ⌘P</td><td>Print to scale: paper, 1:N or fit, print window, test page</td></tr>
-        <tr><td>👁 / 🔓</td><td>Hide or lock the current layer (top-right). Autosave runs every 5&nbsp;s.</td></tr>
+        <tr><td>LAYER chip</td><td>Names the layer you're drawing on; click it to hide, lock, delete or switch layers. Autosave runs every 5&nbsp;s.</td></tr>
         <tr><td>Drag →</td><td>Window select (fully inside)</td></tr>
         <tr><td>Drag ←</td><td>Crossing select (touching)</td></tr>
       </table>

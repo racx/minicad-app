@@ -175,4 +175,38 @@ const nm = row0.children.find(c=>c.className==='nm');
 check('a hostile layer name is set as text, not markup',
       !!nm && nm.textContent==='<img src=x onerror=1>' && row0._html==='');
 
+/* ===== one place to manage a layer =====
+   The bar used to carry a <select> of every layer plus its own 👁 and 🔒, which
+   duplicated the panel and, being current-layer-only, was how you ended up
+   drawing in invisible ink. It is a readout now; the panel does the work. */
+S.setLayers([{name:'0', color:'#e8e8e8'}, {name:'DIVISA', color:'#0ff', locked:true}]);
+S.setCurrentLayer('0');
+U.refreshLayers();
+const chip = dom.els.get('layerCur');
+check('the bar names the layer being drawn on', chip.textContent === '0');
+
+S.setCurrentLayer('DIVISA');
+U.refreshLayers();
+check('…and flags a locked one', chip.textContent === 'DIVISA 🔒');
+check('…and says so in the tooltip', /locked/.test(chip.title) && /DIVISA/.test(chip.title));
+
+S.layerOf('DIVISA').off = true;
+U.refreshLayers();
+check('a hidden current layer is flagged — you can still draw on it',
+      chip.textContent === 'DIVISA 🚫 🔒' && /nothing you draw will show/.test(chip.title));
+S.layerOf('DIVISA').off = false;
+
+const panel = dom.els.get('layers');
+chip.listeners.click.forEach(fn => fn({}));
+check('clicking the chip opens the panel', panel.classList.contains('open'));
+chip.listeners.click.forEach(fn => fn({}));
+check('…and clicking it again closes it', !panel.classList.contains('open'));
+
+const html = await (await import('node:fs')).promises.readFile(
+  new URL('../index.html', import.meta.url), 'utf8');
+for (const gone of ['id="layerSel"', 'id="btnLayerOff"', 'id="btnLayerLock"', 'id="btnLayerPanel"'])
+  check(`the bar no longer carries ${gone} — the panel owns it`, !html.includes(gone));
+check('the bar keeps the current-layer chip, its colour and +',
+      html.includes('id="layerCur"') && html.includes('id="layerColor"') && html.includes('id="btnAddLayer"'));
+
 finish();

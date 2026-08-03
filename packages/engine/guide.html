@@ -77,7 +77,7 @@
     <li>Type <span class="say">Z</span> <kbd>Enter</kbd> then <span class="say">E</span> <kbd>Enter</kbd> to center the room on screen.</li>
     <li><b>Cut a doorway</b> in the bottom wall: draw two short vertical lines crossing it, about 90 apart (<span class="say">L</span>, click above the wall, click below it, Enter — twice). Then type <span class="say">TR</span> <kbd>Enter</kbd> (Trim), press <kbd>Enter</kbd> again (meaning "everything is a knife"), and click the piece of bottom wall <i>between</i> the two little lines. It disappears. <kbd>Enter</kbd> to finish.</li>
     <li>Erase the two helper lines: click one, click the other (they highlight blue), type <span class="say">E</span> <kbd>Enter</kbd>.</li>
-    <li><b>Furniture:</b> switch the LAYER dropdown (top-right) to <i>furniture</i>. Type <span class="say">REC</span> <kbd>Enter</kbd>, click two opposite corners to make a sofa. Type <span class="say">C</span> <kbd>Enter</kbd>, click a center point, type <span class="say">30</span> <kbd>Enter</kbd> — a side table.</li>
+    <li><b>Furniture:</b> click the LAYER chip (top-right) and pick <i>furniture</i> from the panel. Type <span class="say">REC</span> <kbd>Enter</kbd>, click two opposite corners to make a sofa. Type <span class="say">C</span> <kbd>Enter</kbd>, click a center point, type <span class="say">30</span> <kbd>Enter</kbd> — a side table.</li>
     <li><b>Label it:</b> switch layer to <i>annot</i>. Type <span class="say">T</span> <kbd>Enter</kbd>, click where the text should start, type <span class="say">20</span> <kbd>Enter</kbd> for the height, then type <span class="say">Living room</span> <kbd>Enter</kbd>.</li>
     <li>Click <b>Save</b> in the toolbar — it downloads <code>drawing.json</code>. Next time, click <b>Open</b> and pick that file to continue where you left off.</li>
   </ol>
@@ -159,8 +159,8 @@
   <div class="box warn"><b>Mac keyboard note:</b> the F-keys may be busy doing volume/brightness. Either hold <kbd>fn</kbd> while pressing them, or simply click the ORTHO/OSNAP buttons at the bottom — same thing.</div>
 
   <h2>Layers (colored pens)</h2>
-  <p>Think of layers as different colored pens: <i>walls</i>, <i>furniture</i>, <i>annot</i> (notes/labels). The dropdown at the top-right picks which pen you're drawing with; the color swatch changes its color; <b>+</b> adds a new one. Keeping walls and furniture on separate layers keeps a plan readable.</p>
-  <p>The <b>👁</b> button hides the chosen layer (great for seeing the bare walls without furniture), and <b>🔒</b> locks it — still visible and snappable, but click-proof, so you can't nudge the walls by accident while arranging chairs. Drew something on the wrong layer? Select it and type <span class="say">CH</span> to move it.</p>
+  <p>Think of layers as different colored pens: <i>walls</i>, <i>furniture</i>, <i>annot</i> (notes/labels). The chip at the top-right always names the pen you're drawing with; the color swatch changes its color; <b>+</b> adds a new one. Keeping walls and furniture on separate layers keeps a plan readable.</p>
+  <p>Click that chip to open the layer panel, which is where every layer is managed: click a name to draw on it, <b>👁</b> to hide it (great for seeing the bare walls without furniture), <b>🔒</b> to lock it — still visible and snappable, but click-proof, so you can't nudge the walls by accident while arranging chairs. Drew something on the wrong layer? Select it and type <span class="say">CH</span> to move it.</p>
 
   <h2>Saving your work</h2>
   <table>
@@ -183,7 +183,7 @@
   approximation of them, so clicks and selection boxes pass straight through. You can still see
   them, hide them with their layer, and snap to them for measuring. Type
   <span class="say">THAW</span> if you want to make them fully editable.</p>
-  <p><b>The layer list.</b> Click <b>☰</b> next to the layer box to open every layer at once —
+  <p><b>The layer list.</b> Click the layer chip to open every layer at once —
   a drawing from an architect can easily have 130. Type in the filter to narrow it
   (<code>excluir</code>, or <code>*hatch</code> for everything ending in "hatch"), click a row to
   draw on that layer, and use the 👁 / 🔒 / 🗑 buttons per layer. <b>Isolate current</b> hides
@@ -199,7 +199,7 @@
   it from a separate print-style file at plotting time), so if everything looks uniformly thin,
   that's why, not a fault in the file.</p>
   <p><b>Layers work normally.</b> Everything keeps the layer the architect drew it on, so switching
-  a layer off in the layer box really does hide all of it — handy when a drawing arrives with
+  a layer off in the layer panel really does hide all of it — handy when a drawing arrives with
   scratch layers you don't care about.</p>
   <p>When a file doesn't say what its units are, MiniCAD works it out from the drawing itself —
   it looks at the dimensions and reasons that a room is a few metres, not a few centimetres. It

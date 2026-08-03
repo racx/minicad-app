@@ -18,7 +18,19 @@ export function setupDOM(){
       _html:'',
       get innerHTML(){ return el._html + el.children.map(c=>c.innerHTML||c.textContent||'').join(''); },
       set innerHTML(v){ el._html = v; if (v === '') el.children.length = 0; },
-      classList:{ toggle(){}, add(){}, remove(){} },
+      // a real one, not three no-ops: code that asks `contains()` back after a
+      // toggle (the layers panel does) needs an answer, and a stub that always
+      // says nothing is set makes a broken toggle look fine
+      classList: (()=>{ const set = new Set(); return {
+        add: c => set.add(c),
+        remove: c => set.delete(c),
+        contains: c => set.has(c),
+        toggle(c, force){
+          const on = force === undefined ? !set.has(c) : !!force;
+          on ? set.add(c) : set.delete(c);
+          return on;
+        },
+      }; })(),
       addEventListener(type,fn){ (el.listeners[type] ||= []).push(fn); },
       appendChild(c){ el.children.push(c); return c; },
       removeChild(){},
@@ -31,6 +43,7 @@ export function setupDOM(){
       hasAttribute(k){ return k in el.attrs; },
       focus(){ el.listeners.focus?.forEach(fn=>fn({})); },
       blur(){ el.listeners.blur?.forEach(fn=>fn({})); },
+      select(){},                                  // text fields have one; divs do not care
       click(){},
       getBoundingClientRect(){ return {width:800, height:600, left:0, top:0}; },
       getContext(){ return makeCtx(); },
