@@ -9,7 +9,7 @@
       <%= link_to drawing.title, edit_drawing_path(drawing), data: { turbo_frame: "_top" },
             class: "block text-lg font-bold tracking-tight leading-snug hover:text-teal-deep truncate" %>
       <p class="font-mono text-[11px] text-dim mt-1.5">
-        <%= pluralize(drawing.doc["entities"]&.size || 0, "object") %> ·
+        <%= pluralize(drawing.entity_count, "object") %> ·
         updated <%= time_ago_in_words(drawing.updated_at) %> ago
       </p>
     </div>

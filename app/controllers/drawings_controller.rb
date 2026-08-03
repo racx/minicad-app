@@ -2,7 +2,7 @@ class DrawingsController < ApplicationController
   before_action :set_drawing, except: [ :index, :create ]
 
   def index
-    @drawings = current_user.drawings.order(updated_at: :desc)
+    @drawings = current_user.drawings.without_doc.order(updated_at: :desc)
     @sheet_numbers = sheet_numbers
   end
 

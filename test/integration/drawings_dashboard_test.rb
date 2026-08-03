@@ -15,6 +15,26 @@ class DrawingsDashboardTest < ActionDispatch::IntegrationTest
     assert_no_match "Guest's plan", response.body
   end
 
+  # Regression lock: the dashboard must not load a single doc. One imported
+  # house plan is 4.8 MB of JSON, and the page only wants a count.
+  test "dashboard renders object counts without loading any doc" do
+    drawings(:plan_a).update!(doc: { "entities" => [ { "type" => "line" }, { "type" => "arc" } ] })
+
+    docs_loaded = 0
+    sub = ActiveSupport::Notifications.subscribe("sql.active_record") do |*, payload|
+      sql = payload[:sql].to_s
+      next unless sql.include?('FROM "drawings"')
+      # a bare star pulls the doc just as surely as naming it
+      docs_loaded += 1 if sql.match?(/"drawings"\."doc"/) || sql.match?(/SELECT\s+"drawings"\.\*/)
+    end
+    get drawings_path
+    ActiveSupport::Notifications.unsubscribe(sub)
+
+    assert_response :success
+    assert_match "2 objects", response.body
+    assert_equal 0, docs_loaded, "the dashboard selected the doc column"
+  end
+
   test "create makes an untitled drawing and opens the editor" do
     assert_difference "@user.drawings.count", 1 do
       post drawings_path
