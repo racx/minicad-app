@@ -4,7 +4,39 @@
 import { layers, currentLayer, layerOf, entities } from '../../core/state.js';
 import { connectUI } from '../../core/bus.js';
 
-export const cmdInput = document.getElementById('cmdInput');
+/* ---- the command line is a contenteditable div, not an <input> ----
+   Safari offers saved credit cards on a lone text field that takes "100,50";
+   no attribute stops it, and a contenteditable element is not a form field so
+   nothing tries. The cost is that it has no `value`, which the whole engine
+   reads and writes — so define one over textContent, on the element itself, so
+   `document.getElementById('cmdInput').value` works too (view.js does that).
+   Setting it while focused destroys the caret, hence the restore. */
+export function asTextField(el){
+  if (!el || typeof Object.defineProperty !== 'function') return el;
+  Object.defineProperty(el, 'value', {
+    configurable: true,
+    get(){ return el.textContent || ''; },
+    set(v){
+      el.textContent = v == null ? '' : String(v);
+      if (document.activeElement === el) caretToEnd(el);
+    },
+  });
+  return el;
+}
+
+/* put the caret after the last character — a plain focus() on a div leaves it
+   wherever the browser feels like, which for typed input means "at the start" */
+export function caretToEnd(el){
+  const sel = typeof window !== 'undefined' && window.getSelection && window.getSelection();
+  if (!sel || typeof document.createRange !== 'function') return;   // test stubs
+  const r = document.createRange();
+  r.selectNodeContents(el);
+  r.collapse(false);
+  sel.removeAllRanges();
+  sel.addRange(r);
+}
+
+export const cmdInput = asTextField(document.getElementById('cmdInput'));
 export const promptEl = document.getElementById('prompt');
 export const historyEl = document.getElementById('history');
 export const coordRead = document.getElementById('coordRead');

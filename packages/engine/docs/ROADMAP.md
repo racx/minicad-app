@@ -2,7 +2,7 @@
 
 **Single source of truth** for what exists, how complete it is, and what comes next.
 Evidence-based: every claim below cites `file:line` in the codebase as of commit `536d7c7`.
-Verified against the test suite: `node tests/run.mjs` → **33 suites, 827 checks, all passing** (2026-08-01).
+Verified against the test suite: `node tests/run.mjs` → **34 suites, 847 checks, all passing** (2026-08-03).
 
 Update this file whenever a feature lands or a decision changes the plan.
 
@@ -151,6 +151,7 @@ engine through a stubbed DOM (`tests/stub-dom.mjs`):
 | 26-dxfimport | DXF parse → IR → entities: native mapping, curve tessellation onto FROZEN, HATCH boundary + edge paths (incl. the pattern-section code-reuse trap) and material inference, INSERT scale/rotation/arrays, `$INSUNITS`, layer flags, MTEXT, bad-input refusals, openDXF end-to-end, round-trip of our own export |
 | 27-dwg | DWG magic sniff, `dwgToDxf` request shape, every failure path's human message, openDWG end-to-end against a stubbed endpoint, and a **licence guard**: no engine module may reference the GPL converter |
 | 31-dxfwrite | R2000 structure and handle uniqueness, true colour / lineweight / hatch / dimension-block emission, `\\U+` escaping both ways, and a full round-trip through our own reader |
+| 23c-cmdline | The command line is a contenteditable div, not an `<input>`: markup lock (no name/type/autocomplete, plaintext-only, one non-wrapping line with a min-height), the `value`-over-`textContent` shim, typed commands and coordinates through it, spaces inside a TEXT string, type-anywhere replay, and multi-line paste flattened |
 | 30-spatial | Spatial index: 200 probes agreeing with brute force, superset-not-subset queries, mid-drag staleness covered by the selection union, add/move/delete visibility, degenerate inputs, bounded `snapCandidates`, and a sub-ms hit-test assertion at 3600 entities |
 | 29-dwgdb | DwgDatabase → IR: every entity type, radian angles, ATTRIB's nested text record, INSERT expansion/arrays/attribs, units-not-rescaled, layer flags, bad input — plus a slice of the real house plan asserting room-sized dimensions and untouched coordinates |
 | 28-text-rotation | `rot` across bbox/hit/grips/mirror/ROTATE/SCALE, both renderers' Y-flip sign, DXF group code 50 round-trip, backwards compatibility with pre-rotation saved files |
@@ -174,7 +175,7 @@ screenshots), DXF acceptance by third-party CAD (checked with ezdxf ad hoc).
 > architects — browser-first, DXF-native ("open the DXF a client sent you"). The household
 > tool is the incubator, not the destination. This re-tiers DXF import into Tier 1.
 
-### State of play — 2026-08-02
+### State of play — 2026-08-03
 
 The DWG/DXF import–edit–export loop works end to end on a real
 architect-drawn house (`-BASE-HNX-J-R05.dwg`, 22,177 entities). What is worth
@@ -186,14 +187,26 @@ nobody has confirmed it in a browser:
 - the layer panel's per-row 👁 / 🔒 / 🗑 against a 130-layer drawing
 - whether the R2000 export opens cleanly in *AutoCAD* (ezdxf audits it clean,
   which is not the same thing)
+- the **contenteditable command line** (below) in a real Safari and Chrome:
+  that no card is offered, that type-anywhere lands the first character, that
+  EDITTEXT prefills with the caret at the end, and that the row does not jump
+  when the field empties
 
 **Open, in the order they are worth doing:**
-1. **Safari offers saved credit cards on the command line.** Three
-   attribute-level fixes are in (`autocomplete`/name/opt-outs, `type="search"`,
-   readonly-until-focus) and the first two were confirmed *not* to work on a
-   real machine; the third is untested. The reliable fix is to stop using an
-   `<input>` — a `contenteditable` element is never autofilled — keeping every
-   call site working by defining `value` as a getter/setter over `textContent`.
+1. ~~**Safari offers saved credit cards on the command line.**~~ ✅ **fixed
+   2026-08-03** — the field stopped being an `<input>`. It is a
+   `contenteditable="plaintext-only"` div with no name, type or autocomplete;
+   nothing about it says "form field", so nothing offers to fill it. `value` is
+   a getter/setter over `textContent` defined on the element itself
+   (`ui.js asTextField`), so all ~15 call sites — including view.js reaching in
+   via `getElementById` — read unchanged. Three things a div does not do for
+   free are done by hand: caret to the end after `focus()` (`caretToEnd`,
+   otherwise an EDITTEXT prefill types backwards), the type-anywhere keystroke
+   replayed into the field, and a multi-line paste flattened to one line. The
+   layer filter is still a real `<input>` (it needs `.select()`) and keeps the
+   attribute defences plus readonly-until-focus. Suite 23c. **Untested by a
+   human in Safari** — that is the whole claim, and it is the one thing the
+   tests cannot make.
 2. **Six suites carry their own inline DOM stubs** (01–07 era) instead of
    `tests/stub-dom.mjs`. They miss harness improvements and can stay green
    while the app is broken — a `setAttribute` change broke all six at once.

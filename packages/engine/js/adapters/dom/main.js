@@ -12,9 +12,13 @@ import { findEntityAt, translateIds, entGrips, applyGrip } from '../../core/enti
 import { cv, s2w, w2s, draw, resize, zoomExtents, RULER_PX, W, H } from './view.js';
 import { startCommand, handleEnter, cancelCmd, applyModifiers, eraseWithDependents,
          doUndo, doRedo, setTog, clickSelect, boxSelect, onPoint, startEditText } from '../../core/commands.js';
-import { cmdInput, coordRead, layerSel, layerColor, btnLayerOff, btnLayerLock, log, setPrompt,
+import { cmdInput, caretToEnd, coordRead, layerSel, layerColor, btnLayerOff, btnLayerLock, log, setPrompt,
          toggleHelp, refreshLayers } from './ui.js';
 import { saveJSON, openJSON, openDXF, openDWG, dxfExport, autosaveTick, restoreAutosave } from './io.js';
+
+/* focus() on an editable div leaves the caret wherever the browser last had it
+   — at the start, for a field prefilled by EDITTEXT. Always type at the end. */
+function focusCmd(){ cmdInput.focus(); caretToEnd(cmdInput); }
 
 let panning = null;
 let spaceHeld = false;
@@ -72,7 +76,7 @@ cv.addEventListener('mousemove', ev=>{
 cv.addEventListener('mouseleave', ()=>{ mouse.inside=false; draw(); });
 
 cv.addEventListener('mousedown', ev=>{
-  cmdInput.focus();
+  focusCmd();
   { const r=cv.getBoundingClientRect();               // don't trust the last mousemove
     mouse.sx=ev.clientX-r.left; mouse.sy=ev.clientY-r.top; }
   if (ev.button===1 || (ev.button===0 && spaceHeld)){
@@ -140,7 +144,7 @@ cv.addEventListener('wheel', ev=>{
 cv.addEventListener('dblclick', ev=>{
   if (cmd) return;
   const e = findEntityAt(s2w(mouse.sx, mouse.sy));
-  if (e && e.type==='text'){ startEditText(e); cmdInput.focus(); }
+  if (e && e.type==='text'){ startEditText(e); focusCmd(); }
 });
 cv.addEventListener('contextmenu', ev=>{
   ev.preventDefault();
@@ -157,6 +161,17 @@ cmdInput.addEventListener('keydown', ev=>{
     handleEnter(cmdInput.value); cmdInput.value='';
     syncPanBtn();
   }
+});
+/* an editable div would happily take a multi-line paste; a command line is one
+   line, so flatten it and insert it as plain text */
+cmdInput.addEventListener('paste', ev=>{
+  const txt = ev.clipboardData && ev.clipboardData.getData('text');
+  if (txt == null) return;
+  ev.preventDefault();
+  const flat = txt.replace(/\s+/g, ' ');
+  if (typeof document.execCommand === 'function') document.execCommand('insertText', false, flat);
+  else { cmdInput.value = cmdInput.value + flat; }
+  if (T.dyn) draw();
 });
 // typing in some OTHER editable element (a host app's input, the plot dialog's
 // number field…): the board must keep its hands off — no focus stealing, no
@@ -204,7 +219,18 @@ window.addEventListener('keydown', ev=>{
   }
   if (ev.key===' ' && document.activeElement!==cmdInput){ spaceHeld=true; }
   if (ev.ctrlKey && ev.key.toLowerCase()==='z'){ ev.preventDefault(); ev.shiftKey?doRedo():doUndo(); return; }
-  if (document.activeElement!==cmdInput && !ev.ctrlKey && !ev.metaKey && ev.key.length===1) cmdInput.focus();
+  /* type-anywhere: a printable key pressed on the board goes to the command
+     line. An <input> received the keystroke itself the moment it was focused;
+     an editable div is not reliably given it mid-keydown, so replay the
+     character by hand. Space is excluded — on the board it arms the pan, and
+     no command starts with one. */
+  if (document.activeElement!==cmdInput && !ev.ctrlKey && !ev.metaKey
+      && ev.key.length===1 && ev.key!==' '){
+    ev.preventDefault();
+    focusCmd();
+    cmdInput.value = cmdInput.value + ev.key;
+    if (T.dyn) draw();
+  }
 });
 window.addEventListener('keyup', ev=>{ if (ev.key===' ') spaceHeld=false; });
 
@@ -214,7 +240,7 @@ window.addEventListener('keyup', ev=>{ if (ev.key===' ') spaceHeld=false; });
   document.getElementById(map[k]).addEventListener('click', ()=>setTog(k));
 });
 document.querySelectorAll('#topbar .btn[data-cmd]').forEach(b=>{
-  b.addEventListener('click', ()=>{ startCommand(b.dataset.cmd); cmdInput.focus(); });
+  b.addEventListener('click', ()=>{ startCommand(b.dataset.cmd); focusCmd(); });
 });
 /* pan toggle button: lit while the hand tool is active */
 const btnPan = document.getElementById('btnPan');
@@ -222,7 +248,7 @@ function syncPanBtn(){ btnPan.classList.toggle('on', !!(cmd && cmd.name==='PAN')
 btnPan.addEventListener('click', ()=>{
   if (cmd && cmd.name==='PAN') cancelCmd(true);
   else startCommand('PAN');
-  syncPanBtn(); cmdInput.focus();
+  syncPanBtn(); focusCmd();
 });
 
 document.getElementById('btnUndo').addEventListener('click', doUndo);
@@ -230,7 +256,7 @@ document.getElementById('btnHelp').addEventListener('click', ()=>toggleHelp());
 document.getElementById('helpClose').addEventListener('click', ()=>toggleHelp(false));
 
 /* layers */
-layerSel.addEventListener('change', ()=>{ setCurrentLayer(layerSel.value); layerColor.value=layerOf(currentLayer).color; cmdInput.focus(); });
+layerSel.addEventListener('change', ()=>{ setCurrentLayer(layerSel.value); layerColor.value=layerOf(currentLayer).color; focusCmd(); });
 layerColor.addEventListener('input', ()=>{ layerOf(currentLayer).color=layerColor.value; draw(); });
 btnLayerOff.addEventListener('click', ()=>{
   const l = layerOf(currentLayer);
@@ -248,19 +274,20 @@ btnLayerLock.addEventListener('click', ()=>{
   log(`Layer "${currentLayer}" ${l.locked?'locked — visible and snappable, but can\'t be selected or changed.':'unlocked.'}`);
   refreshLayers(); draw();
 });
-/* ---- keep browser autofill off the command line ----
-   Safari decides for itself that a lone text field taking things like "100,50"
-   might be a card number, and offers saved credit cards. autocomplete="off",
-   a non-payment name, the password-manager opt-outs and type="search" were all
-   ignored on a real machine. It does skip a field that is READONLY at the
-   moment it gains focus, so the field ships readonly and drops it in the focus
-   handler — synchronously, so typing is never blocked. Restored on blur so the
-   next focus gets the same treatment. */
-for (const el of [cmdInput, document.getElementById('layerFind')]){
-  if (!el || typeof el.setAttribute !== 'function') continue;   // test stubs
-  el.setAttribute('readonly', '');
-  el.addEventListener('focus', ()=>el.removeAttribute('readonly'));
-  el.addEventListener('blur',  ()=>el.setAttribute('readonly', ''));
+/* ---- keep browser autofill off the layer filter ----
+   Safari offers saved credit cards on a lone text field. It does skip a field
+   that is READONLY at the moment it gains focus, so this one ships readonly and
+   drops it in the focus handler — synchronously, so typing is never blocked.
+   Restored on blur so the next focus gets the same treatment. The command line
+   went further and stopped being an <input> at all (see ui.js asTextField);
+   the filter keeps its .select() and stays a real field. */
+{
+  const el = document.getElementById('layerFind');
+  if (el && typeof el.setAttribute === 'function'){
+    el.setAttribute('readonly', '');
+    el.addEventListener('focus', ()=>el.removeAttribute('readonly'));
+    el.addEventListener('blur',  ()=>el.setAttribute('readonly', ''));
+  }
 }
 
 /* ---- layer panel ---- */
@@ -270,7 +297,7 @@ const layerFindEl = document.getElementById('layerFind');
 const setPanel = open => {
   layersPanel.classList.toggle('open', open);
   if (open){ refreshLayers(); layerFindEl.focus(); layerFindEl.select(); }
-  else cmdInput.focus();
+  else focusCmd();
 };
 document.getElementById('btnLayerPanel').addEventListener('click', ()=>
   setPanel(!layersPanel.classList.contains('open')));
@@ -345,7 +372,7 @@ function boot(){
     log(`Restored autosaved drawing (${entities.length} objects) — type NEW to start fresh.`, 'r');
   }
   refreshLayers();
-  cmdInput.focus();
+  focusCmd();
   draw();
 }
 boot();

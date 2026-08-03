@@ -107,11 +107,17 @@
   #prompt{color:var(--warn);white-space:nowrap;font-size:13px}
   /* type="search" is what stops Safari offering saved credit cards on a bare
      text input; these strip the native search chrome that comes with it */
-  #cmdInput,#layerFind{-webkit-appearance:none;appearance:none}
-  #cmdInput::-webkit-search-decoration,#cmdInput::-webkit-search-cancel-button,
+  #layerFind{-webkit-appearance:none;appearance:none}
   #layerFind::-webkit-search-decoration,#layerFind::-webkit-search-cancel-button{
     -webkit-appearance:none;appearance:none;display:none}
-  #cmdInput{flex:1;background:transparent;border:none;outline:none;color:var(--text);font-family:var(--mono);font-size:13px}
+  /* the command line is a contenteditable div, not an <input> — see the note on
+     the element itself. It has to LOOK exactly like the input it replaced: one
+     line, no wrapping, scrolling sideways when the typed string outgrows it. */
+  #cmdInput{flex:1;min-width:0;background:transparent;border:none;outline:none;
+    color:var(--text);font-family:var(--mono);font-size:13px;line-height:1.4;min-height:1.4em;
+    white-space:pre;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;
+    caret-color:var(--text);-webkit-user-select:text;user-select:text}
+  #cmdInput::-webkit-scrollbar{display:none}
   #statusRow{display:flex;gap:6px;margin-top:6px;align-items:center}
   .tog{font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--line);color:var(--dim);cursor:pointer;user-select:none;font-family:var(--mono)}
   .tog.on{color:var(--accent);border-color:var(--accent)}
@@ -323,10 +329,16 @@
     <div id="history"></div>
     <div id="cmdRow">
       <span id="prompt">Command:</span>
-      <input id="cmdInput" type="search" name="minicad-command" autocomplete="off" readonly
-             autocorrect="off" autocapitalize="off" spellcheck="false"
-             data-1p-ignore data-lpignore="true" data-form-type="other"
-             aria-label="Command input">
+      <!-- NOT an <input>. Safari decides for itself that a lone text field
+           taking things like "100,50" might be a card number and offers saved
+           credit cards; autocomplete="off", a non-payment name, the password
+           manager opt-outs, type="search" and readonly-until-focus were all
+           tried and ignored. A contenteditable element is not a form field, so
+           nothing offers to fill it. `value` is shimmed over textContent in
+           js/adapters/dom/ui.js, so every call site reads the same as before. -->
+      <div id="cmdInput" contenteditable="plaintext-only" role="textbox"
+           autocorrect="off" autocapitalize="off" spellcheck="false"
+           aria-label="Command input"></div>
     </div>
     <div id="statusRow">
       <span class="tog" id="tGrid">GRID</span>
