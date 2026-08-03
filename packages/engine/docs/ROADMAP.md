@@ -174,6 +174,44 @@ screenshots), DXF acceptance by third-party CAD (checked with ezdxf ad hoc).
 > architects — browser-first, DXF-native ("open the DXF a client sent you"). The household
 > tool is the incubator, not the destination. This re-tiers DXF import into Tier 1.
 
+### State of play — 2026-08-02
+
+The DWG/DXF import–edit–export loop works end to end on a real
+architect-drawn house (`-BASE-HNX-J-R05.dwg`, 22,177 entities). What is worth
+knowing before picking this up:
+
+**Not yet verified by a human.** Everything below passed tests and audits, but
+nobody has confirmed it in a browser:
+- the units prompt on import (`suggestUnits`) and the print-legibility warnings
+- the layer panel's per-row 👁 / 🔒 / 🗑 against a 130-layer drawing
+- whether the R2000 export opens cleanly in *AutoCAD* (ezdxf audits it clean,
+  which is not the same thing)
+
+**Open, in the order they are worth doing:**
+1. **Safari offers saved credit cards on the command line.** Three
+   attribute-level fixes are in (`autocomplete`/name/opt-outs, `type="search"`,
+   readonly-until-focus) and the first two were confirmed *not* to work on a
+   real machine; the third is untested. The reliable fix is to stop using an
+   `<input>` — a `contenteditable` element is never autofilled — keeping every
+   call site working by defining `value` as a getter/setter over `textContent`.
+2. **Six suites carry their own inline DOM stubs** (01–07 era) instead of
+   `tests/stub-dom.mjs`. They miss harness improvements and can stay green
+   while the app is broken — a `setAttribute` change broke all six at once.
+   Consolidate them.
+3. Fit-point splines: 8 of 215 in the house have no control points and
+   currently render as straight lines through the fit points; they should be
+   interpolated.
+4. Rotated TEXT is imported but MTEXT attachment-point handling is only
+   approximated — wrapped rows may sit low in their cell rather than centred.
+5. `public/vite/assets/` accumulates a bundle per build (38 at last count).
+   Harmless locally, bloats an image — needs an `--emptyOutDir` or a clean step.
+
+**Rules learned the hard way, all encoded in code or tests now:** never rescale
+a drawing on the strength of a header (`INSUNITS` lies); a file may be only an
+annotation sheet whose geometry lives in an unresolved xref; frozen-ness is a
+property of an object, not a layer to park it on; and a layer name from someone
+else's file is untrusted text.
+
 ### Tier 1 — next up
 - ~~Print / PDF at scale~~ ✅ **shipped 2026-07-06**: UNITS (mm/cm/m, persisted), PLOT
   dialog (paper/orientation/scale incl. fit-with-displayed-1:N/print window/lineweight/
