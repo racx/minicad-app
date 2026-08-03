@@ -2,7 +2,7 @@
 
 **Single source of truth** for what exists, how complete it is, and what comes next.
 Evidence-based: every claim below cites `file:line` in the codebase as of commit `536d7c7`.
-Verified against the test suite: `node tests/run.mjs` → **34 suites, 853 checks, all passing** (2026-08-03).
+Verified against the test suite: `node tests/run.mjs` → **35 suites, 876 checks, all passing** (2026-08-03).
 
 Update this file whenever a feature lands or a decision changes the plan.
 

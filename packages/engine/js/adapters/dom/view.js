@@ -17,7 +17,27 @@ export { w2s, s2w, gridStep } from '../../core/viewport.js';
 import { w2s, s2w, gridStep } from '../../core/viewport.js';
 import { connectUI } from '../../core/bus.js';
 
+/* Below this many pixels tall, a glyph is a smudge — and text is the most
+   expensive thing a canvas does. At zoom-to-extents an imported plan has ~1000
+   labels rendering at two or three pixels, all of them illegible, all of them
+   paid for every frame. Zoom in and they come back. */
+const TEXT_LEGIBLE_PX = 4;
+
+/* One draw per animation frame.
+   A trackpad emits wheel events far faster than a 17,000-entity frame can be
+   rasterised, and every one of them used to call draw() synchronously; the
+   frames queue up behind the input and the board stops responding until it
+   catches up. Coalescing means the newest view wins and no frame is drawn that
+   is already out of date. Falls back to drawing straight away where there is
+   no rAF (the test harness), so suites still see synchronous effects. */
+let frame = 0;
 export function draw(){
+  if (typeof requestAnimationFrame !== 'function'){ drawNow(); return; }
+  if (frame) return;
+  frame = requestAnimationFrame(()=>{ frame = 0; drawNow(); });
+}
+
+export function drawNow(){
   ctx.setTransform(DPR,0,0,DPR,0,0);
   ctx.clearRect(0,0,W,H);
   ctx.fillStyle = '#131519'; ctx.fillRect(0,0,W,H);
@@ -302,14 +322,19 @@ function drawEntity(e, dx, dy, ghost){
     tracePline(e.pts, e.closed, dx, dy);
     ctx.stroke();
   } else if (e.type==='text'){
+    const px = e.h*view.scale;
     const s=w2s({x:e.x+dx,y:e.y+dy});
-    ctx.font = `${Math.max(2, e.h*view.scale)}px ${'ui-monospace, monospace'}`;
-    ctx.textBaseline = 'alphabetic';
-    if (e.rot){                                   // world CCW → screen CW (Y is flipped)
-      ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(-e.rot);
-      ctx.fillText(e.str, 0, 0);
-      ctx.restore();
-    } else ctx.fillText(e.str, s.x, s.y);
+    // a smudge costs the same to rasterise as a word (no early return here —
+    // the tail of this function resets the dash and line width)
+    if (px >= TEXT_LEGIBLE_PX || isSel){
+      ctx.font = `${Math.max(2, px)}px ${'ui-monospace, monospace'}`;
+      ctx.textBaseline = 'alphabetic';
+      if (e.rot){                                 // world CCW → screen CW (Y is flipped)
+        ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(-e.rot);
+        ctx.fillText(e.str, 0, 0);
+        ctx.restore();
+      } else ctx.fillText(e.str, s.x, s.y);
+    }
     if (isSel){ const b=entBBox(e); const p0=w2s({x:b[0]+dx,y:b[3]+dy}), p1=w2s({x:b[2]+dx,y:b[1]+dy}); ctx.strokeRect(p0.x,p0.y,p1.x-p0.x,p1.y-p0.y); }
   } else if (e.type==='dim'){
     const g=dimGeom(e);
@@ -328,13 +353,15 @@ function drawEntity(e, dx, dy, ghost){
     // value text: live-computed, aligned with the dim line
     let angS=Math.atan2(uy, ux);
     if (angS>Math.PI/2 || angS<-Math.PI/2) angS+=Math.PI;  // keep readable
-    ctx.save();
-    ctx.translate((A.x+B.x)/2, (A.y+B.y)/2); ctx.rotate(angS);
-    ctx.font=`${hs}px ui-monospace, monospace`;
-    ctx.textAlign='center'; ctx.textBaseline='alphabetic';
-    ctx.fillText(unitFmt(g.L), 0, -Math.max(2, hs*0.25));
-    ctx.restore();
-    ctx.textAlign='left';
+    if (hs >= TEXT_LEGIBLE_PX || isSel){               // the ticks still draw; the number would not read
+      ctx.save();
+      ctx.translate((A.x+B.x)/2, (A.y+B.y)/2); ctx.rotate(angS);
+      ctx.font=`${hs}px ui-monospace, monospace`;
+      ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+      ctx.fillText(unitFmt(g.L), 0, -Math.max(2, hs*0.25));
+      ctx.restore();
+      ctx.textAlign='left';
+    }
   }
   ctx.setLineDash([]); ctx.lineWidth = 1;
 }
