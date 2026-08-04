@@ -11,7 +11,7 @@ import { entities, setEntities, nextId, layers, setLayers, currentLayer, setCurr
          view, T, cmd, setCmd, lastCmdName, setLastCmdName, selection, curPt, setSnapMark,
          selRect, setSelRect, plotWin, setPlotWin, units, setUnits,
          setTrackGuides, layerVisible, layerUnlocked } from './state.js';
-import { findEntityAt, entInWindow, entBBox, snapCandidates, translateEnt, translateIds, mirrorEnt } from './entities.js';
+import { findEntityAt, entHitDist, entInWindow, entBBox, snapCandidates, translateEnt, translateIds, mirrorEnt } from './entities.js';
 import { query as spatialQuery } from './spatial.js';
 import { sink } from './bus.js';
 import { gridStep, s2w } from './viewport.js';
@@ -1278,9 +1278,38 @@ export function startEditText(e){
 }
 
 /* ---------- selection ---------- */
+/* Why did that click do nothing?
+   findEntityAt refuses hidden layers, locked layers and frozen imports, and
+   used to refuse them in silence. A client DWG arrives with most of its layers
+   locked by the file and its curves frozen, so "clicking does not select" is
+   the first thing that happens to a real drawing — and the board said nothing
+   at all. Only ever runs on a miss, and only speaks when something is there. */
+let lastMiss = null;
+function explainMiss(p){
+  const tol = 8/view.scale;
+  let best = null, bd = tol;
+  for (const e of spatialQuery(p.x-tol, p.y-tol, p.x+tol, p.y+tol)){
+    const d = entHitDist(e, p);
+    if (d <= bd){ bd = d; best = e; }
+  }
+  if (!best){ lastMiss = null; return; }               // empty space: nothing to explain
+
+  let msg;
+  if (!layerVisible(best.layer))
+    msg = `Nothing selectable there — layer "${best.layer}" is hidden. Turn it back on in the layer panel.`;
+  else if (!layerUnlocked(best.layer))
+    msg = `That object is on layer "${best.layer}", which is locked. Unlock it in the layer panel (click the layer name in the bar) to select it.`;
+  else if (best.frozen)
+    msg = 'That shape came in from a CAD file as an outline MiniCAD cannot edit yet (a spline, ellipse or filled region). Type THAW to release every imported shape for editing.';
+  else return;                                          // a real miss inside the tolerance
+
+  if (msg !== lastMiss){ log(msg); lastMiss = msg; }    // one click, one explanation
+}
+
 export function clickSelect(p, additive){
   const e = findEntityAt(p);
-  if (!e){ if(!additive) selection.clear(); return; }
+  if (!e){ explainMiss(p); if(!additive) selection.clear(); return; }
+  lastMiss = null;
   if (selection.has(e.id) && additive) selection.delete(e.id);
   else selection.add(e.id);
 }

@@ -175,6 +175,43 @@ const nm = row0.children.find(c=>c.className==='nm');
 check('a hostile layer name is set as text, not markup',
       !!nm && nm.textContent==='<img src=x onerror=1>' && row0._html==='');
 
+/* ===== a click that selects nothing has to say why =====
+   A client DWG arrives with its layers locked by the file and its curved
+   furniture frozen, so the first thing that happens on a real drawing is that
+   clicking a table does nothing. It used to do nothing silently. */
+S.setLayers([{name:'0', color:'#fff'},
+             {name:'RED-Mobiliário', color:'#fff', locked:true},
+             {name:'oculta', color:'#fff', off:true}]);
+S.setCurrentLayer('0');
+
+const clickAt = p => { S.selection.clear(); dom.logs.length = 0; C.clickSelect(p, false); };
+
+S.setEntities([{id:1, type:'line', layer:'RED-Mobiliário', x1:0, y1:0, x2:10, y2:0}]);
+clickAt({x:5, y:0});
+check('a locked layer refuses the click', S.selection.size === 0);
+check('…and names the layer and where to unlock it',
+      dom.logs.some(l => l.includes('RED-Mobiliário') && /locked/.test(l) && /layer panel/.test(l)));
+
+S.setEntities([{id:2, type:'pline', layer:'0', frozen:true, closed:true,
+                pts:[{x:0,y:0},{x:10,y:0},{x:10,y:10}]}]);
+clickAt({x:5, y:0});
+check('a frozen import refuses the click', S.selection.size === 0);
+check('…and says THAW releases it', dom.logs.some(l => /THAW/.test(l)));
+
+S.setEntities([{id:3, type:'line', layer:'oculta', x1:0, y1:0, x2:10, y2:0}]);
+clickAt({x:5, y:0});
+check('a hidden layer says so rather than nothing',
+      S.selection.size === 0 && dom.logs.some(l => /hidden/.test(l)));
+
+// empty space is not a mystery and must not chatter
+S.setEntities([{id:4, type:'line', layer:'0', x1:0, y1:0, x2:10, y2:0}]);
+clickAt({x:500, y:500});
+check('clicking empty space explains nothing', dom.logs.length === 0);
+
+// and the ordinary case still works
+clickAt({x:5, y:0});
+check('an ordinary object still selects, silently', S.selection.has(4) && dom.logs.length === 0);
+
 /* ===== one place to manage a layer =====
    The bar used to carry a <select> of every layer plus its own 👁 and 🔒, which
    duplicated the panel and, being current-layer-only, was how you ended up
