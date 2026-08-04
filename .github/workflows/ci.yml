@@ -14,6 +14,9 @@ on:
 jobs:
   ci:
     runs-on: ubuntu-latest
+    # bin/ci is ~30 s locally. Anything past this is wedged, not slow, and a
+    # wedged job would otherwise sit there burning runner minutes for hours.
+    timeout-minutes: 15
 
     services:
       postgres:
@@ -25,8 +28,24 @@ jobs:
           - 5432:5432
         options: --health-cmd="pg_isready" --health-interval=10s --health-timeout=5s --health-retries=3
 
+    # NOT DATABASE_URL. Rails merges that into the CURRENT environment's config
+    # only, and bin/ci spans three: bin/setup prepares development, the suite
+    # runs in test, the seeds step sets RAILS_ENV itself. db:test:prepare built
+    # its config from database.yml, found no host, and went looking for a Unix
+    # socket that does not exist on a runner. database.yml names no host at all,
+    # so libpq reads these instead — every step, every environment, over TCP.
     env:
-      DATABASE_URL: postgres://postgres:postgres@localhost:5432
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      # The suite is 70 tests in 3.5 s. Past 50 Rails forks a worker per core,
+      # and each one creates and schema-loads its own minicad_app_test-N — more
+      # setup than the run costs. It is also the one part of the suite that can
+      # HANG rather than fail: a worker that cannot make its database leaves the
+      # parent waiting on DRb forever, which is exactly what happened testing
+      # this workflow locally. Raise it when the suite is big enough to earn it.
+      PARALLEL_WORKERS: "1"
 
     steps:
       - name: Install packages
