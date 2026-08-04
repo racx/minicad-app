@@ -233,6 +233,23 @@ check('a hidden current layer is flagged — you can still draw on it',
       chip.textContent === 'DIVISA 🚫 🔒' && /nothing you draw will show/.test(chip.title));
 S.layerOf('DIVISA').off = false;
 
+/* the file's own locks, lifted in one go */
+S.setLayers([{name:'0', color:'#fff'},
+             {name:'RED-Piso hatch', color:'#fff', locked:true},
+             {name:'RED-Mobiliário', color:'#fff', locked:true},
+             {name:'livre', color:'#fff'}]);
+S.setCurrentLayer('0');
+dom.logs.length = 0;
+const unlockAll = dom.els.get('layAllUnlock');
+unlockAll.listeners.click.forEach(fn => fn({}));
+check('Unlock all clears every lock', S.layers.every(l => !l.locked));
+check('…and says how many it freed', dom.logs.some(l => /Unlocked 2 layers/.test(l)));
+
+dom.logs.length = 0;
+unlockAll.listeners.click.forEach(fn => fn({}));
+check('…and no-ops with a message when nothing is locked',
+      dom.logs.some(l => /No layer is locked/.test(l)));
+
 const panel = dom.els.get('layers');
 chip.listeners.click.forEach(fn => fn({}));
 check('clicking the chip opens the panel', panel.classList.contains('open'));

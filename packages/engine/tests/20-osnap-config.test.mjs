@@ -98,5 +98,42 @@ fireChange('osTrack');
 check('tracking checkbox drives SNAP_FLAGS', C.SNAP_FLAGS.tracking===false);
 $('osTrack').checked=true; fireChange('osTrack');
 
+/* ===== snapping belongs to point entry =====
+   The crosshair used to be magnetic all the time. On an imported plan that
+   yanks it around while you are only looking, and every mousemove paid for a
+   spatial query and a bucketful of candidate maths. A marker now appears when
+   a command is actually asking for a point. */
+reset();
+C.setSnapActive(C.SNAP_DEFAULTS);
+S.T.osnap = true;
+const seg = add(0, 0, 10, 0);                    // endpoint at (10,0) to snap to
+S.view.scale = 1; S.view.ox = 0; S.view.oy = 0;
+
+// world (10.4, 0.2) is inside the 11 px tolerance of that endpoint
+const move = (wx, wy) => dom.fire('mousemove', { clientX: wx, clientY: -wy });
+
+reset(); S.setEntities([seg]);
+move(10.4, 0.2);
+check('idle: no snap marker', S.snapMark === null);
+check('idle: the crosshair reads where the mouse actually is',
+      near(S.curPt.x, 10.4, 1e-6) && near(S.curPt.y, 0.2, 1e-6));
+
+C.startCommand('L');                             // now a command wants a point
+move(10.4, 0.2);
+check('drawing: the endpoint snap fires', !!S.snapMark && S.snapMark.k === 'end');
+check('…and the point is pulled onto it', near(S.curPt.x, 10, 1e-6) && near(S.curPt.y, 0, 1e-6));
+
+C.cancelCmd(true);
+move(10.4, 0.2);
+check('command cancelled: the marker goes away again', S.snapMark === null);
+
+// a step that wants a typed value, not a coordinate, must not snap either
+C.startCommand('L'); C.onPoint({x:0, y:0}); C.startCommand('T');
+C.onPoint({x:0, y:0});                           // TEXT: point → height → string
+move(10.4, 0.2);
+check('a height/string step does not snap', S.snapMark === null);
+C.cancelCmd(true);
+
+reset();
 C.setSnapActive(C.SNAP_DEFAULTS);
 finish();

@@ -4,7 +4,7 @@
 import { fmt } from '../../core/geometry.js';
 import { entities, setEntities, layers, currentLayer, setCurrentLayer, layerOf, snapshot,
          undoStack, view, T, cmd, selection, mouse, curPt, setCurPt, boxSel, setBoxSel,
-         setHoverSel, setHotGrip, units, unitFmt } from '../../core/state.js';
+         setHoverSel, setHotGrip, setSnapMark, setTrackGuides, units, unitFmt } from '../../core/state.js';
 import './plotui.js';                                   // print dialog wiring (self-registers)
 import './osnapui.js';                                  // object-snap dialog wiring (self-registers)
 import './hatchui.js';                                  // hatch material picker (self-registers)
@@ -19,6 +19,21 @@ import { saveJSON, openJSON, openDXF, openDWG, dxfExport, autosaveTick, restoreA
 /* focus() on an editable div leaves the caret wherever the browser last had it
    — at the start, for a field prefilled by EDITTEXT. Always type at the end. */
 function focusCmd(){ cmdInput.focus(); caretToEnd(cmdInput); }
+
+/* Is the board actually asking for a coordinate right now?
+   Object snap is a point-entry aid, so it belongs to point entry — AutoCAD only
+   shows a marker once a command wants a point. Snapping while merely moving the
+   mouse yanks the crosshair around a busy imported plan for no reason, and on
+   22,000 entities it also does a spatial query and a bucket of candidate maths
+   on every single mousemove. Dragging a selection or a grip counts: those are
+   point entry by another name. The step list matches the one mousedown uses to
+   decide whether a click IS a point — the two must agree. */
+function wantsAPoint(){
+  if (dragging) return true;
+  if (!cmd || cmd.name === 'PAN' || cmd.name === 'ZOOM') return false;
+  return cmd.step !== 'select' && cmd.step !== 'dist' && cmd.step !== 'height'
+      && cmd.step !== 'string' && cmd.step !== 'factor';
+}
 
 let panning = null;
 let spaceHeld = false;
@@ -63,8 +78,12 @@ cv.addEventListener('mousemove', ev=>{
       gripDrag.moved = true; snapshot();          // one undo step per grip edit
     }
     if (gripDrag.moved) applyGrip(gripDrag.ent, gripDrag.g, curPt);
-  } else {
+  } else if (wantsAPoint()){
     setCurPt(applyModifiers(s2w(mouse.sx, mouse.sy)));
+  } else {
+    // idle: no markers, no magnetism, and none of the work behind them
+    setSnapMark(null); setTrackGuides(null);
+    setCurPt(s2w(mouse.sx, mouse.sy));
   }
   const hov = (!cmd && !boxSel && !gripDrag && selection.size) ? findEntityAt(s2w(mouse.sx, mouse.sy)) : null;
   setHoverSel(!!dragging || !!(hov && selection.has(hov.id)));
@@ -319,6 +338,15 @@ layerListEl.addEventListener('click', ev=>{
 document.getElementById('layAllOn').addEventListener('click', ()=>{
   let n=0; for (const l of layers) if (l.off){ l.off=false; n++; }
   log(n ? `Turned ${n} layer${n>1?'s':''} back on.` : 'Every layer is already visible.', 'r');
+  refreshLayers(); draw();
+});
+/* The file's own locks, lifted in one go. A drawing that arrives with 118 of
+   its 130 layers locked is read-only in practice, and unlocking it row by row
+   is the kind of chore that makes people give up on the tool. */
+document.getElementById('layAllUnlock').addEventListener('click', ()=>{
+  let n=0; for (const l of layers) if (l.locked){ l.locked=false; n++; }
+  log(n ? `Unlocked ${n} layer${n>1?'s':''} — everything on them can be selected now.`
+        : 'No layer is locked.', 'r');
   refreshLayers(); draw();
 });
 document.getElementById('layIsolate').addEventListener('click', ()=>{

@@ -255,6 +255,9 @@
       <div id="layerList"></div>
       <footer>
         <button class="btn" id="layAllOn">Show all</button>
+        <!-- a client DWG arrives with most of its layers locked by the file,
+             which makes the whole drawing read-only one row at a time -->
+        <button class="btn" id="layAllUnlock">Unlock all</button>
         <button class="btn" id="layIsolate">Isolate current</button>
       </footer>
     </div>
@@ -323,7 +326,7 @@
         <tr><td>NEW</td><td>Start a fresh drawing (asks first)</td></tr>
         <tr><td>UNITS</td><td>What 1 drawing unit means: mm / cm / m (affects dims &amp; readout)</td></tr>
         <tr><td>PLOT / ⌘P</td><td>Print to scale: paper, 1:N or fit, print window, test page</td></tr>
-        <tr><td>LAYER chip</td><td>Names the layer you're drawing on; click it to hide, lock, delete or switch layers. Autosave runs every 5&nbsp;s.</td></tr>
+        <tr><td>LAYER chip</td><td>Names the layer you're drawing on; click it to hide, lock, unlock all, delete or switch layers. Autosave runs every 5&nbsp;s.</td></tr>
         <tr><td>Drag →</td><td>Window select (fully inside)</td></tr>
         <tr><td>Drag ←</td><td>Crossing select (touching)</td></tr>
       </table>
