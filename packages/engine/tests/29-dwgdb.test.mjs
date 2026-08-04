@@ -117,17 +117,44 @@ r = imp([{type:'INSERT', layer:'0', name:'B', insertionPoint:{x:100,y:50},
           xScale:2, yScale:2, rotation:Math.PI/2, columnCount:1, rowCount:1, attribs:[]}],
         {b:{name:'B', basePoint:{x:0,y:0},
             entities:[{type:'LINE', layer:'0', startPoint:{x:0,y:0}, endPoint:{x:10,y:0}}]}});
-let l = of(r,'line')[0];
-check('INSERT expands its block', of(r,'line').length===1);
-check('INSERT applies rotation (radians) + scale + position',
+// A block stays a block — see suite 26 for the same rule against the DXF
+// reader. A house plan's 400 chairs arrive as 400 references to one chair.
+let ii = of(r,'insert')[0];
+check('INSERT arrives as a reference to a definition',
+      of(r,'insert').length===1 && ii.name==='B' && !!r.blocks.B);
+check('…placed, scaled and turned (radians, not degrees)',
+      near(ii.x,100) && near(ii.y,50) && near(ii.s,2) && near(ii.rot, Math.PI/2, 1e-9));
+
+const E29 = await import('../js/core/entities.js');
+const S29 = await import('../js/core/state.js');
+S29.setBlocks(r.blocks);
+let l = E29.blockParts(ii)[0];
+check('and it draws where the flattened version used to',
       near(l.x1,100,1e-9) && near(l.y1,50,1e-9) && near(l.x2,100,1e-9) && near(l.y2,70,1e-9));
+S29.setBlocks({});
 
 r = imp([{type:'INSERT', layer:'0', name:'B', insertionPoint:{x:0,y:0}, xScale:1, yScale:1,
           rotation:0, columnCount:3, rowCount:1, columnSpacing:10, attribs:[]}],
         {b:{name:'B', basePoint:{x:0,y:0},
             entities:[{type:'LINE', layer:'0', startPoint:{x:0,y:0}, endPoint:{x:1,y:0}}]}});
-check('INSERT arrays repeat the block', of(r,'line').length===3);
-check('array spacing applied', near(of(r,'line')[2].x1, 20, 1e-9));
+check('INSERT arrays repeat the block', of(r,'insert').length===3);
+check('array spacing applied', near(of(r,'insert')[2].x, 20, 1e-9));
+
+// a mirrored insert (negative X scale) keeps its handedness as a flag
+r = imp([{type:'INSERT', layer:'0', name:'B', insertionPoint:{x:0,y:0},
+          xScale:-1, yScale:1, rotation:0, attribs:[]}],
+        {b:{name:'B', basePoint:{x:0,y:0},
+            entities:[{type:'LINE', layer:'0', startPoint:{x:0,y:0}, endPoint:{x:1,y:0}}]}});
+check('a negative X scale becomes a mirrored insert, not a distorted one',
+      of(r,'insert').length===1 && of(r,'insert')[0].mir === true);
+
+// unequal scales are the one thing the engine cannot hold, so they flatten
+r = imp([{type:'INSERT', layer:'0', name:'B', insertionPoint:{x:0,y:0},
+          xScale:2, yScale:5, rotation:0, attribs:[]}],
+        {b:{name:'B', basePoint:{x:0,y:0},
+            entities:[{type:'LINE', layer:'0', startPoint:{x:0,y:0}, endPoint:{x:10,y:0}}]}});
+check('a squashed insert is flattened rather than arriving wrong',
+      of(r,'insert').length===0 && near(of(r,'line')[0].x2, 20, 1e-9));
 
 r = imp([{type:'INSERT', layer:'0', name:'MISSING', insertionPoint:{x:0,y:0},
           xScale:1, yScale:1, rotation:0, attribs:[]}]);
@@ -203,9 +230,24 @@ check('an ordinary empty block is not mistaken for an xref',
 /* ===== the real house slice ===== */
 const doc = W.dwgDocToIR(slice);
 const house = M.importDoc(doc);
-check('the real house slice produces geometry', house.entities.length > 100);
-check('its blocks expanded (more entities out than model-space records in)',
-      house.entities.length > 40);
+check('the real house slice produces geometry', house.entities.length > 40);
+// The point of keeping blocks: the SAME drawing, out of fewer objects. This
+// slice used to flatten to 100+ entities; it is now 77, of which 18 are
+// references to 12 definitions, and the geometry you can see is unchanged.
+S29.setBlocks(house.blocks);
+const inserts = house.entities.filter(e => e.type === 'insert');
+const drawn = house.entities.length - inserts.length +
+              inserts.reduce((n, e) => n + E29.blockParts(e).length, 0);
+check('its blocks came through as symbols, not as loose lines',
+      Object.keys(house.blocks).length > 5 && inserts.length > 5);
+// Flattening this slice produced exactly 127 objects. Keeping the blocks must
+// draw the same 127 — no more, no less — out of 77 stored ones. Losing a few
+// would mean a definition failed to resolve a nested insert, which is exactly
+// the bug this number caught while it was being written.
+check('…and expand to precisely the geometry flattening produced', drawn === 127);
+check('…so the same drawing costs 77 objects instead of 127',
+      house.entities.length === 77);
+S29.setBlocks({});
 check('nothing in it is unreadable', Object.keys(house.report.skipped).length===0);
 check('its layers came through', house.layers.length > 20);
 check('it reports inches and keeps the numbers', house.report.foreignUnit==='inches');

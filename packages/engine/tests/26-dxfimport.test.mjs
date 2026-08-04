@@ -84,17 +84,47 @@ r = imp(wrap([], [],
    '0','LINE','8','0','10','0','20','0','11','10','21','0',
    '0','ENDBLK'],
   ['0','INSERT','8','0','2','B','10','100','20','50','41','2','42','2','50','90']));
-const il = one(r,'line');
-check('INSERT expands the block into a real entity', r.entities.length===1);
-check('INSERT applies scale + rotation + position',
+// A block stays a block: the drawing gets a definition plus a reference, not
+// the flattened lines it used to get. A client plan with 400 chairs arrives as
+// 400 references to one chair.
+const ii = one(r,'insert');
+check('INSERT arrives as a reference to a definition',
+      r.entities.length===1 && ii.name==='B' && !!r.blocks.B);
+check('…placed, scaled and turned', near(ii.x,100) && near(ii.y,50) && near(ii.s,2) &&
+      near(ii.rot, Math.PI/2, 1e-9));
+check('…and the definition is in its OWN coordinates, not the world',
+      near(r.blocks.B.ents[0].x2, 10, 1e-9));
+// layer 0 inside a block means "whatever the insert is on" — so it is dropped
+// here and filled in when the insert expands
+check('geometry drawn on layer 0 inside a block inherits the insert\'s layer',
+      r.blocks.B.ents[0].layer === undefined);
+
+// what it expands to is still exactly where the old flattening put it
+const E26 = await import('../js/core/entities.js');
+const S26 = await import('../js/core/state.js');
+S26.setBlocks(r.blocks);
+const il = E26.blockParts(ii)[0];
+check('and it draws where the flattened version used to',
       near(il.x1,100,1e-9) && near(il.y1,50,1e-9) && near(il.x2,100,1e-9) && near(il.y2,70,1e-9));
+S26.setBlocks({});
 
 r = imp(wrap([], [],
   ['0','BLOCK','2','B','10','0','20','0',
    '0','LINE','8','0','10','0','20','0','11','1','21','0','0','ENDBLK'],
   ['0','INSERT','8','0','2','B','10','0','20','0','70','3','44','10']));
-check('INSERT column array repeats the block', of(r,'line').length===3);
-check('array spacing applied', near(of(r,'line')[2].x1,20,1e-9));
+check('INSERT column array repeats the block', of(r,'insert').length===3);
+check('array spacing applied', near(of(r,'insert')[2].x, 20, 1e-9));
+
+// Non-uniform scale is the one placement MiniCAD cannot express — a squashed
+// circle is an ellipse, which it has no editable form for — so those still
+// flatten to geometry rather than arriving distorted.
+r = imp(wrap([], [],
+  ['0','BLOCK','2','B','10','0','20','0',
+   '0','LINE','8','0','10','0','20','0','11','10','21','0','0','ENDBLK'],
+  ['0','INSERT','8','0','2','B','10','0','20','0','41','2','42','5']));
+check('a squashed insert is flattened instead of arriving wrong',
+      of(r,'insert').length===0 && of(r,'line').length===1);
+check('…with the squash actually applied', near(of(r,'line')[0].x2, 20, 1e-9));
 
 r = imp(ents('0','INSERT','8','0','2','MISSING','10','0','20','0'));
 check('INSERT of an undefined block is reported, not crashed',

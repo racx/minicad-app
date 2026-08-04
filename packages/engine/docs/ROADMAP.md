@@ -2,7 +2,7 @@
 
 **Single source of truth** for what exists, how complete it is, and what comes next.
 Evidence-based: every claim below cites `file:line` in the codebase as of commit `536d7c7`.
-Verified against the test suite: `node tests/run.mjs` → **36 suites, 939 checks, all passing** (2026-08-04).
+Verified against the test suite: `node tests/run.mjs` → **36 suites, 949 checks, all passing** (2026-08-04).
 
 Update this file whenever a feature lands or a decision changes the plan.
 
@@ -272,8 +272,17 @@ as a shape one segment short of shut.
   inserts to geometry rather than writing BLOCK/INSERT records — the drawing is identical but
   arrives as loose lines, and the BLOCKS machinery dimensions already use is the place to
   start; no symbol LIBRARY (doors, windows, furniture ship with nothing — you define your
-  own); imported DWG/DXF blocks are still expanded to world geometry on the way in rather
-  than becoming definitions.
+  own).
+- ~~Imported blocks flattened on the way in~~ ✅ **fixed 2026-08-04**: both readers emit block
+  definitions in the IR (`blockdefs`) and inserts as references, and `cadimport` maps a
+  definition by importing it as a small drawing of its own — same mapping, same freezing, one
+  level down. Kept only when the placement is expressible: equal scale magnitudes (signs are
+  mirroring, which the engine has) inside a matrix that has not already squashed it. Anything
+  else still flattens, so a distorted block arrives as correct loose lines rather than as a
+  wrong symbol. Layer `0` inside a definition means "the insert's layer", so it is dropped on
+  import and filled in at expansion. On the real house slice: **the same 127 objects of
+  geometry, held as 77** — parity asserted exactly, because a definition failing to resolve a
+  nested insert shows up as nothing but a slightly smaller number.
 
 ### Non-goals (deliberate)
 3D, paper space/viewports, xrefs, splines/ellipses, hatching, plot styles — out of scope

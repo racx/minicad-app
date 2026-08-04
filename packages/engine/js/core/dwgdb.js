@@ -109,6 +109,24 @@ function hatchShapes(e, layer, m, out, report){
   }
 }
 
+/* A DWG block → an IR definition, read once in its own coordinates. Same
+   contract as dxf.js defineIRBlock: false means "not usable as a definition",
+   and the caller flattens instead. */
+function defineIRBlock(name, blocks, out, report, depth){
+  out.defs ||= {};
+  if (out.defs[name]) return true;
+  const blk = blocks.get(name);
+  if (!blk) return false;
+  const base = P(blk.basePoint);
+  out.defs[name] = {base, shapes:[]};       // claimed first, so a self-reference stops
+  const inner = [];
+  inner.defs = out.defs;
+  toShapes(blk.entities || [], blocks, [1,0,0,1,0,0], depth+1, inner, report);
+  if (!inner.length){ delete out.defs[name]; return false; }
+  out.defs[name].shapes = inner;
+  return true;
+}
+
 /* ---------- entity list → IR ---------- */
 function toShapes(ents, blocks, m, depth, out, report){
   for (const e of ents){
@@ -208,10 +226,29 @@ function toShapes(ents, blocks, m, depth, out, report){
         const cs = e.columnSpacing || 0, rs = e.rowSpacing || 0;
         const ins = P(e.insertionPoint), base = P(blk.basePoint);
         const co = Math.cos(rot), si = Math.sin(rot);
-        for (let cx=0; cx<cols; cx++) for (let ry=0; ry<rows; ry++){
-          const local = xfMul([co,si,-si,co, ins.x + cx*cs, ins.y + ry*rs],
-                              [sx,0,0,sy, -base.x*sx, -base.y*sy]);
-          toShapes(blk.entities || [], blocks, xfMul(m, local), depth+1, out, report);
+
+        // Keep it as a symbol when MiniCAD can express the placement exactly:
+        // equal scales (their signs are mirroring, which it has) inside a
+        // matrix that has not already squashed it. See dxf.js for the whole
+        // argument — this is the same rule against the other reader.
+        const uniform = Math.abs(Math.abs(sx) - Math.abs(sy)) < 1e-9 && Math.abs(sx) > 1e-12;
+        if (uniform && xfUniform(m) && defineIRBlock(e.name, blocks, out, report, depth)){
+          const mir = (sx < 0) !== (sy < 0);
+          const extra = sy < 0 ? Math.PI : 0;
+          for (let cx=0; cx<cols; cx++) for (let ry=0; ry<rows; ry++){
+            const q = xfPt(m, {x: ins.x + cx*cs, y: ins.y + ry*rs});
+            const sh = {k:'insert', layer, name:e.name, p:q,
+                        s: Math.abs(sx) * xfScale(m),
+                        rot: normAng(rot + extra + xfRot(m))};
+            if (mir) sh.mir = true;
+            push(sh);
+          }
+        } else {
+          for (let cx=0; cx<cols; cx++) for (let ry=0; ry<rows; ry++){
+            const local = xfMul([co,si,-si,co, ins.x + cx*cs, ins.y + ry*rs],
+                                [sx,0,0,sy, -base.x*sx, -base.y*sy]);
+            toShapes(blk.entities || [], blocks, xfMul(m, local), depth+1, out, report);
+          }
         }
       }
       // ATTRIBs travel with the instance and are already in world coordinates
@@ -274,6 +311,7 @@ export function dwgDocToIR(db){
   toShapes(ents, blocks, [1,0,0,1,0,0], 0, shapes, report);
 
   return {shapes, layers, missingRefs,
+          blockdefs: shapes.defs || null,        // symbols the drawing brought with it
           units: INSUNITS[code] || null,
           foreignUnit: (!INSUNITS[code] && UNIT_NAME[code]) || null,
           skipped: report.skipped, hatch: report.hatch};

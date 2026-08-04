@@ -48,7 +48,7 @@ function loadDoc(doc, name, what){
   const res = importDoc(doc);
   if (!res.entities.length){ log(`That ${what} has nothing MiniCAD can draw in it.`, 'e'); return false; }
   snapshot();
-  setLayers(res.layers); setBlocks({}); setEntities(res.entities); setIdSeq(res.idSeq);
+  setLayers(res.layers); setBlocks(res.blocks || {}); setEntities(res.entities); setIdSeq(res.idSeq);
   if (res.units) setUnits(res.units);
   setCurrentLayer((res.layers.find(l=>!l.locked && !l.off) || res.layers[0]).name);
   refreshLayers(); selection.clear(); zoomExtents();

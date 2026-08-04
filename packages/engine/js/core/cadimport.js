@@ -183,7 +183,7 @@ export function materialFor(s){
 }
 
 /* ---------- IR → MiniCAD ---------- */
-export function importDoc(doc){
+export function importDoc(doc, nested = false, known = null){
   const entities = [];
   const seen = new Map();                          // layer name → layer object
   let id = 1;
@@ -191,7 +191,29 @@ export function importDoc(doc){
                   hatch:doc.hatch || 0, filled:0, foreignUnit:doc.foreignUnit || null,
                   missingRefs:doc.missingRefs || []};
 
-  for (const l of doc.layers) if (!seen.has(l.name)) seen.set(l.name, {...l});
+  for (const l of doc.layers || []) if (!seen.has(l.name)) seen.set(l.name, {...l});
+
+  /* ---- block definitions ----
+     A definition is a small drawing, so it is imported as one: the same
+     mapping, the same freezing rules, the same hatch handling, one level down.
+     Anything the file drew on layer 0 inside a block INHERITS the layer of the
+     insert — that is what layer 0 means in a block — so the layer is dropped
+     here and filled in at expansion time. */
+  const blocks = {};
+  // Every definition's name is known before any of them is built: a block that
+  // contains another block must resolve its child even though that child has
+  // not been mapped yet, and definitions come in no particular order.
+  const names = known || new Set(Object.keys(doc.blockdefs || {}));
+  for (const [name, def] of Object.entries(doc.blockdefs || {})){
+    const sub = importDoc({shapes: def.shapes, layers: [], skipped: {}}, true, names);
+    if (!sub.entities.length) continue;
+    for (const e of sub.entities) if (e.layer === '0') delete e.layer;
+    for (const l of sub.layers) if (!seen.has(l.name) && l.name !== '0') seen.set(l.name, {...l});
+    blocks[name] = {base: {...def.base}, ents: sub.entities};
+    report.native += sub.report.native;
+    report.frozen += sub.report.frozen;
+  }
+  report.blocks = Object.keys(blocks).length;
 
   const layerFor = name => {
     if (!seen.has(name)) seen.set(name, {name, color:'#e8e8e8'});
@@ -306,9 +328,19 @@ export function importDoc(doc){
     else if (s.k==='solid'){
       freezePoly(s.pts, true, s.layer);
     }
+    else if (s.k==='insert'){
+      if (!names.has(s.name)){ bumpSkip(report, `INSERT ${s.name}`); continue; }
+      const e = {type:'insert', layer:layerFor(s.layer), name:s.name, x:s.p.x, y:s.p.y};
+      if (s.s && Math.abs(s.s - 1) > 1e-12) e.s = s.s;
+      if (s.rot) e.rot = normAng(s.rot);
+      if (s.mir) e.mir = true;
+      add(e, false, s);
+    }
     // POINT: no MiniCAD equivalent and nothing visible to lose — most are
     // AutoCAD's invisible dimension "Defpoints". Dropped without a fuss.
   }
+
+  if (nested) return {entities, layers:[...seen.values()], blocks, units:doc.units, idSeq:id, report};
 
   const layers = [...seen.values()];
   const used = new Set(entities.map(e=>e.layer));
@@ -329,7 +361,7 @@ export function importDoc(doc){
     else layers.unshift({name:'0', color:'#e8e8e8'});
   }
   report.layers = layers.length;
-  return {entities, layers, units:doc.units, idSeq:id, report};
+  return {entities, layers, blocks, units:doc.units, idSeq:id, report};
 }
 
 function bumpSkip(report, t){ report.skipped[t] = (report.skipped[t]||0) + 1; }
@@ -434,6 +466,9 @@ export function reportLines(r, name){
   if (r.frozen)
     out.push(`${r.frozen} curved/complex objects came in as approximations — they stay on their own layers and you can see, hide and snap to them, ` +
              `but clicks pass through so you can't nudge them by accident. Type THAW to make them editable.`);
+  if (r.blocks)
+    out.push(`${r.blocks} symbol${r.blocks>1?'s':''} (blocks) came through as symbols rather than loose lines — ` +
+             `type INSERT to place another copy of any of them, or EXPLODE one to edit just that copy.`);
   if (r.foreignUnit)
     out.push(`That file says it is drawn in ${r.foreignUnit}, which MiniCAD doesn't have — ` +
              `the numbers were kept exactly as they are. Type UNITS to say what 1 unit means.`)

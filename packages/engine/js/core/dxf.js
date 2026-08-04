@@ -231,6 +231,29 @@ function hatchLoops(r){
   return loops;
 }
 
+/* Turn a DXF block into an IR definition, once, the first time an insert
+   asks for it. Its contents are read with the IDENTITY matrix — a definition
+   is in its own coordinates, and the placement lives on each insert instead.
+   Nested inserts inside it stay inserts (the engine composes them), so this
+   is where the importer stops flattening a plan into loose lines.
+
+   Returns false if the block cannot be a definition after all, and the caller
+   falls back to expanding it. */
+function defineIRBlock(name, blocks, out, report, depth){
+  out.defs ||= {};
+  if (out.defs[name]) return true;
+  const blk = blocks[name];
+  if (!blk) return false;
+  out.defs[name] = {base:{x:blk.base.x, y:blk.base.y}, shapes:[]};  // claim it first: a
+  // block that reaches itself must find the entry already there and stop
+  const inner = [];
+  inner.defs = out.defs;
+  toShapes(blk.recs, blocks, [1,0,0,1,0,0], depth+1, inner, report);
+  if (!inner.length){ delete out.defs[name]; return false; }        // nothing drawable in it
+  out.defs[name].shapes = inner;
+  return true;
+}
+
 function toShapes(recs, blocks, m, depth, out, report){
   for (let i=0; i<recs.length; i++){
     const r = recs[i];
@@ -376,6 +399,31 @@ function toShapes(recs, blocks, m, depth, out, report){
       const cs = g(r,44,0), rs = g(r,45,0);
       const ins = P(r,10,20);
       const co = Math.cos(rot), si = Math.sin(rot);
+
+      /* Keep it as a symbol if MiniCAD can express this placement exactly.
+         It can when the two scales match in size (their signs are mirroring,
+         which it does have) and the matrix it sits in is itself a similarity —
+         i.e. nothing above has already squashed it. Everything else is still
+         expanded to loose geometry, which is what the whole importer did
+         before: a door that arrives as lines is worse than one that arrives as
+         a reusable block, but far better than one that arrives distorted. */
+      const uniform = Math.abs(Math.abs(sx) - Math.abs(sy)) < 1e-9 && Math.abs(sx) > 1e-12;
+      if (uniform && xfUniform(m) && defineIRBlock(name, blocks, out, report, depth)){
+        // sign of each scale is a reflection: one negative = mirrored, both
+        // negative = turned through 180° instead
+        const mir = (sx < 0) !== (sy < 0);
+        const extra = sy < 0 ? Math.PI : 0;
+        for (let cx=0; cx<cols; cx++) for (let ry=0; ry<rows; ry++){
+          const q = xfPt(m, {x: ins.x + cx*cs, y: ins.y + ry*rs});
+          const sh = {k:'insert', layer, name, p:q,
+                      s: Math.abs(sx) * xfScale(m),
+                      rot: normAng(rot + extra + xfRot(m))};
+          if (mir) sh.mir = true;
+          push(sh);
+        }
+        continue;
+      }
+
       for (let cx=0; cx<cols; cx++) for (let ry=0; ry<rows; ry++){
         const ox = ins.x + cx*cs, oy = ins.y + ry*rs;
         // local → block-base-relative → scale → rotate → insert point, then the parent matrix
@@ -523,6 +571,7 @@ export function parseDXF(text){
 
   return {
     shapes, layers, missingRefs,
+    blockdefs: shapes.defs || null,        // symbols the drawing brought with it
     units: INSUNITS[code] || null,
     foreignUnit: (!INSUNITS[code] && UNIT_NAME[code]) || null,
     skipped: report.skipped,
