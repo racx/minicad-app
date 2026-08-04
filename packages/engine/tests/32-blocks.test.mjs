@@ -210,11 +210,47 @@ check('a saved drawing carries its definitions', !!S.blockDef('chair'));
 check('…so the insert still draws after a reload',
       E.blockParts(S.entities[0]).length === 2 && near(E.blockParts(S.entities[0])[0].x2, 7));
 
-// DXF export: written as geometry, because half-right structure is worse
-const dxf = W.buildDXF({entities:S.entities, layers:S.layers, units:'cm',
-                        expandInsert: E.blockParts});
-check('DXF export writes the block as its geometry', (dxf.match(/\nLINE\r?\n/g) || []).length === 2);
-check('…and never emits an entity type AutoCAD would not know',
-      !dxf.includes('\ninsert\n'));
+/* ===== 8. exported DXF keeps them as symbols ===== */
+const D = await import('../js/core/dxf.js');
+const M = await import('../js/core/cadimport.js');
+
+reset();
+S.setBlocks({ chair: { base:{x:0, y:0}, ents:[
+  {id:1, type:'line', layer:'0', x1:0, y1:0, x2:2, y2:0},
+  {id:2, type:'line', layer:'0', x1:0, y1:0, x2:0, y2:1}]}});
+S.setEntities([
+  {id:1, type:'insert', name:'chair', x:3, y:4, s:2, layer:'0'},
+  {id:2, type:'insert', name:'chair', x:9, y:0, rot:Math.PI/2, mir:true, layer:'0'},
+]);
+let dxf = W.buildDXF({entities:S.entities, layers:S.layers, units:'cm', blocks:S.blocks});
+
+check('a BLOCK is declared, not flattened', dxf.includes('\nchair\n'));
+check('…with a BLOCK_RECORD to own it', (dxf.match(/\nBLOCK_RECORD\r?\n/g) || []).length >= 3);
+check('…and the placements are INSERTs', (dxf.match(/\nINSERT\r?\n/g) || []).length === 2);
+check('…so the geometry is written ONCE, not per copy',
+      (dxf.match(/\nLINE\r?\n/g) || []).length === 2);
+
+// read our own file back: the round trip is the real proof
+let back = M.importDoc(D.parseDXF(dxf));
+check('re-reading it gives back two references, not four lines',
+      back.entities.filter(e => e.type === 'insert').length === 2 &&
+      Object.keys(back.blocks).length === 1);
+S.setBlocks(back.blocks);
+const a = back.entities.find(e => near(e.x, 3)), b2 = back.entities.find(e => near(e.x, 9));
+check('scale survives the trip', near(a.s, 2));
+check('rotation survives the trip', near(b2.rot, Math.PI/2, 1e-9));
+check('and so does handedness — a mirrored door still opens the other way',
+      b2.mir === true);
+const arm = E.blockParts(a)[0];
+check('the geometry lands where it did before exporting',
+      near(arm.x1, 3) && near(arm.y1, 4) && near(arm.x2, 7));
+
+// a block whose definition went missing must still export as a drawing
+reset();
+S.setEntities([{id:1, type:'insert', name:'ghost', x:0, y:0, layer:'0'}]);
+dxf = W.buildDXF({entities:S.entities, layers:S.layers, units:'cm',
+                  blocks:{}, expandInsert: E.blockParts});
+check('an insert with no definition exports as nothing, not as a broken reference',
+      !dxf.includes('\nINSERT\r?\n') && dxf.includes('ENDSEC'));
 
 finish();

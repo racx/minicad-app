@@ -2,7 +2,7 @@
 
 **Single source of truth** for what exists, how complete it is, and what comes next.
 Evidence-based: every claim below cites `file:line` in the codebase as of commit `536d7c7`.
-Verified against the test suite: `node tests/run.mjs` → **36 suites, 949 checks, all passing** (2026-08-04).
+Verified against the test suite: `node tests/run.mjs` → **36 suites, 957 checks, all passing** (2026-08-04).
 
 Update this file whenever a feature lands or a decision changes the plan.
 
@@ -268,11 +268,16 @@ as a shape one segment short of shut.
   time (`R(p)·M(p)·R(c)·M(c) = R(p ∓ c)·M(p xor c)` — a reflection reverses any rotation applied
   after it), depth-capped at 8 and cycle-guarded, so a block containing itself expands once and
   stops rather than hanging the tab.
-  **Still open:** DXF export flattens
-  inserts to geometry rather than writing BLOCK/INSERT records — the drawing is identical but
-  arrives as loose lines, and the BLOCKS machinery dimensions already use is the place to
-  start; no symbol LIBRARY (doors, windows, furniture ship with nothing — you define your
-  own).
+  **DXF export writes real BLOCK/INSERT 2026-08-04**: a `BLOCK_RECORD` and a `BLOCK…ENDBLK`
+  per definition (contents in the definition's own coordinates, base point in group 10),
+  `INSERT` per placement with 41/42/43 and 50; mirroring is a negative X scale, which is where
+  the engine's `mir` flag came from. Names are sanitised for DXF and de-duplicated. Nested
+  definitions are pulled in transitively — a block written without the block it contains opens
+  with a hole in it. Audited: **0 errors / 0 fixes under ezdxf** with nested, mirrored and
+  dimensioned content in one file, and the mirrored insert explodes to the same coordinates in
+  ezdxf as in MiniCAD. An insert whose definition is missing falls back to flattened geometry.
+  **Still open:** no symbol LIBRARY (doors, windows, furniture ship with nothing — you define
+  your own).
 - ~~Imported blocks flattened on the way in~~ ✅ **fixed 2026-08-04**: both readers emit block
   definitions in the IR (`blockdefs`) and inserts as references, and `cadimport` maps a
   definition by importing it as a small drawing of its own — same mapping, same freezing, one

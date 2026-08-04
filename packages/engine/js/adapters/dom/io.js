@@ -137,7 +137,7 @@ export function clearAutosave(){
 }
 
 export function dxfExport(){
-  const dxf = buildDXF({entities, layers, units, expandInsert: blockParts});
+  const dxf = buildDXF({entities, layers, units, blocks, expandInsert: blockParts});
   download('drawing.dxf', dxf, 'application/dxf');
   const n = entities.filter(e=>e.type==='hatch').length;
   log(`Exported drawing.dxf (${entities.length} objects${n?`, ${n} hatches`:''}) — ` +

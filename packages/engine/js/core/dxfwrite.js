@@ -26,14 +26,15 @@ function handles(){
   return () => (++n).toString(16).toUpperCase();
 }
 
-export function buildDXF({entities = [], layers = [], units = 'cm', expandInsert = null} = {}){
-  // Blocks are written as the geometry they stand for. A real BLOCK/INSERT pair
-  // would keep them reusable in the receiving CAD, and this file already has
-  // the BLOCKS machinery for dimensions to borrow — but geometry that is right
-  // beats structure that is half right, so until that is built and audited an
-  // insert is flattened. The drawing looks identical; it just arrives as parts.
-  if (expandInsert && entities.some(e => e.type === 'insert'))
-    entities = entities.flatMap(e => e.type === 'insert' ? expandInsert(e) : [e]);
+export function buildDXF({entities = [], layers = [], units = 'cm',
+                          blocks = {}, expandInsert = null} = {}){
+  // An insert is written as a real BLOCK/INSERT pair so it stays a symbol in
+  // whatever opens the file. Only if its definition is missing does it fall
+  // back to being flattened into loose geometry — better a correct drawing
+  // than a reference to nothing.
+  if (entities.some(e => e.type === 'insert' && !blocks[e.name]))
+    entities = entities.flatMap(e =>
+      (e.type === 'insert' && !blocks[e.name]) ? (expandInsert ? expandInsert(e) : []) : [e]);
 
   const L = [];
   const p = (...a) => { for (const v of a) L.push(typeof v === 'number' ? f(v) : esc(String(v))); };
@@ -119,46 +120,48 @@ export function buildDXF({entities = [], layers = [], units = 'cm', expandInsert
   const dims = entities.filter(e => e.type === 'dim')
     .map((e, i) => ({e, name: '*D' + i, rec: h(), blk: h()}));
 
-  table('BLOCK_RECORD', hBLKREC, 2 + dims.length, () => {
+  /* Every definition reachable from a placed insert, nested ones included —
+     a block written without the block it contains is a file that opens with a
+     hole in it. DXF names are stricter than ours, so they are sanitised once
+     and remembered. */
+  const blockRefs = new Map();
+  const dxfNames = new Set();
+  const claim = name => {
+    if (blockRefs.has(name) || !blocks[name]) return;
+    let dxfName = String(name).replace(/[^A-Za-z0-9_$.-]/g, '_').slice(0, 250) || 'BLOCK';
+    while (dxfNames.has(dxfName.toUpperCase())) dxfName += '_';
+    dxfNames.add(dxfName.toUpperCase());
+    blockRefs.set(name, {dxfName, rec: h(), blk: h(), def: blocks[name]});
+    for (const q of blocks[name].ents || []) if (q.type === 'insert') claim(q.name);
+  };
+  for (const e of entities) if (e.type === 'insert') claim(e.name);
+
+  table('BLOCK_RECORD', hBLKREC, 2 + dims.length + blockRefs.size, () => {
     for (const [name, hh] of [['*Model_Space', hMS], ['*Paper_Space', hPS]])
       p('0','BLOCK_RECORD','5',hh,'330',hBLKREC,'100','AcDbSymbolTableRecord','100','AcDbBlockTableRecord',
         '2',name,'70',0,'280',1,'281',0);
     for (const d of dims)
       p('0','BLOCK_RECORD','5',d.rec,'330',hBLKREC,'100','AcDbSymbolTableRecord','100','AcDbBlockTableRecord',
         '2',d.name,'70',0,'280',1,'281',0);
+    for (const b of blockRefs.values())
+      p('0','BLOCK_RECORD','5',b.rec,'330',hBLKREC,'100','AcDbSymbolTableRecord','100','AcDbBlockTableRecord',
+        '2',b.dxfName,'70',0,'280',1,'281',0);
   });
   p('0','ENDSEC');
 
-  /* ---------- blocks ---------- */
-  p('0','SECTION','2','BLOCKS');
-  for (const [name, owner] of [['*Model_Space', hMS], ['*Paper_Space', hPS]]){
-    const hb = h();
-    p('0','BLOCK','5',hb,'330',owner,'100','AcDbEntity','8','0','100','AcDbBlockBegin',
-      '2',name,'70',0,'10',0,'20',0,'30',0,'3',name,'1','');
-    p('0','ENDBLK','5',h(),'330',owner,'100','AcDbEntity','8','0','100','AcDbBlockEnd');
-  }
-  for (const d of dims){
-    p('0','BLOCK','5',d.blk,'330',d.rec,'100','AcDbEntity','8', d.e.layer || '0','100','AcDbBlockBegin',
-      '2',d.name,'70',1,'10',0,'20',0,'30',0,'3',d.name,'1','');
-    dimGraphics(p, h, d.rec, d.e);
-    p('0','ENDBLK','5',h(),'330',d.rec,'100','AcDbEntity','8', d.e.layer || '0','100','AcDbBlockEnd');
-  }
-  p('0','ENDSEC');
-
-  /* ---------- entities ---------- */
-  p('0','SECTION','2','ENTITIES');
-
   // common preamble for every entity: handle, owner, layer, and the author's
   // lineweight when they set one
-  const head = (type, e, subclass) => {
-    p('0', type, '5', h(), '330', hMS, '100', 'AcDbEntity', '8', e.layer || '0');
+  const headFor = owner => (type, e, subclass) => {
+    p('0', type, '5', h(), '330', owner, '100', 'AcDbEntity', '8', e.layer || '0');
     if (e.lw) p('370', lwCode(e.lw));
     p('100', subclass);
   };
 
-  const byId = new Map(entities.map(e => [e.id, e]));
-
-  for (const e of entities){
+  /* One entity, written under whichever owner asked for it — model space, or a
+     block definition. `lookup` resolves a hatch's boundary within the same
+     scope, because ids inside a definition are the definition's own. */
+  const writeEntity = (e, owner, lookup) => {
+    const head = headFor(owner);
     if (e.type === 'line'){
       head('LINE', e, 'AcDbLine');
       p('10',e.x1,'20',e.y1,'30',0,'11',e.x2,'21',e.y2,'31',0);
@@ -186,14 +189,60 @@ export function buildDXF({entities = [], layers = [], units = 'cm', expandInsert
       p('100','AcDbText');
     }
     else if (e.type === 'hatch'){
-      const b = byId.get(e.ref);
+      const b = lookup.get(e.ref);
       if (b) writeHatch(p, head, e, b);
+    }
+    else if (e.type === 'insert'){
+      const b = blockRefs.get(e.name);
+      if (!b) return;                              // definition missing: nothing to say
+      head('INSERT', e, 'AcDbBlockReference');
+      p('2', b.dxfName);
+      p('10', e.x, '20', e.y, '30', 0);
+      // mirroring is a negative X scale, which is where MiniCAD's `mir` came
+      // from in the first place
+      const sc = e.s || 1;
+      p('41', e.mir ? -sc : sc, '42', sc, '43', sc);
+      if (e.rot) p('50', D(e.rot));
     }
     else if (e.type === 'dim'){
       const d = dims.find(x => x.e === e);
       if (d) writeDim(p, head, e, d.name);
     }
+  };
+
+
+  /* ---------- blocks ---------- */
+  p('0','SECTION','2','BLOCKS');
+  for (const [name, owner] of [['*Model_Space', hMS], ['*Paper_Space', hPS]]){
+    const hb = h();
+    p('0','BLOCK','5',hb,'330',owner,'100','AcDbEntity','8','0','100','AcDbBlockBegin',
+      '2',name,'70',0,'10',0,'20',0,'30',0,'3',name,'1','');
+    p('0','ENDBLK','5',h(),'330',owner,'100','AcDbEntity','8','0','100','AcDbBlockEnd');
   }
+  for (const d of dims){
+    p('0','BLOCK','5',d.blk,'330',d.rec,'100','AcDbEntity','8', d.e.layer || '0','100','AcDbBlockBegin',
+      '2',d.name,'70',1,'10',0,'20',0,'30',0,'3',d.name,'1','');
+    dimGraphics(p, h, d.rec, d.e);
+    p('0','ENDBLK','5',h(),'330',d.rec,'100','AcDbEntity','8', d.e.layer || '0','100','AcDbBlockEnd');
+  }
+  // the user's own blocks. Contents stay in the definition's coordinates and
+  // group 10 carries the base point, which is what the insert lines up with.
+  for (const b of blockRefs.values()){
+    const ents = b.def.ents || [];
+    const base = b.def.base || {x:0, y:0};
+    p('0','BLOCK','5',b.blk,'330',b.rec,'100','AcDbEntity','8','0','100','AcDbBlockBegin',
+      '2',b.dxfName,'70',0,'10',base.x,'20',base.y,'30',0,'3',b.dxfName,'1','');
+    const scope = new Map(ents.map(q => [q.id, q]));
+    for (const q of ents) writeEntity(q, b.rec, scope);
+    p('0','ENDBLK','5',h(),'330',b.rec,'100','AcDbEntity','8','0','100','AcDbBlockEnd');
+  }
+  p('0','ENDSEC');
+
+  /* ---------- entities ---------- */
+  p('0','SECTION','2','ENTITIES');
+
+  const byId = new Map(entities.map(e => [e.id, e]));
+  for (const e of entities) writeEntity(e, hMS, byId);
   p('0','ENDSEC');
 
   /* ---------- objects ----------
