@@ -11,7 +11,8 @@ import './hatchui.js';                                  // hatch material picker
 import { findEntityAt, translateIds, entGrips, applyGrip } from '../../core/entities.js';
 import { cv, s2w, w2s, draw, resize, zoomExtents, RULER_PX, W, H } from './view.js';
 import { startCommand, handleEnter, cancelCmd, applyModifiers, eraseWithDependents,
-         doUndo, doRedo, setTog, clickSelect, boxSelect, onPoint, startEditText } from '../../core/commands.js';
+         doUndo, doRedo, setTog, clickSelect, boxSelect, onPoint, startEditText,
+         parsePoint } from '../../core/commands.js';
 import { cmdInput, caretToEnd, coordRead, layerCur, layerColor, log, setPrompt,
          toggleHelp, refreshLayers } from './ui.js';
 import { saveJSON, openJSON, openDXF, openDWG, dxfExport, autosaveTick, restoreAutosave } from './io.js';
@@ -28,9 +29,13 @@ function focusCmd(){ cmdInput.focus(); caretToEnd(cmdInput); }
    on every single mousemove. Dragging a selection or a grip counts: those are
    point entry by another name. The step list matches the one mousedown uses to
    decide whether a click IS a point — the two must agree. */
+const PICKS_OBJECTS = new Set(['OFFSET','TRIM','EXTEND','FILLET']);   // and PAN/ZOOM want no point at all
 function wantsAPoint(){
   if (dragging) return true;
   if (!cmd || cmd.name === 'PAN' || cmd.name === 'ZOOM') return false;
+  // these ask you to click a LINE, not a location — mousedown passes them the
+  // raw cursor for exactly that reason, so a snap marker is a lie
+  if (PICKS_OBJECTS.has(cmd.name)) return false;
   return cmd.step !== 'select' && cmd.step !== 'dist' && cmd.step !== 'height'
       && cmd.step !== 'string' && cmd.step !== 'factor';
 }
@@ -85,6 +90,7 @@ cv.addEventListener('mousemove', ev=>{
     setSnapMark(null); setTrackGuides(null);
     setCurPt(s2w(mouse.sx, mouse.sy));
   }
+  showTyped();
   const hov = (!cmd && !boxSel && !gripDrag && selection.size) ? findEntityAt(s2w(mouse.sx, mouse.sy)) : null;
   setHoverSel(!!dragging || !!(hov && selection.has(hov.id)));
   coordRead.textContent = `${unitFmt(curPt.x)}, ${unitFmt(curPt.y)} ${units}` + (T.ortho?'  ORTHO':'') ;
@@ -172,7 +178,18 @@ cv.addEventListener('contextmenu', ev=>{
 });
 
 /* ================= keyboard ================= */
-cmdInput.addEventListener('input', ()=>{ if (T.dyn) draw(); });   // dynamic input mirrors keystrokes live
+/* Type 0.2 while drawing and the rubber band should already be 200 mm long,
+   swinging with the mouse — you aim, you do not guess. The maths for it was
+   always there (parsePoint: a bare number is a distance along the cursor
+   direction, and 3,4 or @3<45 are points), but it only ran on Enter, so until
+   you committed there was nothing to see. Same function, applied a keystroke
+   earlier: whatever Enter would do, the preview is already showing. */
+function showTyped(){
+  if (!cmd) return;
+  const p = cmdInput.value.trim() ? parsePoint(cmdInput.value) : null;
+  if (p && isFinite(p.x) && isFinite(p.y)){ setSnapMark(null); setCurPt(p); }
+}
+cmdInput.addEventListener('input', ()=>{ showTyped(); draw(); });   // dynamic input mirrors keystrokes live
 cmdInput.addEventListener('keydown', ev=>{
   const typingText = cmd && cmd.step==='string';        // spaces allowed inside TEXT strings
   if (ev.key==='Enter' || (ev.key===' ' && !typingText)){
@@ -229,7 +246,11 @@ window.addEventListener('keydown', ev=>{
     syncPanBtn();
     cmdInput.value=''; return;
   }
-  if ((ev.key==='Delete'||ev.key==='Backspace') && !cmd && document.activeElement===cmdInput && !cmdInput.value && selection.size){
+  // Delete erases the selection. This used to insist the command line held
+  // focus, so it did nothing at all after clicking a toolbar button or a layer
+  // row — foreignInputFocused() above has already let real text fields keep the
+  // key, and the command line's own contents are the only thing left to protect.
+  if ((ev.key==='Delete'||ev.key==='Backspace') && !cmd && !cmdInput.value && selection.size){
     ev.preventDefault();
     snapshot();
     const gone = eraseWithDependents([...selection]);
@@ -237,7 +258,11 @@ window.addEventListener('keydown', ev=>{
     selection.clear(); draw(); return;
   }
   if (ev.key===' ' && document.activeElement!==cmdInput){ spaceHeld=true; }
-  if (ev.ctrlKey && ev.key.toLowerCase()==='z'){ ev.preventDefault(); ev.shiftKey?doRedo():doUndo(); return; }
+  // ⌘Z as well as Ctrl-Z: this is a Mac-first tool and Ctrl-Z alone means undo
+  // simply did not answer there. ⌘⇧Z / Ctrl-⇧Z redo.
+  if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase()==='z'){
+    ev.preventDefault(); ev.shiftKey ? doRedo() : doUndo(); return;
+  }
   /* type-anywhere: a printable key pressed on the board goes to the command
      line. An <input> received the keystroke itself the moment it was focused;
      an editable div is not reliably given it mid-keydown, so replay the

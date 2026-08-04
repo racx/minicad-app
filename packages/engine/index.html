@@ -39,9 +39,12 @@
 
   /* ---------- help ---------- */
   #help{position:absolute;top:10px;right:10px;width:320px;max-height:calc(100% - 20px);overflow:auto;background:rgba(28,31,37,.97);border:1px solid var(--line);border-radius:8px;padding:14px 16px;display:none;z-index:5}
-  #layers{position:absolute;top:10px;right:10px;width:340px;max-height:calc(100% - 20px);
-    display:none;flex-direction:column;background:rgba(28,31,37,.97);border:1px solid var(--line);
-    border-radius:8px;z-index:6;font-size:12px}
+  /* Docked down the right edge, top to bottom, not a floating card: with 130
+     layers you work OUT of this list, so it stays put while you draw and you
+     close it when you are done (the chip toggles it, ✕ closes it). */
+  #layers{position:absolute;top:0;right:0;bottom:0;width:340px;
+    display:none;flex-direction:column;background:rgba(28,31,37,.97);
+    border-left:1px solid var(--line);z-index:6;font-size:12px}
   #layers.open{display:flex}
   #layers header{display:flex;align-items:center;gap:8px;padding:10px 12px 8px;border-bottom:1px solid var(--line)}
   #layers header h2{font-size:13px;color:var(--accent);font-family:var(--mono);margin:0;flex:1}
@@ -297,7 +300,7 @@
         <tr><td>Double-click text</td><td>Edit its wording in place</td></tr>
         <tr><td>E / ERASE</td><td>Erase selection (or Delete key)</td></tr>
         <tr><td>Drag selected</td><td>Move objects directly (Esc while dragging = abort)</td></tr>
-        <tr><td>U</td><td>Undo &nbsp;·&nbsp; REDO to redo</td></tr>
+        <tr><td>U · ⌘Z</td><td>Undo (Ctrl-Z too) &nbsp;·&nbsp; REDO or ⌘⇧Z to redo</td></tr>
       </table>
       <h3>Inspect / view</h3>
       <table>

@@ -83,4 +83,31 @@ const html = await (await import('node:fs')).promises.readFile(
         find.getAttribute('readonly') !== null);
 }
 
+/* ===== ⌘Z, not just Ctrl-Z =====
+   This is a Mac-first tool. Undo was bound to ctrlKey alone, so the shortcut
+   every Mac user reaches for first did nothing at all. */
+document.activeElement = null;
+S.setEntities([]); S.undoStack.length = 0; S.redoStack.length = 0;
+C.startCommand('L'); C.handleEnter('0,0'); C.handleEnter('10,0'); C.handleEnter('');
+check('a line to undo', S.entities.length === 1);
+
+dom.fireWin('keydown', { key: 'z', metaKey: true });
+check('⌘Z undoes', S.entities.length === 0);
+
+dom.fireWin('keydown', { key: 'z', metaKey: true, shiftKey: true });
+check('⌘⇧Z redoes', S.entities.length === 1);
+
+dom.fireWin('keydown', { key: 'z', ctrlKey: true });
+check('Ctrl-Z still undoes', S.entities.length === 0);
+
+dom.fireWin('keydown', { key: 'Z', metaKey: true, shiftKey: true });
+check('the shortcut is case-insensitive — shift makes it a capital Z',
+      S.entities.length === 1);
+
+// and a foreign field keeps its own undo stack
+document.activeElement = foreign;
+dom.fireWin('keydown', { key: 'z', metaKey: true });
+check('⌘Z inside someone else\'s input is left to the browser', S.entities.length === 1);
+document.activeElement = null;
+
 finish();
