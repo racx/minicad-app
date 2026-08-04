@@ -8,6 +8,7 @@ import { entities, setEntities, layers, currentLayer, setCurrentLayer, layerOf, 
 import './plotui.js';                                   // print dialog wiring (self-registers)
 import './osnapui.js';                                  // object-snap dialog wiring (self-registers)
 import './hatchui.js';                                  // hatch material picker (self-registers)
+import './symbolui.js';                                 // symbol library picker (self-registers)
 import { findEntityAt, translateIds, entGrips, applyGrip } from '../../core/entities.js';
 import { cv, s2w, w2s, draw, resize, zoomExtents, RULER_PX, W, H } from './view.js';
 import { startCommand, handleEnter, cancelCmd, applyModifiers, eraseWithDependents,

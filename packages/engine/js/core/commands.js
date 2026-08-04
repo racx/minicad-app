@@ -6,6 +6,7 @@ import { dist, fmt, deep, rotPt, ptSegDist, TAU, normAng, arcSweep, arcPt, arcFr
          tangentBulge, bulgeFrom3, plineEndTangent, plineParts, plineCurved, entityArea,
          tessellateBoundary, pointInPoly } from './geometry.js';
 import { materialByKey } from './materials.js';
+import { SYMBOLS, symbolDef } from './symbols.js';
 import { entIntersections, lineEntT, lineLine, perpFoot, tangentPts, nearestOnEnt } from './intersect.js';
 import { entities, setEntities, nextId, layers, setLayers, currentLayer, setCurrentLayer, undoStack, redoStack, snapshot,
          view, T, cmd, setCmd, lastCmdName, setLastCmdName, selection, curPt, setSnapMark,
@@ -278,14 +279,14 @@ export function startCommand(raw){
     setPrompt('BLOCK — Specify base point (the handle you will insert it by):');
   }
   else if (name==='INSERT'){
-    const names = Object.keys(blocks);
-    if (!names.length){
-      log('No blocks yet. Select some objects and type BLOCK to make one first.', 'e');
-      cancelCmd(true); return;
-    }
     cmd.step = 'name';
-    log(`Blocks: ${names.join(', ')}`);
-    setPrompt('INSERT — Block name:');
+    const mine = Object.keys(blocks);
+    if (mine.length) log(`Blocks in this drawing: ${mine.join(', ')}`);
+    if (symbolOpener){ symbolOpener(); setPrompt('INSERT — pick a symbol, or type a block name:'); }
+    else {
+      log(`Library: ${Object.keys(SYMBOLS).join(', ')}`);
+      setPrompt('INSERT — Block or symbol name:');
+    }
   }
   else if (name==='CHLAYER'){
     if (!selection.size){ log('Select objects first, then CHLAYER.', 'e'); cancelCmd(true); return; }
@@ -1039,6 +1040,28 @@ function performExplode(ids){
   endCmd();
 }
 
+/* A library symbol becomes an ordinary block in this drawing the first time it
+   is asked for — scaled from metres into whatever units the drawing uses, so a
+   0.8 m door is 80 in centimetres and 800 in millimetres. After that it is the
+   drawing's own: editable, explodable, and exported like any other block. */
+export function useSymbol(key){
+  if (blockDef(key)) return true;
+  const def = symbolDef(key, units);
+  if (!def) return false;
+  defineBlock(key, def);
+  return true;
+}
+
+/* the symbol picker, if the host has one (see adapters/dom/symbolui.js) */
+let symbolOpener = null;
+export function registerSymbolDialog(fn){ symbolOpener = fn; }
+export function chooseSymbol(key){
+  if (!cmd || cmd.name !== 'INSERT'){ startCommand('INSERT'); }
+  if (!useSymbol(key)){ log(`No symbol called "${key}".`, 'e'); return; }
+  cmd.blockName = key; cmd.step = 'pos';
+  setPrompt(`INSERT ${key} — Specify insertion point:`);
+}
+
 /* One placed reference to a block definition. */
 function placeInsert(rot){
   snapshot();
@@ -1174,8 +1197,9 @@ export function handleEnter(text){
   }
   if (n==='INSERT' && cmd.step==='name'){
     const name = text.trim();
-    if (!blockDef(name)){
-      log(`No block called "${name}". Blocks here: ${Object.keys(blocks).join(', ') || 'none'}`, 'e');
+    if (!blockDef(name) && !useSymbol(name)){
+      log(`No block or symbol called "${name}". In this drawing: ${Object.keys(blocks).join(', ') || 'none'}. ` +
+          `Library: ${Object.keys(SYMBOLS).join(', ')}`, 'e');
       return;
     }
     cmd.blockName = name; cmd.step = 'pos';

@@ -2,7 +2,7 @@
 
 **Single source of truth** for what exists, how complete it is, and what comes next.
 Evidence-based: every claim below cites `file:line` in the codebase as of commit `536d7c7`.
-Verified against the test suite: `node tests/run.mjs` → **36 suites, 957 checks, all passing** (2026-08-04).
+Verified against the test suite: `node tests/run.mjs` → **37 suites, 1014 checks, all passing** (2026-08-04).
 
 Update this file whenever a feature lands or a decision changes the plan.
 
@@ -276,8 +276,16 @@ as a shape one segment short of shut.
   with a hole in it. Audited: **0 errors / 0 fixes under ezdxf** with nested, mirrored and
   dimensioned content in one file, and the mirrored insert explodes to the same coordinates in
   ezdxf as in MiniCAD. An insert whose definition is missing falls back to flattened geometry.
-  **Still open:** no symbol LIBRARY (doors, windows, furniture ship with nothing — you define
-  your own).
+  **Symbol library shipped 2026-08-04** (`js/core/symbols.js`, picker in `adapters/dom/symbolui.js`):
+  16 symbols — doors 700/800/900, windows 600/1000/1500, WC, basin, shower, bath, sink, stove,
+  fridge, single and double bed, table, chair, sofa, north arrow. Defined in METRES because
+  that is what a door is, and scaled into the drawing's units on first use, so the same symbol
+  is 80 in a centimetre drawing and 800 in a millimetre one. A symbol becomes an ordinary
+  block in the drawing the moment it is used — editable, explodable, exported like any other.
+  Suite 33 checks every entry is real-world sized and carries no layer (so it takes the layer
+  you insert it on).
+  **Still open:** the symbols are a first pass by someone who is not an architect — worth a
+  review by someone who draws plans for a living, especially at 1:50.
 - ~~Imported blocks flattened on the way in~~ ✅ **fixed 2026-08-04**: both readers emit block
   definitions in the IR (`blockdefs`) and inserts as references, and `cadimport` maps a
   definition by importing it as a small drawing of its own — same mapping, same freezing, one

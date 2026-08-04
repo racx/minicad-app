@@ -95,6 +95,19 @@
   #osnapDlg .hint{font-size:11px;color:var(--dim)}
   #osnapDlg kbd{color:var(--dim);font-size:10px}
 
+  /* ---------- symbol library dialog ---------- */
+  #symbolDlg{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:420px;
+    max-height:78%;display:none;flex-direction:column;background:rgba(28,31,37,.98);
+    border:1px solid var(--line);border-radius:8px;padding:16px 18px;z-index:6}
+  #symbolDlg.open{display:flex}
+  #symbolDlg h2{font-size:13px;color:var(--accent);margin-bottom:10px;font-family:var(--mono)}
+  #symbolList{overflow:auto;flex:1;margin-bottom:10px}
+  #symbolList h3{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;
+    margin:10px 0 5px}
+  #symbolList h3:first-child{margin-top:0}
+  #symbolList .grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+  #symbolList button{text-align:left}
+
   /* ---------- hatch dialog ---------- */
   #hatchDlg{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:300px;background:rgba(28,31,37,.98);border:1px solid var(--line);border-radius:8px;padding:16px 18px;display:none;z-index:6}
   #hatchDlg h2{font-size:13px;color:var(--accent);margin-bottom:12px;font-family:var(--mono)}
@@ -218,6 +231,11 @@
       <div id="hatchMats"></div>
       <div class="row buttons"><button class="btn" id="hatchCancel">Cancel</button></div>
     </div>
+    <div id="symbolDlg">
+      <h2>Insert a symbol</h2>
+      <div id="symbolList"></div>
+      <div class="row buttons"><button class="btn" id="symbolCancel">Cancel</button></div>
+    </div>
     <div id="osnapDlg">
       <h2>Object snap</h2>
       <div class="row">
@@ -293,7 +311,7 @@
         <tr><td>F / FILLET</td><td>Fillet two lines — radius 0 = sharp corner, &gt;0 = rounded</td></tr>
         <tr><td>MI / MIRROR</td><td>Mirror across a two-point line (asks to erase source)</td></tr>
         <tr><td>J / JOIN</td><td>Merge touching lines, arcs and polylines into one polyline (PEDIT works too)</td></tr>
-        <tr><td>B · I</td><td>BLOCK makes a symbol from the selection (base point + name) · INSERT places one (name, point, scale, angle)</td></tr>
+        <tr><td>B · I</td><td>BLOCK makes a symbol from the selection (base point + name) · INSERT opens the library (doors, windows, WC, furniture) or places one of yours</td></tr>
         <tr><td>X / EXPLODE</td><td>Break a polyline (rectangles too) into its lines and arcs</td></tr>
         <tr><td>S / STRETCH</td><td>Crossing box → endpoints inside move, rest stays put</td></tr>
         <tr><td>Grips</td><td>Drag the blue squares on a selected object to reshape it</td></tr>
