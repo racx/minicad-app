@@ -146,6 +146,59 @@ check('an insert with no definition is inert, not a crash',
       E.blockParts(orphan).length === 0 &&
       JSON.stringify(E.entBBox(orphan)) === JSON.stringify([1,2,1,2]));
 
+/* ===== 6b. blocks made of blocks =====
+   A kitchen is cupboards; a cupboard is a door. The placements compose:
+   R(p)·M(p) · R(c)·M(c) = R(p ∓ c) · M(p xor c), because a reflection reverses
+   any rotation applied after it. Exact numbers, so the composition is either
+   right or the suite says where. */
+reset();
+S.setBlocks({
+  arm:  { base:{x:0, y:0}, ents:[{id:1, type:'line', layer:'0', x1:0, y1:0, x2:2, y2:0}] },
+  // a pair of arms: one at the origin, one 10 to the right and turned 90°
+  pair: { base:{x:0, y:0}, ents:[
+    {id:1, type:'insert', name:'arm', x:0,  y:0, layer:'0'},
+    {id:2, type:'insert', name:'arm', x:10, y:0, rot:Math.PI/2, layer:'0'},
+  ]},
+});
+S.setEntities([{id:1, type:'insert', name:'pair', x:0, y:0, layer:'0'}]);
+let np = E.blockParts(S.entities[0]);
+check('a nested block expands all the way down to geometry',
+      np.length === 2 && np.every(q => q.type === 'line'));
+check('…the inner placement is honoured', near(np[0].x2, 2) && near(np[1].x1, 10));
+check('…including its own rotation', near(np[1].x2, 10, 1e-9) && near(np[1].y2, 2, 1e-9));
+
+// the outer placement composes on top
+S.setEntities([{id:1, type:'insert', name:'pair', x:0, y:0, rot:Math.PI/2, s:2, layer:'0'}]);
+np = E.blockParts(S.entities[0]);
+check('outer rotation and scale compose with the inner ones',
+      near(np[0].x2, 0, 1e-9) && near(np[0].y2, 4, 1e-9) &&
+      near(np[1].x1, 0, 1e-9) && near(np[1].y1, 20, 1e-9) &&
+      near(np[1].x2, -4, 1e-9) && near(np[1].y2, 20, 1e-9));
+
+// mirrored outer, rotated inner: the reflection must reverse the inner turn
+S.setEntities([{id:1, type:'insert', name:'pair', x:0, y:0, mir:true, layer:'0'}]);
+np = E.blockParts(S.entities[0]);
+check('a mirrored parent reverses the child\'s rotation',
+      near(np[1].x1, -10, 1e-9) && near(np[1].x2, -10, 1e-9) && near(np[1].y2, 2, 1e-9));
+
+// BLOCK may now be built from a selection that already contains a block
+reset();
+S.setBlocks({ arm: { base:{x:0,y:0}, ents:[{id:1, type:'line', layer:'0', x1:0, y1:0, x2:2, y2:0}] } });
+S.setEntities([{id:1, type:'insert', name:'arm', x:0, y:0, layer:'0'}]);
+S.selection.add(1);
+C.startCommand('B'); C.onPoint({x:0, y:0}); C.handleEnter('group');
+check('BLOCK accepts a selection containing another block', !!S.blockDef('group'));
+check('…and it draws', E.blockParts(S.entities[0]).length === 1);
+
+// a definition that reaches itself must stop, not hang the tab
+S.setBlocks({ loop: { base:{x:0,y:0}, ents:[
+  {id:1, type:'insert', name:'loop', x:1, y:0, layer:'0'},
+  {id:2, type:'line', layer:'0', x1:0, y1:0, x2:1, y2:0},
+]}});
+S.setEntities([{id:1, type:'insert', name:'loop', x:0, y:0, layer:'0'}]);
+check('a block containing itself expands once and stops',
+      E.blockParts(S.entities[0]).length === 1);
+
 /* ===== 7. it has to survive the round trip ===== */
 defineChair();
 S.setEntities([{id:1, type:'insert', name:'chair', x:3, y:4, s:2, layer:'0'}]);

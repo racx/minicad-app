@@ -2,7 +2,7 @@
 
 **Single source of truth** for what exists, how complete it is, and what comes next.
 Evidence-based: every claim below cites `file:line` in the codebase as of commit `536d7c7`.
-Verified against the test suite: `node tests/run.mjs` → **36 suites, 931 checks, all passing** (2026-08-04).
+Verified against the test suite: `node tests/run.mjs` → **36 suites, 939 checks, all passing** (2026-08-04).
 
 Update this file whenever a feature lands or a decision changes the plan.
 
@@ -264,7 +264,11 @@ as a shape one segment short of shut.
   uses a negative X scale), so a mirrored door opens the other way. EXPLODE breaks one back
   into geometry. Definitions travel in the saved doc, the autosave and the Rails adapter.
   Suite 32.
-  **Still open:** no nested blocks (a block cannot contain an insert); DXF export flattens
+  **Nested blocks land 2026-08-04**: a definition may contain inserts, composed one level at a
+  time (`R(p)·M(p)·R(c)·M(c) = R(p ∓ c)·M(p xor c)` — a reflection reverses any rotation applied
+  after it), depth-capped at 8 and cycle-guarded, so a block containing itself expands once and
+  stops rather than hanging the tab.
+  **Still open:** DXF export flattens
   inserts to geometry rather than writing BLOCK/INSERT records — the drawing is identical but
   arrives as loose lines, and the BLOCKS machinery dimensions already use is the place to
   start; no symbol LIBRARY (doors, windows, furniture ship with nothing — you define your

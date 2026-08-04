@@ -1161,10 +1161,6 @@ export function handleEnter(text){
     // when it is expanded, so the objects can be defined anywhere on the sheet
     const chosen = entities.filter(e => cmd.sel.includes(e.id));
     if (!chosen.length){ log('Those objects are gone.', 'e'); endCmd(); return; }
-    if (chosen.some(e => e.type === 'insert')){
-      log('A block cannot contain another block yet — explode the inner one first.', 'e');
-      endCmd(); return;
-    }
     defineBlock(name, { base:{...cmd.base}, ents: JSON.parse(JSON.stringify(chosen)) });
     // AutoCAD replaces the selection with an insert of what you just defined
     snapshot();

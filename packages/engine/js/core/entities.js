@@ -23,12 +23,25 @@ import { query, queryPoint } from './spatial.js';
    covers the placement, the definition it points at, and the geometry epoch,
    which is what changes when a definition is redefined. */
 const partsCache = new WeakMap();
+const MAX_NEST = 8;                          // deeper than any real drawing nests
+
 export function blockParts(e){
-  const def = blockDef(e.name);
-  if (!def) return [];                       // insert of a block that is not here
   const sig = `${e.name}|${e.x}|${e.y}|${e.rot||0}|${e.s||1}|${e.mir?1:0}|${geomEpoch}`;
   const hit = partsCache.get(e);
   if (hit && hit.sig === sig) return hit.parts;
+  const parts = expandInsert(e, e.layer, `${e.id}`, 0, new Set());
+  partsCache.set(e, {sig, parts});
+  return parts;
+}
+
+/* One level of expansion, which may recurse into blocks that contain blocks.
+   `chain` is the names above us: a definition that reaches itself would expand
+   forever, so it stops instead. `path` keeps the generated ids unique and
+   stable across frames. */
+function expandInsert(e, ownerLayer, path, depth, chain){
+  const def = blockDef(e.name);
+  if (!def) return [];                       // insert of a block that is not here
+  if (depth >= MAX_NEST || chain.has(e.name)) return [];   // nested too deep, or a loop
 
   const s = e.s || 1, rot = e.rot || 0;
   // MIRROR flips the block about its own Y axis before rotating — the same
@@ -43,11 +56,31 @@ export function blockParts(e){
   };
 
   const idMap = new Map();                   // hatches reference their boundary by id
-  const parts = (def.ents || []).map((src, i) => {
+  const parts = [];
+  const inner = new Set(chain).add(e.name);
+  (def.ents || []).forEach((src, i) => {
     const o = JSON.parse(JSON.stringify(src));
-    o.id = `${e.id}/${i}`;                   // stable, and never collides with a real id
+    o.id = `${path}/${i}`;                   // stable, and never collides with a real id
     idMap.set(src.id, o.id);
-    o.layer = o.layer || e.layer;
+    o.layer = o.layer || ownerLayer;
+
+    if (o.type === 'insert'){
+      // A block inside a block. The two placements compose into one:
+      //   R(p)·M(p) · R(c)·M(c)  =  R(p ∓ c) · M(p xor c)
+      // because a reflection reverses any rotation applied after it.
+      const q = at({x:o.x, y:o.y});
+      const child = {
+        ...o, x:q.x, y:q.y,
+        s: s * (o.s || 1),
+        rot: normAng(e.mir ? rot - (o.rot || 0) : rot + (o.rot || 0)),
+        mir: e.mir ? !o.mir : !!o.mir,
+        layer: o.layer,
+      };
+      if (!child.mir) delete child.mir;
+      parts.push(...expandInsert(child, o.layer, o.id, depth + 1, inner));
+      return;
+    }
+
     if (o.type === 'line'){
       const a = at({x:o.x1, y:o.y1}), b = at({x:o.x2, y:o.y2});
       o.x1=a.x; o.y1=a.y; o.x2=b.x; o.y2=b.y;
@@ -73,11 +106,9 @@ export function blockParts(e){
       o.off *= s * (e.mir ? -1 : 1);          // the left normal is on the other side now
       if (o.h) o.h *= s;
     }
-    return o;
+    parts.push(o);
   });
   for (const o of parts) if (o.type === 'hatch') o.ref = idMap.get(o.ref) ?? o.ref;
-
-  partsCache.set(e, {sig, parts});
   return parts;
 }
 
