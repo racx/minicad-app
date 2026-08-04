@@ -2,8 +2,8 @@
    MiniCAD — save / open / DXF export
    ========================================================= */
 import { normAng, fmt } from '../../core/geometry.js';
-import { dimGeom, dimH } from '../../core/entities.js';
-import { entities, setEntities, layers, setLayers, getIdSeq, setIdSeq,
+import { dimGeom, dimH, blockParts } from '../../core/entities.js';
+import { entities, setEntities, layers, setLayers, blocks, setBlocks, getIdSeq, setIdSeq,
          setCurrentLayer, snapshot, selection, units, setUnits } from '../../core/state.js';
 import { zoomExtents } from './view.js';
 import { startCommand } from '../../core/commands.js';
@@ -23,7 +23,7 @@ export function download(name, data, mime){
 }
 
 export function saveJSON(){
-  download('drawing.json', JSON.stringify({layers, entities, idSeq:getIdSeq(), units}, null, 1), 'application/json');
+  download('drawing.json', JSON.stringify({layers, entities, blocks, idSeq:getIdSeq(), units}, null, 1), 'application/json');
   log('Saved drawing.json', 'r');
 }
 
@@ -33,7 +33,8 @@ export function openJSON(f){
     try{
       const d=JSON.parse(r.result);
       snapshot();
-      setLayers(d.layers||layers); setEntities(d.entities||[]); setIdSeq(d.idSeq||entities.length+1);
+      setLayers(d.layers||layers); setBlocks(d.blocks); setEntities(d.entities||[]);
+      setIdSeq(d.idSeq||entities.length+1);
       setUnits(d.units||'cm');
       setCurrentLayer(layers[0].name); refreshLayers(); selection.clear(); zoomExtents();
       log(`Opened ${f.name} (${entities.length} objects).`, 'r');
@@ -47,7 +48,7 @@ function loadDoc(doc, name, what){
   const res = importDoc(doc);
   if (!res.entities.length){ log(`That ${what} has nothing MiniCAD can draw in it.`, 'e'); return false; }
   snapshot();
-  setLayers(res.layers); setEntities(res.entities); setIdSeq(res.idSeq);
+  setLayers(res.layers); setBlocks({}); setEntities(res.entities); setIdSeq(res.idSeq);
   if (res.units) setUnits(res.units);
   setCurrentLayer((res.layers.find(l=>!l.locked && !l.off) || res.layers[0]).name);
   refreshLayers(); selection.clear(); zoomExtents();
@@ -110,7 +111,7 @@ let lastAutosave = '';
 
 export function autosaveTick(){
   if (typeof localStorage === 'undefined') return;
-  const data = JSON.stringify({layers, entities, idSeq:getIdSeq(), units});
+  const data = JSON.stringify({layers, entities, blocks, idSeq:getIdSeq(), units});
   if (data !== lastAutosave){
     try{ localStorage.setItem(AUTOSAVE_KEY, data); lastAutosave = data; }catch(e){ /* storage full/blocked */ }
   }
@@ -122,7 +123,8 @@ export function restoreAutosave(){
   try{
     const d = JSON.parse(raw);
     if (!d.entities || !d.entities.length) return false;
-    setLayers(d.layers||layers); setEntities(d.entities); setIdSeq(d.idSeq||d.entities.length+1);
+    setLayers(d.layers||layers); setBlocks(d.blocks); setEntities(d.entities);
+    setIdSeq(d.idSeq||d.entities.length+1);
     setUnits(d.units||'cm');
     setCurrentLayer(layers[0].name);
     lastAutosave = raw;
@@ -135,7 +137,7 @@ export function clearAutosave(){
 }
 
 export function dxfExport(){
-  const dxf = buildDXF({entities, layers, units});
+  const dxf = buildDXF({entities, layers, units, expandInsert: blockParts});
   download('drawing.dxf', dxf, 'application/dxf');
   const n = entities.filter(e=>e.type==='hatch').length;
   log(`Exported drawing.dxf (${entities.length} objects${n?`, ${n} hatches`:''}) — ` +

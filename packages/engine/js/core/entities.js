@@ -5,10 +5,81 @@
 import { dist, ptSegDist, arcPt, arcSweep, angleOnArc, normAng, mirrorPt,
          plineParts, bulgeApex, bulgeFromApex, tessellateBoundary, pointInPoly,
          textW, textCorners, textLocal, readableAng } from './geometry.js';
-import { entities, view, layerVisible, layerUnlocked } from './state.js';
+import { entities, view, layerVisible, layerUnlocked, blockDef, geomEpoch } from './state.js';
 // runtime-only cycle with spatial.js (it needs entBBox, we need query) — both
 // sides call across at query time, never at module init, so ESM is happy
 import { query, queryPoint } from './spatial.js';
+
+/* ---------- blocks ----------
+   An `insert` is a reference: {type:'insert', name, x, y, rot, s}. It owns no
+   geometry of its own, so every subsystem below answers by expanding it into
+   world-space copies of its definition and asking them instead. Scale is
+   UNIFORM on purpose — a non-uniform insert turns circles into ellipses, and
+   an ellipse is not something this engine can hand back to you as an editable
+   object (imports keep them frozen). INSERT refuses to pretend otherwise.
+
+   Expansion is memoised per insert object: hit-testing a plan full of chairs
+   would otherwise rebuild every chair on every mouse move. The signature
+   covers the placement, the definition it points at, and the geometry epoch,
+   which is what changes when a definition is redefined. */
+const partsCache = new WeakMap();
+export function blockParts(e){
+  const def = blockDef(e.name);
+  if (!def) return [];                       // insert of a block that is not here
+  const sig = `${e.name}|${e.x}|${e.y}|${e.rot||0}|${e.s||1}|${e.mir?1:0}|${geomEpoch}`;
+  const hit = partsCache.get(e);
+  if (hit && hit.sig === sig) return hit.parts;
+
+  const s = e.s || 1, rot = e.rot || 0;
+  // MIRROR flips the block about its own Y axis before rotating — the same
+  // trick DXF plays with a negative X scale. Without it a mirrored door still
+  // opens the way it did, which is worse than refusing to mirror at all.
+  const mx = e.mir ? -1 : 1;
+  const cos = Math.cos(rot), sin = Math.sin(rot);
+  const bx = def.base ? def.base.x : 0, by = def.base ? def.base.y : 0;
+  const at = p => {                          // block coords → world
+    const dx = (p.x - bx) * s * mx, dy = (p.y - by) * s;
+    return { x: e.x + dx*cos - dy*sin, y: e.y + dx*sin + dy*cos };
+  };
+
+  const idMap = new Map();                   // hatches reference their boundary by id
+  const parts = (def.ents || []).map((src, i) => {
+    const o = JSON.parse(JSON.stringify(src));
+    o.id = `${e.id}/${i}`;                   // stable, and never collides with a real id
+    idMap.set(src.id, o.id);
+    o.layer = o.layer || e.layer;
+    if (o.type === 'line'){
+      const a = at({x:o.x1, y:o.y1}), b = at({x:o.x2, y:o.y2});
+      o.x1=a.x; o.y1=a.y; o.x2=b.x; o.y2=b.y;
+    } else if (o.type === 'circle'){
+      const c = at({x:o.cx, y:o.cy}); o.cx=c.x; o.cy=c.y; o.r *= s;
+    } else if (o.type === 'arc'){
+      const c = at({x:o.cx, y:o.cy}); o.cx=c.x; o.cy=c.y; o.r *= s;
+      // a reflection reverses the sweep, so the ends swap to stay CCW
+      const [a0, a1] = e.mir ? [Math.PI - o.a1, Math.PI - o.a0] : [o.a0, o.a1];
+      o.a0 = normAng(a0 + rot); o.a1 = normAng(a1 + rot);
+    } else if (o.type === 'pline'){
+      o.pts = o.pts.map(p => { const q = at(p);
+        return p.bulge ? {x:q.x, y:q.y, bulge: e.mir ? -p.bulge : p.bulge} : q; });
+    } else if (o.type === 'text'){
+      const q = at({x:o.x, y:o.y}); o.x=q.x; o.y=q.y; o.h *= s;
+      // MIRRTEXT=0: the label moves with the block but stays the right way round
+      const base = e.mir ? Math.PI - (o.rot || 0) : (o.rot || 0);
+      const ang = readableAng(base + rot);
+      if (ang) o.rot = ang; else delete o.rot;
+    } else if (o.type === 'dim'){
+      const a = at({x:o.x1, y:o.y1}), b = at({x:o.x2, y:o.y2});
+      o.x1=a.x; o.y1=a.y; o.x2=b.x; o.y2=b.y;
+      o.off *= s * (e.mir ? -1 : 1);          // the left normal is on the other side now
+      if (o.h) o.h *= s;
+    }
+    return o;
+  });
+  for (const o of parts) if (o.type === 'hatch') o.ref = idMap.get(o.ref) ?? o.ref;
+
+  partsCache.set(e, {sig, parts});
+  return parts;
+}
 
 // text height of a dim: explicit e.h, else automatic (4% of measured length)
 export function dimH(e){ return e.h || dimGeom(e).L*0.04 || 1; }
@@ -25,6 +96,11 @@ export function dimGeom(e){
 }
 
 export function entHitDist(ent, p){
+  if (ent.type==='insert'){                 // as close as its closest piece
+    let best = Infinity;
+    for (const q of blockParts(ent)) best = Math.min(best, entHitDist(q, p));
+    return best;
+  }
   if (ent.type==='dim'){
     const g=dimGeom(ent);
     return Math.min(
@@ -98,6 +174,14 @@ export function entBBox(e){
         if (angleOnArc(part.arc, q)) eat(arcPt(part.arc, q));
     return [x0,y0,x1,y1];
   }
+  if (e.type==='insert'){
+    const parts = blockParts(e);
+    if (!parts.length) return [e.x, e.y, e.x, e.y];      // unknown block: just its insertion point
+    let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+    for (const q of parts){ const b=entBBox(q);
+      x0=Math.min(x0,b[0]); y0=Math.min(y0,b[1]); x1=Math.max(x1,b[2]); y1=Math.max(y1,b[3]); }
+    return [x0,y0,x1,y1];
+  }
   if (e.type==='hatch'){
     const b = entities.find(z=>z.id===e.ref);
     return b ? entBBox(b) : [0,0,0,0];
@@ -128,7 +212,20 @@ export function entInWindow(e, r, crossing){ // r = [x0,y0,x1,y1] world
    171,557 candidates and is the single most expensive thing a mouse move does. */
 export function snapCandidates(excludeId, bounds){
   const out=[];
-  const list = bounds ? query(bounds[0], bounds[1], bounds[2], bounds[3]) : entities;
+  const found = bounds ? query(bounds[0], bounds[1], bounds[2], bounds[3]) : entities;
+  // An insert snaps like the geometry it stands for, so it is replaced here by
+  // its parts — and its insertion point is a snap in its own right, which is
+  // how you butt one block up against another.
+  let list = found;
+  if (found.some(e => e.type === 'insert')){
+    list = [];
+    for (const e of found){
+      if (e.type !== 'insert'){ list.push(e); continue; }
+      if (e.id === excludeId || !layerVisible(e.layer)) continue;
+      out.push({p:{x:e.x, y:e.y}, k:'end'});
+      list.push(...blockParts(e));
+    }
+  }
   for (const e of list){
     if (e.id===excludeId) continue;              // grip drags don't snap to themselves
     if (!layerVisible(e.layer)) continue;        // hidden layers don't snap (locked ones do)
@@ -183,6 +280,7 @@ export function entGrips(e){
     });
     return out;
   }
+  if (e.type==='insert') return [{x:e.x, y:e.y, g:'ins'}];   // one grip, like AutoCAD gives a block
   if (e.type==='text'){
     const c = textCorners(e);
     return [{x:e.x, y:e.y, g:'ins'}, {x:c[1].x, y:c[1].y, g:'rot'}];   // insertion + baseline end
@@ -244,6 +342,7 @@ export function translateEnt(e,dx,dy){
   else if (e.type==='pline'){ e.pts.forEach(p=>{p.x+=dx;p.y+=dy;}); }
   else if (e.type==='text'){ e.x+=dx;e.y+=dy; }
   else if (e.type==='dim'){ e.x1+=dx;e.y1+=dy;e.x2+=dx;e.y2+=dy; }
+  else if (e.type==='insert'){ e.x+=dx; e.y+=dy; }        // the reference moves; the definition does not
 }
 export function translateIds(ids,dx,dy){ ids.forEach(id=>{const e=entities.find(z=>z.id===id); if(e)translateEnt(e,dx,dy);}); }
 
@@ -268,6 +367,14 @@ export function mirrorEnt(e, a, b){
       const phi=Math.atan2(b.y-a.y, b.x-a.x);
       e.rot = readableAng(2*phi - e.rot);           // reflect the angle, then keep it right-way-up
     }
+  }
+  else if (e.type==='insert'){
+    const p=mirrorPt({x:e.x,y:e.y},a,b); e.x=p.x; e.y=p.y;
+    // Reflecting a rotated, possibly-already-mirrored block is still one
+    // rotation and one flip: Ref(φ)·R(rot)·M = R(2φ − rot + π)·M̄.
+    const phi=Math.atan2(b.y-a.y, b.x-a.x);
+    e.rot = normAng(2*phi - (e.rot||0) + Math.PI);
+    if (e.mir) delete e.mir; else e.mir = true;
   }
   else if (e.type==='dim'){
     const g=dimGeom(e);

@@ -2,7 +2,7 @@
 
 **Single source of truth** for what exists, how complete it is, and what comes next.
 Evidence-based: every claim below cites `file:line` in the codebase as of commit `536d7c7`.
-Verified against the test suite: `node tests/run.mjs` → **35 suites, 876 checks, all passing** (2026-08-03).
+Verified against the test suite: `node tests/run.mjs` → **36 suites, 931 checks, all passing** (2026-08-04).
 
 Update this file whenever a feature lands or a decision changes the plan.
 
@@ -255,9 +255,21 @@ as a shape one segment short of shut.
 - SCALE by reference length; FILLET for arcs/plines; CHAMFER.
 
 ### Tier 3 — the big one
-- **Blocks / symbol library** (doors, windows, furniture): definitions, insert with
-  rotation/scale, grips, DXF BLOCK/INSERT export. This is the feature that turns the
-  drafting tool into a floor-planning tool; schedule as its own multi-step project.
+- ~~**Blocks / symbol library**~~ ✅ **core shipped 2026-08-04**: `BLOCK` (select → base point →
+  name, and the selection becomes an insert) and `INSERT` (name → point → scale → angle).
+  An `insert` entity references a definition in `state.blocks`; every subsystem answers by
+  expanding it (`entities.js blockParts`, memoised per insert). Uniform scale only — a
+  non-uniform insert makes ellipses, which this engine cannot hand back as editable objects.
+  MIRROR really mirrors (a `mir` flag flips the definition about its own Y axis, the way DXF
+  uses a negative X scale), so a mirrored door opens the other way. EXPLODE breaks one back
+  into geometry. Definitions travel in the saved doc, the autosave and the Rails adapter.
+  Suite 32.
+  **Still open:** no nested blocks (a block cannot contain an insert); DXF export flattens
+  inserts to geometry rather than writing BLOCK/INSERT records — the drawing is identical but
+  arrives as loose lines, and the BLOCKS machinery dimensions already use is the place to
+  start; no symbol LIBRARY (doors, windows, furniture ship with nothing — you define your
+  own); imported DWG/DXF blocks are still expanded to world geometry on the way in rather
+  than becoming definitions.
 
 ### Non-goals (deliberate)
 3D, paper space/viewports, xrefs, splines/ellipses, hatching, plot styles — out of scope

@@ -10,8 +10,8 @@ import { entIntersections, lineEntT, lineLine, perpFoot, tangentPts, nearestOnEn
 import { entities, setEntities, nextId, layers, setLayers, currentLayer, setCurrentLayer, undoStack, redoStack, snapshot,
          view, T, cmd, setCmd, lastCmdName, setLastCmdName, selection, curPt, setSnapMark,
          selRect, setSelRect, plotWin, setPlotWin, units, setUnits,
-         setTrackGuides, layerVisible, layerUnlocked } from './state.js';
-import { findEntityAt, entHitDist, entInWindow, entBBox, snapCandidates, translateEnt, translateIds, mirrorEnt } from './entities.js';
+         setTrackGuides, layerVisible, layerUnlocked, blocks, blockDef, defineBlock, bumpGeom } from './state.js';
+import { findEntityAt, entHitDist, entInWindow, entBBox, snapCandidates, translateEnt, translateIds, mirrorEnt, blockParts } from './entities.js';
 import { query as spatialQuery } from './spatial.js';
 import { sink } from './bus.js';
 import { gridStep, s2w } from './viewport.js';
@@ -35,6 +35,7 @@ export const ALIASES = {
   EX:'EXTEND', EXTEND:'EXTEND', F:'FILLET', FILLET:'FILLET',
   MI:'MIRROR', MIRROR:'MIRROR', S:'STRETCH', STRETCH:'STRETCH',
   J:'JOIN', JOIN:'JOIN', PEDIT:'JOIN', X:'EXPLODE', EXPLODE:'EXPLODE',
+  B:'BLOCK', BLOCK:'BLOCK', I:'INSERT', INSERT:'INSERT', DDINSERT:'INSERT',
   H:'HATCH', HATCH:'HATCH', BHATCH:'HATCH', AREA:'AREA', AA:'AREA',
   DIM:'DIM', DLI:'DIM', DAL:'DIM', DIMLINEAR:'DIM', DIMTXT:'DIMTXT', DTX:'DIMTXT',
   DI:'DIST', DIST:'DIST', Z:'ZOOM', ZOOM:'ZOOM', ZOOMEXT:'ZOOMEXT', P:'PAN', PAN:'PAN',
@@ -270,6 +271,22 @@ export function startCommand(raw){
     cmd.step='layer';
     setPrompt('LAYDEL — Layer to delete (wildcards ok, e.g. EXCLUIR*):');
   }
+  else if (name==='BLOCK'){
+    if (!selection.size){ log('Select the objects to turn into a block first, then BLOCK.', 'e'); cancelCmd(true); return; }
+    cmd.sel = [...selection];
+    cmd.step = 'base';
+    setPrompt('BLOCK — Specify base point (the handle you will insert it by):');
+  }
+  else if (name==='INSERT'){
+    const names = Object.keys(blocks);
+    if (!names.length){
+      log('No blocks yet. Select some objects and type BLOCK to make one first.', 'e');
+      cancelCmd(true); return;
+    }
+    cmd.step = 'name';
+    log(`Blocks: ${names.join(', ')}`);
+    setPrompt('INSERT — Block name:');
+  }
   else if (name==='CHLAYER'){
     if (!selection.size){ log('Select objects first, then CHLAYER.', 'e'); cancelCmd(true); return; }
     cmd.step='layer';
@@ -425,6 +442,19 @@ export function onPoint(p){
   else if (n==='CIRCLE'){
     if (!cmd.center){ cmd.center=p; setPrompt('CIRCLE — Specify radius (click or type):'); }
     else { makeCircle(dist(cmd.center,p)); return; }
+  }
+  else if (n==='BLOCK' && cmd.step==='base'){
+    cmd.base = {x:p.x, y:p.y};
+    cmd.step = 'name';
+    setPrompt('BLOCK — Name for this block:');
+  }
+  else if (n==='INSERT' && cmd.step==='pos'){
+    cmd.pt = {x:p.x, y:p.y};
+    cmd.step = 'scale';
+    setPrompt('INSERT — Scale <1>:');
+  }
+  else if (n==='INSERT' && cmd.step==='angle'){
+    placeInsert(Math.atan2(p.y-cmd.pt.y, p.x-cmd.pt.x));
   }
   else if (n==='TEXT' && cmd.step==='point'){
     cmd.pt=p; cmd.step='height';
@@ -974,9 +1004,16 @@ function performJoin(ids){
 }
 function performExplode(ids){
   const born=[], consumed=new Set();
-  let plines=0, skipped=0;
+  let plines=0, skipped=0, inserts=0;
   for (const id of ids){
     const e=entities.find(z=>z.id===id); if (!e) continue;
+    if (e.type==='insert'){                    // a block becomes the geometry it stood for
+      const parts = blockParts(e);
+      if (!parts.length){ skipped++; continue; }
+      inserts++; consumed.add(e.id);
+      for (const q of parts) born.push({...JSON.parse(JSON.stringify(q)), id:nextId()});
+      continue;
+    }
     if (e.type!=='pline'){ skipped++; continue; }
     plines++; consumed.add(e.id);
     for (const part of plineParts(e)){
@@ -987,8 +1024,8 @@ function performExplode(ids){
         born.push({id:nextId(), type:'line', x1:part.a.x, y1:part.a.y, x2:part.b.x, y2:part.b.y, layer:e.layer});
     }
   }
-  if (!plines){
-    log('EXPLODE breaks polylines (rectangles too) into lines and arcs — select one.', 'e');
+  if (!plines && !inserts){
+    log('EXPLODE breaks polylines (rectangles too) into lines and arcs, and blocks into their pieces — select one.', 'e');
     endCmd(); return;
   }
   snapshot();
@@ -996,7 +1033,22 @@ function performExplode(ids){
   for (const e of entities) if (e.type==='hatch' && consumed.has(e.ref)){ consumed.add(e.id); hatchesGone++; }
   setEntities(entities.filter(e=>!consumed.has(e.id)).concat(born));
   selection.clear();
-  log(`Exploded ${plines} polyline${plines>1?'s':''} into ${born.length} objects${skipped?` (${skipped} skipped)`:''}${hatchesGone?` — ${hatchesGone} hatch${hatchesGone>1?'es':''} removed with the outline`:''}.`, 'r');
+  const what = [plines && `${plines} polyline${plines>1?'s':''}`, inserts && `${inserts} block${inserts>1?'s':''}`]
+    .filter(Boolean).join(' and ');
+  log(`Exploded ${what} into ${born.length} objects${skipped?` (${skipped} skipped)`:''}${hatchesGone?` — ${hatchesGone} hatch${hatchesGone>1?'es':''} removed with the outline`:''}.`, 'r');
+  endCmd();
+}
+
+/* One placed reference to a block definition. */
+function placeInsert(rot){
+  snapshot();
+  const e = {id:nextId(), type:'insert', name:cmd.blockName,
+             x:cmd.pt.x, y:cmd.pt.y, layer:currentLayer};
+  if (cmd.scale && cmd.scale !== 1) e.s = cmd.scale;
+  if (rot) e.rot = normAng(rot);
+  entities.push(e);
+  bumpGeom();
+  log(`Inserted "${cmd.blockName}".`, 'r');
   endCmd();
 }
 
@@ -1100,6 +1152,51 @@ export function handleEnter(text){
     snapshot();
     entities.push({id:nextId(), type:'text', x:cmd.pt.x, y:cmd.pt.y, h:cmd.h, str:text, layer:currentLayer});
     endCmd(); return;
+  }
+  if (n==='BLOCK' && cmd.step==='name'){
+    const name = text.trim();
+    if (!name){ log('Give the block a name, e.g. door80.', 'e'); return; }
+    if (blockDef(name)){ log(`A block called "${name}" already exists — pick another name.`, 'e'); return; }
+    // the definition keeps its own copy in world coordinates; base is subtracted
+    // when it is expanded, so the objects can be defined anywhere on the sheet
+    const chosen = entities.filter(e => cmd.sel.includes(e.id));
+    if (!chosen.length){ log('Those objects are gone.', 'e'); endCmd(); return; }
+    if (chosen.some(e => e.type === 'insert')){
+      log('A block cannot contain another block yet — explode the inner one first.', 'e');
+      endCmd(); return;
+    }
+    defineBlock(name, { base:{...cmd.base}, ents: JSON.parse(JSON.stringify(chosen)) });
+    // AutoCAD replaces the selection with an insert of what you just defined
+    snapshot();
+    const keep = new Set(chosen.map(e => e.id));
+    setEntities(entities.filter(e => !keep.has(e.id)).concat([
+      {id:nextId(), type:'insert', name, x:cmd.base.x, y:cmd.base.y, layer:currentLayer}
+    ]));
+    selection.clear();
+    log(`Block "${name}" defined from ${chosen.length} object${chosen.length>1?'s':''}, and placed. INSERT puts down another.`, 'r');
+    endCmd(); return;
+  }
+  if (n==='INSERT' && cmd.step==='name'){
+    const name = text.trim();
+    if (!blockDef(name)){
+      log(`No block called "${name}". Blocks here: ${Object.keys(blocks).join(', ') || 'none'}`, 'e');
+      return;
+    }
+    cmd.blockName = name; cmd.step = 'pos';
+    setPrompt(`INSERT ${name} — Specify insertion point:`);
+    return;
+  }
+  if (n==='INSERT' && cmd.step==='scale'){
+    const v = text.trim() === '' ? 1 : parseFloat(text);
+    if (!(v > 0)){ log('Scale must be a positive number, e.g. 1 or 0.5.', 'e'); return; }
+    cmd.scale = v; cmd.step = 'angle';
+    setPrompt('INSERT — Rotation in degrees <0>, or click a direction:');
+    return;
+  }
+  if (n==='INSERT' && cmd.step==='angle'){
+    const v = text.trim() === '' ? 0 : parseFloat(text);
+    if (isNaN(v)){ log('Enter an angle in degrees, or click a direction.', 'e'); return; }
+    placeInsert(v*Math.PI/180); return;
   }
   if (n==='ZOOM'){
     const c = text.toUpperCase();

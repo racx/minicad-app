@@ -138,8 +138,10 @@ const MAX_UNSAVED_MS = 30000  // ... but never sit dirty longer than this
 const RETRY_MS = 5000         // min gap between failed attempts
 
 function serialize() {
-  const { layers, entities, getIdSeq, units } = engine.state
-  return JSON.stringify({ layers, entities, idSeq: getIdSeq(), units })
+  const { layers, entities, blocks, getIdSeq, units } = engine.state
+  // blocks ride along with the drawing: a doc that saved its inserts but not
+  // their definitions reopens as a plan full of nothing
+  return JSON.stringify({ layers, entities, blocks, idSeq: getIdSeq(), units })
 }
 
 function applyDoc(d) {
@@ -150,6 +152,7 @@ function applyDoc(d) {
     return
   }
   state.setLayers(d.layers || state.layers)
+  state.setBlocks(d.blocks)                    // definitions before the inserts that need them
   state.setEntities(d.entities || [])
   state.setIdSeq(d.idSeq || (d.entities?.length || 0) + 1)
   state.setUnits(d.units || 'cm')

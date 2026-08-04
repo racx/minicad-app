@@ -26,7 +26,15 @@ function handles(){
   return () => (++n).toString(16).toUpperCase();
 }
 
-export function buildDXF({entities = [], layers = [], units = 'cm'} = {}){
+export function buildDXF({entities = [], layers = [], units = 'cm', expandInsert = null} = {}){
+  // Blocks are written as the geometry they stand for. A real BLOCK/INSERT pair
+  // would keep them reusable in the receiving CAD, and this file already has
+  // the BLOCKS machinery for dimensions to borrow — but geometry that is right
+  // beats structure that is half right, so until that is built and audited an
+  // insert is flattened. The drawing looks identical; it just arrives as parts.
+  if (expandInsert && entities.some(e => e.type === 'insert'))
+    entities = entities.flatMap(e => e.type === 'insert' ? expandInsert(e) : [e]);
+
   const L = [];
   const p = (...a) => { for (const v of a) L.push(typeof v === 'number' ? f(v) : esc(String(v))); };
   const f = v => Number.isFinite(v) ? String(Math.round(v * 1e8) / 1e8) : '0';

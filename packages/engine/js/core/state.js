@@ -20,6 +20,18 @@ export function nextId(){ return idSeq++; }
 export function getIdSeq(){ return idSeq; }
 export function setIdSeq(n){ idSeq = n; }
 
+/* ---------- block definitions ----------
+   name → {base:{x,y}, ents:[…]}. The entities are stored in the block's own
+   coordinates (base point at the origin is NOT assumed — base is subtracted
+   when an insert is expanded), with local ids that mean nothing outside the
+   definition. Like layers, definitions live beside the undo stack rather than
+   inside it: undo takes back the insert you placed, not the block you taught
+   the drawing. */
+export let blocks = {};
+export function setBlocks(b){ blocks = b || {}; bumpGeom(); }
+export function blockDef(name){ return blocks[name] || null; }
+export function defineBlock(name, def){ blocks[name] = def; bumpGeom(); }
+
 export let layers = [
   {name:'0',     color:'#e8e8e8'},
   {name:'walls', color:'#4db8ff'},

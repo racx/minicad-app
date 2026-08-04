@@ -3,7 +3,7 @@
    ========================================================= */
 import { dist, fmt, arcFrom3, bulgeArc, tangentBulge, bulgeFrom3, plineEndTangent } from '../../core/geometry.js';
 import { entities, view, T, cmd, curPt, snapMark, trackGuides, boxSel, mouse, selection, layerOf, layerVisible, hoverSel, hotGrip, unitFmt, units, lwOf, lwPx } from '../../core/state.js';
-import { entBBox, entGrips, dimGeom, dimH } from '../../core/entities.js';
+import { entBBox, entGrips, dimGeom, dimH, blockParts } from '../../core/entities.js';
 import { query as spatialQuery } from '../../core/spatial.js';
 import { materialByKey } from '../../core/materials.js';
 import { log } from './ui.js';
@@ -321,6 +321,14 @@ function drawEntity(e, dx, dy, ghost){
   } else if (e.type==='pline'){
     tracePline(e.pts, e.closed, dx, dy);
     ctx.stroke();
+  } else if (e.type==='insert'){
+    // a reference draws as the thing it refers to; selection colour is already
+    // set on the context, so the pieces inherit the highlight
+    for (const q of blockParts(e)) drawEntity(q, dx, dy, ghost);
+    if (isSel){                                     // and mark the handle you grab it by
+      const s0 = w2s({x:e.x+dx, y:e.y+dy});
+      ctx.strokeRect(s0.x-3, s0.y-3, 6, 6);
+    }
   } else if (e.type==='text'){
     const px = e.h*view.scale;
     const s=w2s({x:e.x+dx,y:e.y+dy});

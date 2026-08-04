@@ -162,6 +162,22 @@
   <p>Think of layers as different colored pens: <i>walls</i>, <i>furniture</i>, <i>annot</i> (notes/labels). The chip at the top-right always names the pen you're drawing with; the color swatch changes its color; <b>+</b> adds a new one. Keeping walls and furniture on separate layers keeps a plan readable.</p>
   <p>Click that chip to open the layer panel, which is where every layer is managed: click a name to draw on it, <b>👁</b> to hide it (great for seeing the bare walls without furniture), <b>🔒</b> to lock it — still visible and snappable, but click-proof, so you can't nudge the walls by accident while arranging chairs. Drew something on the wrong layer? Select it and type <span class="say">CH</span> to move it.</p>
 
+  <h2>Blocks: draw the door once</h2>
+  <p>A <b>block</b> is a symbol you define once and place as many times as you like — a door,
+  a window, a chair, a north arrow. Draw it, select it, type <span class="say">B</span>, then click
+  the <i>base point</i> (the handle you will hold it by — for a door, the hinge) and give it a name.
+  What you selected turns into one object.</p>
+  <p>Type <span class="say">I</span> to place another: name, where it goes, how big
+  (<span class="say">1</span> = as drawn, <span class="say">0.5</span> = half), and which way it
+  faces in degrees. Every copy points back at the one definition, so a plan with forty chairs stays
+  small. Blocks travel inside the drawing, so saving and reopening keeps them.</p>
+  <p>Mirroring a block really mirrors it — a door mirrored across a wall opens the other way, which
+  is what you want and the reason the copies are references rather than duplicated lines. Type
+  <span class="say">X</span> (explode) to break one back into plain lines when you need to edit
+  just that copy. Two limits worth knowing: scale is the same in both directions (no squashing),
+  and a block cannot yet contain another block. Exported DXF carries blocks as their geometry —
+  they look identical in other CAD, but arrive as loose lines rather than as reusable symbols.</p>
+
   <h2>Saving your work</h2>
   <table>
     <tr><td>Save</td><td>Downloads <code>drawing.json</code> — this is <b>your file</b>, reopen it with the Open button.</td></tr>
