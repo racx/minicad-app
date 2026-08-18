@@ -144,6 +144,13 @@ export function applyModifiers(rawW, excludeId){
     };
     const near = [rawW.x-tol, rawW.y-tol, rawW.x+tol, rawW.y+tol];
     for (const c of snapCandidates(excludeId, near)) consider(c);
+    // vertices of the polyline being drawn are endpoints too — the entity
+    // doesn't exist yet, so snapCandidates can't see them, which made closing
+    // onto the first point impossible (the last vertex is the rubber base;
+    // snapping to it would only invite a zero-length segment)
+    const inProgress = (cmd && cmd.name==='PLINE')
+      ? cmd.pts.slice(0, -1).map(q=>({p:{x:q.x, y:q.y}, k:'end'})) : [];
+    for (const c of inProgress) consider(c);
     // dynamic snaps near the cursor
     const nearEnts = spatialQuery(near[0], near[1], near[2], near[3]).filter(e=>{
       if (e.id===excludeId || e.type==='text' || !layerVisible(e.layer)) return false;
@@ -185,7 +192,7 @@ export function applyModifiers(rawW, excludeId){
       // interest is a cross — approximate it with the visible area
       const vw = 1200/view.scale, vh = 900/view.scale;
       const tb = [rawW.x-vw, rawW.y-vh, rawW.x+vw, rawW.y+vh];
-      for (const c of snapCandidates(excludeId, tb)){
+      for (const c of [...snapCandidates(excludeId, tb), ...inProgress]){
         if (!SNAP_ACTIVE.has(c.k)) continue;      // track off active snap points only
         const ddx=Math.abs(c.p.x-rawW.x), ddy=Math.abs(c.p.y-rawW.y);
         if (ddx<txd){ txd=ddx; tx=c.p.x; txs=c.p; }
@@ -203,7 +210,9 @@ export function applyModifiers(rawW, excludeId){
     }
   }
   const base = rubberBase();
-  if (T.ortho && base){
+  // ortho never applies to a rectangle's second corner: h/v from the first
+  // corner is precisely the degenerate (zero-area) rectangle
+  if (T.ortho && base && cmd.name!=='RECTANG'){
     if (Math.abs(p.x-base.x) >= Math.abs(p.y-base.y)) p = {x:p.x, y:base.y};
     else p = {x:base.x, y:p.y};
   }
@@ -391,12 +400,16 @@ export function onPoint(p){
     }
   }
   else if (n==='PLINE'){
+    // landing back on the first vertex (via endpoint snap or typed coords)
+    // closes the polyline — the natural gesture; typed C still works
+    const closes = cmd.pts.length>2 && dist(p, cmd.pts[0]) < 1e-9;
     if (cmd.plMode==='arc' && cmd.pts.length){
       const last = cmd.pts[cmd.pts.length-1];
       if (cmd.arcMid){                              // 3-point arc (no tangent to continue from)
         const bl = bulgeFrom3(last, cmd.arcMid, p);
         if (bl) last.bulge = bl;
         cmd.arcMid = null;
+        if (closes){ finishPline(true); return; }  // bulge on last spans the closing segment
         cmd.pts.push(p);
         setPrompt('PLINE arc — Specify arc end point [L = straight, C to close]:');
       } else {
@@ -410,11 +423,13 @@ export function onPoint(p){
             log("Can't reach that point with a tangent arc — pick a point more to the side.", 'e'); return;
           }
           if (Math.abs(bl) > 1e-9) last.bulge = bl;
+          if (closes){ finishPline(true); return; }
           cmd.pts.push(p);
           setPrompt('PLINE arc — Specify arc end point [L = straight, C to close]:');
         }
       }
     } else {
+      if (closes){ finishPline(true); return; }
       cmd.pts.push(p);
       setPrompt('PLINE — Specify next point [A = arc, C to close, Enter to end]:');
     }

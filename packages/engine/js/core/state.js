@@ -76,7 +76,9 @@ export function unitFmt(v){ return formatLen(v, units); }
 export const view = { scale: 4, ox: 0, oy: 0 };  // screen = world*scale + o  (y flipped)
 
 /* ---------- toggles ---------- */
-export const T = { grid:true, snap:false, ortho:true, osnap:true, dyn:true };
+// ortho starts OFF (as in AutoCAD): forced h/v on by default made free
+// sketching feel like the cursor was being dragged away from the mouse
+export const T = { grid:true, snap:false, ortho:false, osnap:true, dyn:true };
 
 /* ---------- runtime ---------- */
 export let cmd = null;               // active command state machine
