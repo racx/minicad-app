@@ -146,18 +146,18 @@ S.entities.forEach(e=>S.selection.add(e.id));
 C.startCommand('PEDIT');
 check('PEDIT joins like JOIN', S.entities.length===1 && S.entities[0].type==='pline');
 
-/* ===== curved plines refused by OFFSET with a way forward ===== */
+/* ===== curved plines offset for real now (detail in suite 12) ===== */
 reset();
 S.entities.push({id:S.nextId(), type:'pline', closed:false, layer:'0',
                  pts:[{x:0,y:0,bulge:0.5},{x:10,y:0},{x:20,y:0}]});
 C.startCommand('O');
 C.handleEnter('2');
-C.startCommand;  // no-op
-const curvedTarget = S.entities[0];
 // drive OFFSET pick via onPoint on top of the entity
 C.onPoint({x:10, y:0});   // pick object
 C.onPoint({x:10, y:5});   // pick side
-check('OFFSET refuses curved pline and mentions EXPLODE',
-      S.entities.length===1 && dom.logs.some(l=>l.includes('EXPLODE it, offset the pieces')));
+check('OFFSET handles a curved pline (no more EXPLODE detour)',
+      S.entities.length===2 && S.entities[1].type==='pline' &&
+      S.entities[1].pts.some(p=>p.bulge) &&
+      !dom.logs.some(l=>l.includes('EXPLODE it, offset the pieces')));
 
 finish();

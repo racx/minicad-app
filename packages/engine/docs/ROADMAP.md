@@ -272,8 +272,12 @@ as a shape one segment short of shut.
   entity (62 nearest-ACI + 420 true colour). ezdxf audit: 0 errors / 0 fixes with all 7
   materials. Round-trips through our importer (`MINICAD_*` names map back; `GREEN` added
   to the pattern→material table). Suite 31.
-- **OFFSET for curved polylines** (arc segments offset to r±d, joint recompute) — the current
-  refusal points users at EXPLODE → offset → JOIN.
+- ~~OFFSET for curved polylines~~ ✅ **shipped 2026-08-19**: each segment offsets as its own
+  primitive (arcs keep centre and orientation, radius ±d; bulges recomputed from final
+  endpoints since mitered joints slide along the offset circle). Corners: line/line miters
+  unlimited (as before), arc-involved joints trim onto the offset primitives within a 4·d
+  miter limit, and unreachable convex corners are bridged with a corner arc of radius d
+  about the original vertex. Collapse through an arc's centre refused. Suite 12.
 - **Radius + angular dimensions** (`DIMRAD`, `DIMANG`) on the existing dim entity family.
 - ~~Tangent + nearest osnap~~ ✅ shipped (TAN default-on; NEA **off by default** —
   tick "Nearest ⧖" in the `OSNAP` dialog — see §3).

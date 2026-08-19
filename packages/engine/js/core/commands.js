@@ -3,11 +3,11 @@
    typed input, snap/ortho modifiers, undo/redo, selection
    ========================================================= */
 import { dist, fmt, deep, rotPt, ptSegDist, TAU, normAng, arcSweep, arcPt, arcFrom3,
-         tangentBulge, bulgeFrom3, plineEndTangent, plineParts, plineCurved, entityArea,
+         tangentBulge, bulgeFrom3, bulgeArc, plineEndTangent, plineParts, plineCurved, entityArea,
          tessellateBoundary, pointInPoly } from './geometry.js';
 import { materialByKey } from './materials.js';
 import { SYMBOLS, symbolDef } from './symbols.js';
-import { entIntersections, lineEntT, lineLine, perpFoot, tangentPts, nearestOnEnt } from './intersect.js';
+import { entIntersections, lineEntT, lineLine, lineCircleT, circleCircle, perpFoot, tangentPts, nearestOnEnt } from './intersect.js';
 import { entities, setEntities, nextId, layers, setLayers, currentLayer, setCurrentLayer, undoStack, redoStack, snapshot,
          view, T, cmd, setCmd, lastCmdName, setLastCmdName, selection, curPt, setSnapMark,
          selRect, setSelRect, plotWin, setPlotWin, units, setUnits,
@@ -753,10 +753,6 @@ function offsetEntity(e, d, side){
     if (e.type==='circle') entities.push({id:nextId(), type:'circle', cx:e.cx, cy:e.cy, r, layer:e.layer});
     else entities.push({id:nextId(), type:'arc', cx:e.cx, cy:e.cy, r, a0:e.a0, a1:e.a1, layer:e.layer});
   } else if (e.type==='pline'){
-    if (plineCurved(e)){
-      log('OFFSET does not handle curved polylines yet — EXPLODE it, offset the pieces, then JOIN them back.', 'e');
-      undoStack.pop(); return;
-    }
     const pts = offsetPlinePts(e, d, side);
     if (!pts){ log('Offset would collapse the polyline.', 'e'); undoStack.pop(); return; }
     entities.push({id:nextId(), type:'pline', closed:e.closed, pts, layer:e.layer});
@@ -770,39 +766,107 @@ function offsetEntity(e, d, side){
   }
   log('Offset created.', 'r');
 }
-// offset a polyline: shift each segment sideways, rejoin corners with mitered intersections
+/* offset a polyline, arcs included: each segment offsets as its own primitive
+   (a line shifts along its normal; an arc keeps its centre and orientation and
+   its radius grows or shrinks by d), then the corners are rejoined — mitered
+   where the offset primitives intersect, bridged with a corner arc of radius d
+   about the original vertex where they cannot meet (an arc's circle, unlike a
+   line, cannot be extended past itself). Arc bulges are recomputed from the
+   final endpoints because a mitered joint slides them along the offset circle;
+   the sweep changes even though the circle does not. */
 function offsetPlinePts(e, d, side){
   const pts=e.pts, n=pts.length;
+  const closed = e.closed && n>2;
   const segs=[];
-  for (let i=0;i<n-1;i++) segs.push([pts[i], pts[i+1]]);
-  if (e.closed && n>2) segs.push([pts[n-1], pts[0]]);
+  for (let i=0;i<n-1;i++) segs.push({a:pts[i], b:pts[i+1], bulge:pts[i].bulge||0});
+  if (closed) segs.push({a:pts[n-1], b:pts[0], bulge:pts[n-1].bulge||0});
   if (!segs.length) return null;
-  // which side? decided by the segment nearest to the pick point
+
+  // which side? decided by the segment nearest to the pick point:
+  // left/right of the travel direction (for an arc: travelling CCW puts the
+  // centre on the left, so "picked on the centre side" means left iff CCW)
   let bi=0, bd=Infinity;
-  segs.forEach((s,i)=>{ const dd=ptSegDist(side, s[0], s[1]); if (dd<bd){ bd=dd; bi=i; } });
-  const [sa,sb]=segs[bi];
-  const sgn = Math.sign((side.x-sa.x)*-(sb.y-sa.y) + (side.y-sa.y)*(sb.x-sa.x)) || 1;
-  // every segment shifted along its left normal by sgn·d
-  const off = segs.map(([a,b])=>{
-    const dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy);
-    if (!L) return null;
-    const nx=-dy/L*sgn*d, ny=dx/L*sgn*d;
-    return {a:{x:a.x+nx, y:a.y+ny}, d:{x:dx, y:dy}};
-  });
-  if (off.some(o=>!o)) return null;
-  const out=[];
-  if (e.closed && n>2){
-    for (let i=0;i<off.length;i++){
-      const prev = off[(i-1+off.length)%off.length];
-      out.push(lineLine(prev.a, prev.d, off[i].a, off[i].d) || {x:off[i].a.x, y:off[i].a.y});
-    }
+  segs.forEach((s,i)=>{ const dd=ptSegDist(side, s.a, s.b); if (dd<bd){ bd=dd; bi=i; } });
+  const near = segs[bi];
+  let sgn;
+  if (near.bulge){
+    const g = bulgeArc(near.a, near.b, near.bulge);
+    sgn = ((dist(side, {x:g.cx, y:g.cy}) < g.r) === (near.bulge > 0)) ? 1 : -1;
   } else {
-    out.push({x:off[0].a.x, y:off[0].a.y});
-    for (let i=1;i<off.length;i++)
-      out.push(lineLine(off[i-1].a, off[i-1].d, off[i].a, off[i].d) || {x:off[i].a.x, y:off[i].a.y});
-    const last=off[off.length-1];
-    out.push({x:last.a.x+last.d.x, y:last.a.y+last.d.y});
+    sgn = Math.sign((side.x-near.a.x)*-(near.b.y-near.a.y) + (side.y-near.a.y)*(near.b.x-near.a.x)) || 1;
   }
+  const t = sgn*d;                                 // shift along the left normal of travel
+
+  // each segment offset as its own primitive
+  const off=[];
+  for (const s of segs){
+    if (s.bulge){
+      const g = bulgeArc(s.a, s.b, s.bulge);
+      if (!g) return null;
+      const orient = Math.sign(s.bulge);
+      const r = g.r - t*orient;                    // left is toward the centre iff CCW
+      if (r <= 1e-9) return null;                  // arc collapses through its centre
+      const c = {x:g.cx, y:g.cy}, f = r/g.r;
+      const move = q => ({x:c.x+(q.x-c.x)*f, y:c.y+(q.y-c.y)*f});
+      off.push({arc:true, c, r, orient, a:move(s.a), b:move(s.b)});
+    } else {
+      const dx=s.b.x-s.a.x, dy=s.b.y-s.a.y, L=Math.hypot(dx,dy);
+      if (!L) return null;
+      const nx=-dy/L*t, ny=dx/L*t;
+      off.push({arc:false, dir:{x:dx, y:dy},
+                a:{x:s.a.x+nx, y:s.a.y+ny}, b:{x:s.b.x+nx, y:s.b.y+ny}});
+    }
+  }
+
+  // joint between two offset segments at original vertex V:
+  // {p} = they meet at one point · {pe, ps, bulge} = corner arc bridges them
+  const joint = (A, B, V) => {
+    const pe = A.b, ps = B.a;
+    const eps = 1e-6 * Math.max(1, Math.abs(d));
+    if (dist(pe, ps) < eps) return {p:{x:(pe.x+ps.x)/2, y:(pe.y+ps.y)/2}};   // tangent joint
+    if (!A.arc && !B.arc){
+      const q = lineLine(A.a, A.dir, B.a, B.dir);  // classic miter, unlimited (AutoCAD extends)
+      if (q) return {p:q};
+    } else {
+      const cand = [];
+      if (!A.arc)      for (const tt of lineCircleT(A.a, A.dir, B.c, B.r)) cand.push({x:A.a.x+tt*A.dir.x, y:A.a.y+tt*A.dir.y});
+      else if (!B.arc) for (const tt of lineCircleT(B.a, B.dir, A.c, A.r)) cand.push({x:B.a.x+tt*B.dir.x, y:B.a.y+tt*B.dir.y});
+      else             cand.push(...circleCircle(A.c, A.r, B.c, B.r));
+      let best=null, bq=Infinity;
+      for (const q of cand){ const dd=dist(q, V); if (dd<bq){ bq=dd; best=q; } }
+      if (best && bq < Math.abs(d)*4) return {p:best};   // miter limit: past it, round the corner
+    }
+    // no meeting point: bridge with an arc of radius |d| centred on the corner
+    const cross = (pe.x-V.x)*(ps.y-V.y) - (pe.y-V.y)*(ps.x-V.x);
+    const dot   = (pe.x-V.x)*(ps.x-V.x) + (pe.y-V.y)*(ps.y-V.y);
+    const sweep = Math.atan2(Math.abs(cross), dot);
+    return {pe, ps, bulge: Math.sign(cross || 1) * Math.tan(sweep/4)};
+  };
+
+  // resolve every joint, collect each segment's final endpoints
+  const m = off.length;
+  const start = off.map(o=>o.a), end = off.map(o=>o.b), corner = new Array(m).fill(null);
+  for (let j = closed ? 0 : 1; j<m; j++){
+    const k = (j-1+m)%m;                           // joint j joins off[k] → off[j] at vertex j
+    const r = joint(off[k], off[j], segs[j].a);
+    if (r.p){ end[k]=r.p; start[j]=r.p; }
+    else { end[k]=r.pe; start[j]=r.ps; corner[k]=r.bulge; }
+  }
+
+  // an arc's bulge from its FINAL endpoints — the joints moved them
+  const arcBulge = (o, S, E) => {
+    const a0=Math.atan2(S.y-o.c.y, S.x-o.c.x), a1=Math.atan2(E.y-o.c.y, E.x-o.c.x);
+    const sweep = normAng(o.orient>0 ? a1-a0 : a0-a1) || TAU;
+    return o.orient * Math.tan(sweep/4);
+  };
+
+  const out=[];
+  for (let k=0;k<m;k++){
+    const bl = off[k].arc ? arcBulge(off[k], start[k], end[k]) : 0;
+    out.push(bl ? {x:start[k].x, y:start[k].y, bulge:bl} : {x:start[k].x, y:start[k].y});
+    if (corner[k]!==null) out.push({x:end[k].x, y:end[k].y, bulge:corner[k]});
+  }
+  if (!closed) out.push({x:end[m-1].x, y:end[m-1].y});
   return out;
 }
 
