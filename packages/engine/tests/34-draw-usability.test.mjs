@@ -11,6 +11,9 @@ const reset=()=>{S.setEntities([]);S.undoStack.length=0;S.selection.clear();C.ca
 /* ===== ortho starts off — free sketching by default (F8 turns it on) ===== */
 check('ortho defaults OFF', S.T.ortho===false);
 check('osnap defaults ON', S.T.osnap===true);
+// the status chips are synced from T at boot — markup can't know the defaults
+check('ORTHO chip starts unlit', !document.getElementById('tOrtho').classList.contains('on'));
+check('GRID chip starts lit', document.getElementById('tGrid').classList.contains('on'));
 
 /* ===== RECTANG second corner ignores ortho (h/v = zero-area rectangle) ===== */
 S.T.ortho=true; S.T.osnap=false;

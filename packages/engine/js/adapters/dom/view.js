@@ -189,7 +189,7 @@ function drawCompass(){
   const r = 34, cx = W - r - 24, cy = RULER_PX + r + 20;
   ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2);
   ctx.fillStyle = 'rgba(28,31,37,.45)'; ctx.fill();
-  ctx.strokeStyle = '#2e3443'; ctx.lineWidth = 1; ctx.stroke();
+  ctx.strokeStyle = GRID_MAJOR; ctx.lineWidth = 1; ctx.stroke();
   // tick at each quarter, letter just inside the rim
   ctx.font = '10px system-ui, sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -206,7 +206,7 @@ function drawCompass(){
   // the TOP badge: the one view a 2D board has
   ctx.fillStyle = '#9aa2ad';
   ctx.fillRect(cx-13, cy-10, 26, 20);
-  ctx.fillStyle = '#20272f';
+  ctx.fillStyle = BG;
   ctx.font = '8px system-ui, sans-serif';
   ctx.fillText('TOP', cx, cy+.5);
   ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
@@ -317,14 +317,20 @@ function hatchDots(p0, p1, spec){
       ctx.fillRect(x-0.75, y-0.75, 1.5, 1.5);
 }
 // dynamic input (AutoCAD F12): prompt + what you're typing, riding the crosshair
+/* HUD chrome shared by the dyn-input box, the suggestion list and the angle
+   tags — one style, one place to change it */
+const textW = t => ctx.measureText(t)?.width ?? t.length*6.2;   // headless ctx stubs measureText
+function panel(x, y, w, h){
+  ctx.fillStyle = 'rgba(28,31,37,.92)';
+  ctx.fillRect(x, y, w, h);
+  ctx.strokeStyle = '#2e333d'; ctx.lineWidth = 1;
+  ctx.strokeRect(x+.5, y+.5, w-1, h-1);
+}
+
 /* the little boxed labels the angle guide pins to the drawing */
 function tagLabel(text, x, y, hot){
-  const tw = ctx.measureText(text)?.width ?? text.length*6.2;
-  const bw = tw + 10, bh = 16;
-  ctx.fillStyle = 'rgba(28,31,37,.92)';
-  ctx.fillRect(x - bw/2, y - bh/2, bw, bh);
-  ctx.strokeStyle = '#2e333d'; ctx.lineWidth = 1;
-  ctx.strokeRect(x - bw/2 + .5, y - bh/2 + .5, bw - 1, bh - 1);
+  const bw = textW(text) + 10, bh = 16;
+  panel(x - bw/2, y - bh/2, bw, bh);
   ctx.fillStyle = hot ? '#dce1eb' : '#8b93a1';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(text, x, y + .5);
@@ -341,8 +347,10 @@ function drawAngleGuide(s){
   const L = dist(base, curPt);
   if (L < 1e-9) return;
   const b = w2s(base);
-  const a = Math.atan2(curPt.y - base.y, curPt.x - base.x);   // world CCW from East
-  const deg = Math.round(((a*180/Math.PI) + 360) % 360) % 360;
+  const a = Math.atan2(curPt.y - base.y, curPt.x - base.x);   // world CCW from East, (-π, π]
+  const TAU = Math.PI*2;
+  const sweep = ((a % TAU) + TAU) % TAU;                      // full CCW sweep, 0..2π — the arc
+  const deg = Math.round(sweep*180/Math.PI) % 360;            // must span what the label claims
   const px = Math.hypot(s.x - b.x, s.y - b.y);
   ctx.font = '11px ui-monospace, Menlo, monospace';
   const r = Math.min(56, px * 0.45);
@@ -352,10 +360,10 @@ function drawAngleGuide(s){
     ctx.moveTo(b.x + 8, b.y); ctx.lineTo(b.x + r + 12, b.y);
     ctx.stroke();
     ctx.beginPath();                                          // …and the sweep to the rubber
-    ctx.arc(b.x, b.y, r, 0, -a, a > 0);                       // screen y flipped: world CCW = anticlockwise
+    ctx.arc(b.x, b.y, r, 0, -sweep, true);                    // screen y flipped: world CCW = anticlockwise
     ctx.stroke();
     ctx.setLineDash([]);
-    const mid = -a/2;
+    const mid = -sweep/2;
     tagLabel(`${deg}°`, b.x + (r+18)*Math.cos(mid), b.y + (r+18)*Math.sin(mid), false);
   }
   if (px > 40){                                               // length riding the rubber line
@@ -374,34 +382,28 @@ function drawDynInput(s){
   const sugs = (!cmd && typed) ? suggestCommands(typed) : [];
   const sugLabel = r => r.alias===r.name ? r.name : `${r.alias} (${r.name})`;
   const lines = [prompt, typed || null].filter(Boolean);
-  const tw = t => ctx.measureText(t)?.width ?? t.length*6.2;   // headless ctx stubs measureText
-  const wMax = Math.max(...lines.map(tw), ...sugs.map(r=>tw(sugLabel(r))+14));
+  const wMax = Math.max(...lines.map(textW), ...sugs.map(r=>textW(sugLabel(r))+14));
   const bw = wMax + 14, bh = lines.length*15 + 8, sh = sugs.length*16;
   let x = s.x + 16, y = s.y + 16;                   // right-below the crosshair…
   if (x + bw > W - 4) x = s.x - 16 - bw;            // …flip when the edge is near
   if (y + bh + sh > H - 4) y = s.y - 16 - bh - sh;
-  ctx.fillStyle = 'rgba(28,31,37,.92)';
-  ctx.fillRect(x, y, bw, bh);
-  ctx.strokeStyle = '#2e333d'; ctx.lineWidth = 1;
-  ctx.strokeRect(x+.5, y+.5, bw-1, bh-1);
+  panel(x, y, bw, bh);
   let ly = y + 15;
   ctx.fillStyle = '#8b93a1';
   ctx.fillText(prompt, x+7, ly); ly += 15;
   if (typed){
     ctx.fillStyle = '#43d6b5';
     ctx.fillText(typed, x+7, ly);
-    ctx.fillRect(x+8+tw(typed), ly-9, 1.5, 11);     // caret
+    ctx.fillRect(x+8+textW(typed), ly-9, 1.5, 11);  // caret
   }
   // command suggestions (idle typing): ↑/↓ choose, Tab completes, Enter runs
   if (sugs.length){
-    ctx.fillStyle = 'rgba(28,31,37,.96)';
-    ctx.fillRect(x, y+bh, bw, sh+4);
-    ctx.strokeStyle = '#2e333d';
-    ctx.strokeRect(x+.5, y+bh+.5, bw-1, sh+3);
+    panel(x, y+bh, bw, sh+4);
+    const sel = Math.min(sugSel, sugs.length-1);    // same clamp the keyboard uses
     sugs.forEach((r, i)=>{
       const ry = y + bh + 2 + i*16;
-      if (i===sugSel){ ctx.fillStyle='#2d3a4d'; ctx.fillRect(x+1, ry, bw-2, 16); }
-      ctx.fillStyle = i===sugSel ? '#e8edf5' : '#8b93a1';
+      if (i===sel){ ctx.fillStyle='#2d3a4d'; ctx.fillRect(x+1, ry, bw-2, 16); }
+      ctx.fillStyle = i===sel ? '#e8edf5' : '#8b93a1';
       ctx.fillText(sugLabel(r), x+11, ry+12);
     });
   }

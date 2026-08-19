@@ -47,9 +47,11 @@ export const ALIASES = {
 /* ---------- command autocomplete (AutoCAD-style) ----------
    Typed letters while idle → the matching commands, one row per command,
    shown under the dynamic-input box. Exact alias first, then shortest. */
+let sugMemo = { key: null, rows: [] };           // three callers per keystroke+frame share one scan
 export function suggestCommands(text){
   const t = (text || '').trim().toUpperCase();
-  if (!t || !/^[A-Z?]+$/.test(t)) return [];
+  if (sugMemo.key === t) return sugMemo.rows;
+  if (!t || !/^[A-Z?]+$/.test(t)){ sugMemo = { key: t, rows: [] }; return sugMemo.rows; }
   const byCmd = new Map();                       // canonical name -> best matching alias
   for (const [alias, name] of Object.entries(ALIASES)){
     if (!alias.startsWith(t)) continue;
@@ -60,7 +62,8 @@ export function suggestCommands(text){
   const rows = [...byCmd].map(([name, alias]) => ({alias, name}));
   rows.sort((a,b)=> (b.alias===t)-(a.alias===t) || a.alias.length-b.alias.length ||
                     (a.alias<b.alias ? -1 : 1));
-  return rows.slice(0, 8);
+  sugMemo = { key: t, rows: rows.slice(0, 8) };
+  return sugMemo.rows;
 }
 
 const MODIFY = new Set(['MOVE','COPY','ROTATE','SCALE','ERASE','MIRROR','JOIN','EXPLODE']);
@@ -211,12 +214,14 @@ export function applyModifiers(rawW, excludeId){
       // interest is a cross — approximate it with the visible area
       const vw = 1200/view.scale, vh = 900/view.scale;
       const tb = [rawW.x-vw, rawW.y-vh, rawW.x+vw, rawW.y+vh];
-      for (const c of [...snapCandidates(excludeId, tb), ...inProgress]){
-        if (!SNAP_ACTIVE.has(c.k)) continue;      // track off active snap points only
-        const ddx=Math.abs(c.p.x-rawW.x), ddy=Math.abs(c.p.y-rawW.y);
+      const track = c => {                        // track off active snap points only —
+        if (!SNAP_ACTIVE.has(c.k)) return;        // no spread: this runs per mousemove over
+        const ddx=Math.abs(c.p.x-rawW.x), ddy=Math.abs(c.p.y-rawW.y);   // a viewport of candidates
         if (ddx<txd){ txd=ddx; tx=c.p.x; txs=c.p; }
         if (ddy<tyd){ tyd=ddy; ty=c.p.y; tys=c.p; }
-      }
+      };
+      for (const c of snapCandidates(excludeId, tb)) track(c);
+      for (const c of inProgress) track(c);
       if (tx!==null || ty!==null){
         const q={x:(tx!==null?tx:rawW.x), y:(ty!==null?ty:rawW.y)};
         const guides=[];

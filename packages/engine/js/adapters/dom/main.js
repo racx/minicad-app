@@ -194,15 +194,18 @@ cmdInput.addEventListener('input', ()=>{ setSugSel(0); showTyped(); draw(); }); 
 /* command autocomplete (AutoCAD-style): while idle, typed letters list the
    matching commands at the cursor; ↑/↓ choose, Tab completes, Enter/Space/
    right-click runs the highlighted one — so PLI ⏎ runs PLINE, not an error */
+// the popup only renders while dynamic input is on and the cursor is on the
+// board (drawDynInput's gates) — keys must not act on a list nobody can see
+const sugsShowing = () => (!cmd && T.dyn && mouse.inside) ? suggestCommands(cmdInput.value) : [];
 function submitCmdLine(){
-  const sugs = !cmd ? suggestCommands(cmdInput.value) : [];
+  const sugs = sugsShowing();
   handleEnter(sugs.length ? sugs[Math.min(sugSel, sugs.length-1)].alias : cmdInput.value);
   cmdInput.value=''; setSugSel(0);
   syncPanBtn();
 }
 cmdInput.addEventListener('keydown', ev=>{
   const typingText = cmd && cmd.step==='string';        // spaces allowed inside TEXT strings
-  const sugs = !cmd ? suggestCommands(cmdInput.value) : [];
+  const sugs = sugsShowing();
   if (sugs.length){
     if (ev.key==='ArrowDown'){ ev.preventDefault(); setSugSel((sugSel+1)%sugs.length); draw(); return; }
     if (ev.key==='ArrowUp'){ ev.preventDefault(); setSugSel((sugSel+sugs.length-1)%sugs.length); draw(); return; }
@@ -297,7 +300,9 @@ window.addEventListener('keyup', ev=>{ if (ev.key===' ') spaceHeld=false; });
 /* ================= toggles / UI ================= */
 ['grid','snap','ortho','osnap','dyn'].forEach(k=>{
   const map={grid:'tGrid',snap:'tSnap',ortho:'tOrtho',osnap:'tOsnap',dyn:'tDyn'};
-  document.getElementById(map[k]).addEventListener('click', ()=>setTog(k));
+  const el = document.getElementById(map[k]);
+  el.classList.toggle('on', !!T[k]);   // markup can't know the defaults — sync at boot
+  el.addEventListener('click', ()=>setTog(k));
 });
 document.querySelectorAll('#topbar .btn[data-cmd]').forEach(b=>{
   b.addEventListener('click', ()=>{ startCommand(b.dataset.cmd); focusCmd(); });

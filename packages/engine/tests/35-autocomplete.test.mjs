@@ -9,6 +9,7 @@ const C = await import('../js/core/commands.js');
 const cmdInput = document.getElementById('cmdInput');
 const key = (k, ev={}) => cmdInput.listeners.keydown.forEach(fn=>fn({preventDefault(){}, key:k, ...ev}));
 const reset=()=>{S.setEntities([]);S.undoStack.length=0;S.selection.clear();C.cancelCmd(true);cmdInput.value='';S.setSugSel(0);};
+S.mouse.inside = true;                           // the popup (and its keys) only live on the board
 
 /* ===== suggestCommands: pure ranking ===== */
 let s = C.suggestCommands('PL');
@@ -64,6 +65,15 @@ cmdInput.value = 'C';
 key('Enter');                                    // C during PLINE = close, not CIRCLE
 const e = S.entities[S.entities.length-1];
 check('typed C inside PLINE still closes it', S.cmd===null && e && e.type==='pline' && e.closed===true);
+
+/* ===== keys never act on a popup nobody can see ===== */
+reset();
+S.mouse.inside = false;                          // cursor off the board: no popup rendered
+cmdInput.value = 'PLI';
+key('Enter');
+check('no popup → Enter runs the raw text (unknown command), not a hidden suggestion',
+      S.cmd===null && cmdInput.value==='');
+S.mouse.inside = true;
 
 /* ===== typed-anywhere keys reset the highlight ===== */
 reset();
