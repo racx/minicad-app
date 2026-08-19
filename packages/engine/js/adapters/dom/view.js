@@ -176,6 +176,39 @@ export function drawNow(){
   }
 
   drawRulers();
+  drawCompass();
+}
+
+/* ---------- compass rose (AutoCAD's N/E/S/W ring, top-right) ----------
+   Pure orientation: the board is 2D top view, north is always up. It earns
+   its pixels on a floor plan — "which wall faces south" is an architect's
+   question, and plans are read with a north arrow on them. */
+function drawCompass(){
+  if (W < 300 || H < 220) return;                 // no room on a tiny canvas
+  const r = 34, cx = W - r - 24, cy = RULER_PX + r + 20;
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(28,31,37,.45)'; ctx.fill();
+  ctx.strokeStyle = '#2e3443'; ctx.lineWidth = 1; ctx.stroke();
+  // tick at each quarter, letter just inside the rim
+  ctx.font = '10px system-ui, sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const pts = [['N',0,-1],['E',1,0],['S',0,1],['W',-1,0]];
+  ctx.beginPath();
+  for (const [,ux,uy] of pts){
+    ctx.moveTo(cx+ux*r, cy+uy*r); ctx.lineTo(cx+ux*(r-4), cy+uy*(r-4));
+  }
+  ctx.strokeStyle = '#4a5261'; ctx.stroke();
+  for (const [t,ux,uy] of pts){
+    ctx.fillStyle = t==='N' ? '#dce1eb' : '#8b93a1';
+    ctx.fillText(t, cx+ux*(r-11), cy+uy*(r-11)+.5);
+  }
+  // the TOP badge: the one view a 2D board has
+  ctx.fillStyle = '#9aa2ad';
+  ctx.fillRect(cx-13, cy-10, 26, 20);
+  ctx.fillStyle = '#20272f';
+  ctx.font = '8px system-ui, sans-serif';
+  ctx.fillText('TOP', cx, cy+.5);
+  ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
 }
 
 /* ---------- edge rulers (drawing units, follow pan/zoom) ---------- */
