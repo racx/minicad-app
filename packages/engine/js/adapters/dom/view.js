@@ -160,6 +160,7 @@ export function drawNow(){
     ctx.moveTo(s.x+.5, s.y+box); ctx.lineTo(s.x+.5, s.y+arm);
     ctx.stroke();
     ctx.strokeRect(s.x-4.5, s.y-4.5, 9, 9);
+    drawAngleGuide(s);
     drawDynInput(s);
     if (hoverSel){                       // "you can drag this" move glyph
       const gx=s.x+16, gy=s.y-16, a=6;
@@ -316,6 +317,53 @@ function hatchDots(p0, p1, spec){
       ctx.fillRect(x-0.75, y-0.75, 1.5, 1.5);
 }
 // dynamic input (AutoCAD F12): prompt + what you're typing, riding the crosshair
+/* the little boxed labels the angle guide pins to the drawing */
+function tagLabel(text, x, y, hot){
+  const tw = ctx.measureText(text)?.width ?? text.length*6.2;
+  const bw = tw + 10, bh = 16;
+  ctx.fillStyle = 'rgba(28,31,37,.92)';
+  ctx.fillRect(x - bw/2, y - bh/2, bw, bh);
+  ctx.strokeStyle = '#2e333d'; ctx.lineWidth = 1;
+  ctx.strokeRect(x - bw/2 + .5, y - bh/2 + .5, bw - 1, bh - 1);
+  ctx.fillStyle = hot ? '#dce1eb' : '#8b93a1';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, x, y + .5);
+  ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+}
+
+/* AutoCAD's angle preview: a dashed arc swung from East to the rubber line,
+   the angle boxed at the arc, the length boxed on the line itself — you see
+   how long and how steep BEFORE you commit the click. */
+function drawAngleGuide(s){
+  if (!T.dyn) return;
+  const base = rubberBase();
+  if (!base) return;
+  const L = dist(base, curPt);
+  if (L < 1e-9) return;
+  const b = w2s(base);
+  const a = Math.atan2(curPt.y - base.y, curPt.x - base.x);   // world CCW from East
+  const deg = Math.round(((a*180/Math.PI) + 360) % 360) % 360;
+  const px = Math.hypot(s.x - b.x, s.y - b.y);
+  ctx.font = '11px ui-monospace, Menlo, monospace';
+  const r = Math.min(56, px * 0.45);
+  if (r > 16 && deg !== 0){
+    ctx.setLineDash([4,3]); ctx.strokeStyle = 'rgba(139,147,161,.7)'; ctx.lineWidth = 1;
+    ctx.beginPath();                                          // East reference…
+    ctx.moveTo(b.x + 8, b.y); ctx.lineTo(b.x + r + 12, b.y);
+    ctx.stroke();
+    ctx.beginPath();                                          // …and the sweep to the rubber
+    ctx.arc(b.x, b.y, r, 0, -a, a > 0);                       // screen y flipped: world CCW = anticlockwise
+    ctx.stroke();
+    ctx.setLineDash([]);
+    const mid = -a/2;
+    tagLabel(`${deg}°`, b.x + (r+18)*Math.cos(mid), b.y + (r+18)*Math.sin(mid), false);
+  }
+  if (px > 40){                                               // length riding the rubber line
+    const nx = -(s.y - b.y)/px, ny = (s.x - b.x)/px;           // unit normal, screen space
+    tagLabel(`${unitFmt(L)} ${units}`, (b.x+s.x)/2 + nx*14, (b.y+s.y)/2 + ny*14, true);
+  }
+}
+
 function drawDynInput(s){
   if (!T.dyn) return;
   const typed = document.getElementById('cmdInput')?.value || '';
@@ -323,20 +371,9 @@ function drawDynInput(s){
   if (!cmd && !typed) return;                       // idle and silent: keep the canvas clean
   if (prompt.length > 46) prompt = prompt.slice(0, 45) + '…';
   ctx.font = '11px ui-monospace, Menlo, monospace';
-  // distance + angle from the rubber base (AutoCAD's at-cursor readout):
-  // you see how long and how steep before you commit the click
-  let readout = null;
-  const base = rubberBase();
-  if (base){
-    const L = dist(base, curPt);
-    if (L > 1e-9){
-      const deg = (Math.atan2(curPt.y-base.y, curPt.x-base.x)*180/Math.PI + 360) % 360;
-      readout = `${unitFmt(L)} ${units}  ∠ ${deg.toFixed(deg%1 ? 1 : 0)}°`;
-    }
-  }
   const sugs = (!cmd && typed) ? suggestCommands(typed) : [];
   const sugLabel = r => r.alias===r.name ? r.name : `${r.alias} (${r.name})`;
-  const lines = [prompt, readout, typed || null].filter(Boolean);
+  const lines = [prompt, typed || null].filter(Boolean);
   const tw = t => ctx.measureText(t)?.width ?? t.length*6.2;   // headless ctx stubs measureText
   const wMax = Math.max(...lines.map(tw), ...sugs.map(r=>tw(sugLabel(r))+14));
   const bw = wMax + 14, bh = lines.length*15 + 8, sh = sugs.length*16;
@@ -350,10 +387,6 @@ function drawDynInput(s){
   let ly = y + 15;
   ctx.fillStyle = '#8b93a1';
   ctx.fillText(prompt, x+7, ly); ly += 15;
-  if (readout){
-    ctx.fillStyle = '#dce1eb';
-    ctx.fillText(readout, x+7, ly); ly += 15;
-  }
   if (typed){
     ctx.fillStyle = '#43d6b5';
     ctx.fillText(typed, x+7, ly);
