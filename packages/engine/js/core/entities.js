@@ -161,7 +161,12 @@ export function entHitDist(ent, p){
   if (ent.type==='hatch'){
     const b = entities.find(z=>z.id===ent.ref);
     if (!b) return Infinity;
-    return pointInPoly(p, tessellateBoundary(b)) ? 6/view.scale : Infinity;
+    if (!pointInPoly(p, tessellateBoundary(b))) return Infinity;
+    for (const id of ent.holes || []){                  // a hole is not the hatch —
+      const hEnt = entities.find(z=>z.id===id);         // clicking inside an island
+      if (hEnt && pointInPoly(p, tessellateBoundary(hEnt))) return Infinity;   // hits the island
+    }
+    return 6/view.scale;
   }
   if (ent.type==='text'){
     // work in the text's own frame, so rotation costs nothing here

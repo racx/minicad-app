@@ -273,9 +273,22 @@ function drawHatch(e){
   if (!b || !mat || !layerVisible(b.layer)) return;     // orphaned or hidden boundary: draw nothing
   ctx.save();
   ctx.beginPath();
-  if (b.type==='circle'){ const c=w2s({x:b.cx,y:b.cy}); ctx.arc(c.x, c.y, b.r*view.scale, 0, Math.PI*2); }
-  else tracePline(b.pts, true, 0, 0);
-  ctx.clip();
+  // boundary plus its islands as subpaths — even-odd turns each island into a
+  // hole (and re-fills an island inside an island, AutoCAD's "normal" style).
+  // The moveTo before arc() matters: without it the arc gets a connector line
+  // from the previous subpath and the fill rule counts it.
+  const loop = q => {
+    if (q.type==='circle'){
+      const c=w2s({x:q.cx, y:q.cy}), r=q.r*view.scale;
+      ctx.moveTo(c.x + r, c.y); ctx.arc(c.x, c.y, r, 0, Math.PI*2);
+    } else tracePline(q.pts, true, 0, 0);
+  };
+  loop(b);
+  for (const id of e.holes || []){
+    const hEnt = entities.find(z=>z.id===id);
+    if (hEnt && layerVisible(hEnt.layer)) loop(hEnt);
+  }
+  ctx.clip('evenodd');
   const bb=entBBox(b), p0=w2s({x:bb[0], y:bb[3]}), p1=w2s({x:bb[2], y:bb[1]});
   const sel = selection.has(e.id);
   ctx.strokeStyle = ctx.fillStyle = sel ? '#4db8ff' : mat.color;

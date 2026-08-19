@@ -192,7 +192,8 @@ export function buildDXF({entities = [], layers = [], units = 'cm',
     }
     else if (e.type === 'hatch'){
       const b = lookup.get(e.ref);
-      if (b) writeHatch(p, head, e, b, units);
+      const holes = (e.holes || []).map(id => lookup.get(id)).filter(Boolean);
+      if (b) writeHatch(p, head, e, b, holes, units);
     }
     else if (e.type === 'insert'){
       const b = blockRefs.get(e.name);
@@ -334,7 +335,7 @@ export function lwCode(mm){
    spacing is scaled as if plotted at 1:50 — the reference scale of the house
    plans this trades with — and converted to the drawing's unit. */
 const MM_PER_UNIT = { mm: 1, cm: 10, m: 1000 };
-function writeHatch(p, head, e, b, units){
+function writeHatch(p, head, e, b, holes, units){
   const mat = materialByKey(e.mat);
   const solid = !mat || mat.pattern.solid;
   head('HATCH', e, 'AcDbHatch', mat ? mat.color : null);
@@ -342,26 +343,30 @@ function writeHatch(p, head, e, b, units){
   p('2', solid ? 'SOLID' : 'MINICAD_' + mat.key.toUpperCase());
   p('70', solid ? 1 : 0);           // solid fill flag
   p('71', 0);                       // not associative
-  p('91', 1);                       // one boundary path
+  p('91', 1 + holes.length);        // outer boundary + one path per island
 
   // a circle is four exact quarter-arc segments (bulge tan π/8) — two
   // half-turns would be exact too, but readers (ours included) reject
   // closed loops of fewer than three vertices
   const qb = Math.tan(Math.PI/8);
-  const pts = b.type === 'circle'
-    ? [{x:b.cx + b.r, y:b.cy, bulge:qb}, {x:b.cx, y:b.cy + b.r, bulge:qb},
-       {x:b.cx - b.r, y:b.cy, bulge:qb}, {x:b.cx, y:b.cy - b.r, bulge:qb}]
-    : b.pts;
-  const bulged = pts.some(q => q.bulge);
-  p('92', 3);                       // external | polyline
-  p('72', bulged ? 1 : 0);          // has-bulge flag
-  p('73', 1);                       // closed
-  p('93', pts.length);
-  for (const q of pts){
-    p('10', q.x, '20', q.y);
-    if (bulged) p('42', q.bulge || 0);
-  }
-  p('97', 0);                       // no source boundary objects
+  const loop = (q, flags) => {
+    const pts = q.type === 'circle'
+      ? [{x:q.cx + q.r, y:q.cy, bulge:qb}, {x:q.cx, y:q.cy + q.r, bulge:qb},
+         {x:q.cx - q.r, y:q.cy, bulge:qb}, {x:q.cx, y:q.cy - q.r, bulge:qb}]
+      : q.pts;
+    const bulged = pts.some(v => v.bulge);
+    p('92', flags);                 // path type: bit 1 external, bit 2 polyline
+    p('72', bulged ? 1 : 0);        // has-bulge flag
+    p('73', 1);                     // closed
+    p('93', pts.length);
+    for (const v of pts){
+      p('10', v.x, '20', v.y);
+      if (bulged) p('42', v.bulge || 0);
+    }
+    p('97', 0);                     // no source boundary objects
+  };
+  loop(b, 3);                       // external | polyline
+  for (const hEnt of holes) loop(hEnt, 2);   // island loops: polyline, not external
 
   p('75', 0, '76', solid ? 1 : 0);  // hatch style / predefined vs user-defined
   if (!solid){

@@ -117,4 +117,59 @@ const svg = P.buildPlotSVG({entities:S.entities, layers:S.layers,
 check('plot embeds the material pattern def', svg.includes('hpat-concrete') && svg.includes('<pattern'));
 check('plot fills the boundary with it', svg.includes('fill="url(#hpat-concrete)"'));
 
+/* ===== island detection: hatching a ring leaves the inner shapes open ===== */
+reset();
+const outerR = rect(0,0,100,100);
+const innerR = rect(20,20,60,60);
+const innerC = S.entities.push({id:S.nextId(), type:'circle', cx:80, cy:80, r:10, layer:'0'}) &&
+               S.entities[S.entities.length-1];
+C.startCommand('H');
+C.chooseHatchMaterial('concrete');
+C.onPoint({x:5, y:50});                          // click between the loops
+let ring = S.entities.find(z=>z.type==='hatch');
+check('islands detected on placement', !!ring && ring.holes && ring.holes.length===2 &&
+      ring.holes.includes(innerR.id) && ring.holes.includes(innerC.id));
+check('reported area is net of the islands',
+      dom.logs.some(l=>l.includes(G.fmt(10000 - 1600 - Math.PI*100))));
+C.handleEnter('');
+
+// AREA agrees
+C.startCommand('AA');
+C.onPoint({x:5, y:50});
+check('AREA measures the ring, not the slab',
+      dom.logs.filter(l=>l.includes(G.fmt(10000 - 1600 - Math.PI*100))).length >= 2);
+C.handleEnter('');
+
+// hatching INSIDE an island fills that island (it is its own boundary)
+C.startCommand('H');
+C.chooseHatchMaterial('wood');
+C.onPoint({x:40, y:40});
+const inner = S.entities.filter(z=>z.type==='hatch').find(z=>z.ref===innerR.id);
+check('an island can carry its own hatch', !!inner && !(inner.holes||[]).length);
+C.handleEnter('');
+
+// erasing an island closes its hole but keeps the hatch
+S.selection.add(innerC.id);
+C.eraseWithDependents([innerC.id]);
+ring = S.entities.find(z=>z.type==='hatch' && z.ref===outerR.id);
+check('erased island drops out of holes; hatch survives',
+      !!ring && ring.holes.length===1 && ring.holes[0]===innerR.id);
+
+// copy the ring set: the clone's holes point at the CLONED islands
+S.selection.clear();
+[outerR.id, innerR.id, ring.id].forEach(id=>S.selection.add(id));
+C.startCommand('CO');
+C.onPoint({x:0, y:0});
+C.onPoint({x:200, y:0});
+C.handleEnter('');
+const clone = S.entities.filter(z=>z.type==='hatch' && z.ref!==outerR.id && z.ref!==innerR.id);
+check('copied hatch holes remap to the copied island',
+      clone.length===1 && clone[0].holes.length===1 && clone[0].holes[0]!==innerR.id &&
+      S.entities.some(z=>z.id===clone[0].holes[0] && z.type==='pline'));
+
+// plot prints the ring as one even-odd path with both loops in it
+const svg2 = P.buildPlotSVG({entities:S.entities, layers:S.layers,
+  settings:{paper:'A4', landscape:true, scaleN:50, win:[0,0,100,100], weight:0.35, colors:false, units:'cm'}});
+check('plot punches the hole (even-odd path)', svg2.includes('fill-rule="evenodd"'));
+
 finish();

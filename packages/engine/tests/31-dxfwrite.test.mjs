@@ -23,6 +23,8 @@ const doc = {
     {id:8,type:'hatch',layer:'0',ref:2,mat:'brick'},
     {id:9,type:'hatch',layer:'0',ref:4,mat:'water'},
     {id:10,type:'hatch',layer:'0',ref:2,mat:'green'},
+    {id:11,type:'circle',layer:'0',cx:5,cy:5,r:0.5},
+    {id:12,type:'hatch',layer:'0',ref:2,mat:'wood',holes:[11]},
   ],
 };
 const out = X.buildDXF(doc);
@@ -49,8 +51,8 @@ check(`every handle is unique (${hs.length} of them)`, new Set(hs).size === hs.l
 check('entities carry an owner back-pointer', codeVals('330').length > 5);
 
 /* ===== what R12 could not carry ===== */
-check('true colour written for each layer (and each of the 4 hatches)',
-      codeVals('420').length === doc.layers.length + 4);
+check('true colour written for each layer (and each of the 5 hatches)',
+      codeVals('420').length === doc.layers.length + 5);
 check('the blue layer keeps its exact colour', codeVals('420').includes(String(0x4db8ff)));
 check('a hidden layer is written as a negative ACI', codeVals('62').includes('-7'));
 check('a locked layer is flagged', codeVals('70').includes('4'));
@@ -76,6 +78,11 @@ check('circle boundary is exact (4 quarter-arc vertices, bulge tan π/8)',
 // the pline boundary keeps its author-drawn bulge
 const waterHatch = hatchChunks.find(c => c.includes('MINICAD_WATER'));
 check('pline boundary keeps its bulge', waterHatch.includes('\n42\n0.5\n'));
+// islands: the wood hatch writes two boundary paths — external outer + plain hole
+const woodHatch = hatchChunks.find(c => c.includes('MINICAD_WOOD'));
+check('island hatch declares 2 paths', woodHatch.split('\n91\n')[1].startsWith('2'));
+check('outer path external, hole path plain',
+      woodHatch.includes('\n92\n3\n') && woodHatch.includes('\n92\n2\n'));
 
 /* ===== lineweights snap to the ladder AutoCAD accepts ===== */
 check('0.5mm → 50', X.lwCode(0.5)===50);
@@ -102,7 +109,7 @@ check('esc handles astral characters', X.esc('\u{1F600}').startsWith('\\U+'));
 const back = M.importDoc(D.parseDXF(out));
 const of = t => back.entities.filter(e=>e.type===t);
 check('round-trip keeps every entity',
-      of('line').length>=1 && of('circle').length===1 && of('arc').length===1 &&
+      of('line').length>=1 && of('circle').length===2 && of('arc').length===1 &&
       of('pline').length>=1 && of('text').length===1);
 check('round-trip keeps the layers', back.layers.some(l=>l.name==='walls'));
 check('round-trip restores true colour', back.layers.find(l=>l.name==='walls').color==='#4db8ff');

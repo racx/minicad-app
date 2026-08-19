@@ -123,9 +123,17 @@ export function buildPlotSVG({entities, layers=[], settings, filename='drawing',
     const fill = mat.pattern.solid
       ? `fill="${colors ? mat.color : '#000'}" fill-opacity="0.22" stroke="none"`
       : `fill="url(#hpat-${e.mat})" stroke="none"`;
-    if (b.type==='circle')
-      out.push(`<circle cx="${X(b.cx)}" cy="${Y(b.cy)}" r="${f(b.r*mmu)}" ${fill}/>`);
-    else out.push(`<path d="${plineD(b)}" ${fill}/>`);
+    // boundary + islands in ONE path, even-odd: each island prints as a hole
+    const loopD = q => q.type==='circle'
+      ? `M ${X(q.cx+q.r)} ${Y(q.cy)} A ${f(q.r*mmu)} ${f(q.r*mmu)} 0 1 0 ${X(q.cx-q.r)} ${Y(q.cy)} A ${f(q.r*mmu)} ${f(q.r*mmu)} 0 1 0 ${X(q.cx+q.r)} ${Y(q.cy)} Z`
+      : plineD(q) + (q.closed ? '' : ' Z');
+    let d = loopD(b);
+    for (const id of e.holes || []){
+      const hEnt = entities.find(z=>z.id===id);
+      const hl = hEnt && layerOf(hEnt.layer);
+      if (hEnt && !(hl && hl.off)) d += ' ' + loopD(hEnt);
+    }
+    out.push(`<path d="${d}" fill-rule="evenodd" ${fill}/>`);
   }
   if (usedMats.size){
     const defs=['<defs>'];

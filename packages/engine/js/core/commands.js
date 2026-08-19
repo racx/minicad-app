@@ -518,7 +518,10 @@ export function onPoint(p){
       else {
         const idMap = new Map();
         const clones = cmd.sel.map(id=>{ const e=deep(entities.find(z=>z.id===id)); const nid=nextId(); idMap.set(id, nid); e.id=nid; return e; });
-        clones.forEach(e=>{ if (e.type==='hatch' && idMap.has(e.ref)) e.ref = idMap.get(e.ref); });
+        clones.forEach(e=>{ if (e.type==='hatch'){
+          if (idMap.has(e.ref)) e.ref = idMap.get(e.ref);
+          if (e.holes) e.holes = e.holes.map(id=>idMap.get(id) ?? id);
+        }});
         clones.forEach(e=>translateEnt(e,dx,dy));
         entities.push(...clones);
         log(`Copied ${clones.length}.`, 'r');
@@ -676,20 +679,55 @@ function boundaryAt(p){
   }
   return best ? {b:best} : {err:'No closed shape there — click inside a room or on its outline.'};
 }
+/* island detection (AutoCAD "normal" style): every closed shape lying wholly
+   inside the boundary becomes a hole in the fill — hatch the offset of a room
+   and you get the wall, not a slab over the whole floor. Even-odd rendering
+   makes nested islands alternate on their own. */
+export function islandsWithin(b){
+  const bb = entBBox(b);
+  const poly = tessellateBoundary(b);
+  const out = [];
+  for (const e of entities){
+    if (e.id===b.id || e.type==='hatch' || !layerVisible(e.layer)) continue;
+    if (!entityArea(e)) continue;                    // open shapes can't be islands
+    const eb = entBBox(e);
+    if (eb[0]<bb[0]-1e-9 || eb[1]<bb[1]-1e-9 || eb[2]>bb[2]+1e-9 || eb[3]>bb[3]+1e-9) continue;
+    if (tessellateBoundary(e).every(q=>pointInPoly(q, poly))) out.push(e);
+  }
+  return out;
+}
+// hatch area/perimeter with its islands taken out (holes resolved live — they
+// may have moved or been erased since placement)
+export function hatchNet(hatch, b){
+  const a = entityArea(b);
+  if (!a) return null;
+  let net = a.area;
+  for (const id of hatch?.holes || []){
+    const h = entities.find(z=>z.id===id);
+    const ha = h && entityArea(h);
+    if (ha) net -= ha.area;
+  }
+  return {area: Math.max(net, 0), perim: a.perim};
+}
 // create/update the hatch on a validated boundary — shared by the interactive
 // HATCH command and scripted HATCH (mscript). Returns false if unmeasurable.
 export function hatchBoundary(b, matKey){
   const a = entityArea(b);
   if (!a){ log('Could not measure that shape.', 'e'); return false; }
   snapshot();
+  const holes = islandsWithin(b).map(e=>e.id);
   const existing = entities.find(z=>z.type==='hatch' && z.ref===b.id);
   const matName = materialByKey(matKey).name;
   if (existing){
     existing.mat = matKey;
-    log(`${matName} hatch updated — area ${areaLabel(a)}.`, 'r');
+    if (holes.length) existing.holes = holes; else delete existing.holes;
+    log(`${matName} hatch updated — area ${areaLabel(hatchNet(existing, b))}.`, 'r');
   } else {
-    entities.push({id:nextId(), type:'hatch', ref:b.id, mat:matKey, layer:currentLayer});
-    log(`${matName} hatch created — area ${areaLabel(a)}.`, 'r');
+    const hh = {id:nextId(), type:'hatch', ref:b.id, mat:matKey, layer:currentLayer};
+    if (holes.length) hh.holes = holes;
+    entities.push(hh);
+    log(`${matName} hatch created — area ${areaLabel(hatchNet(hh, b))}` +
+        (holes.length ? ` (${holes.length} island${holes.length>1?'s':''} left open)` : '') + '.', 'r');
   }
   return true;
 }
@@ -702,9 +740,10 @@ function placeHatch(p){
 function reportArea(p){
   const {b, hatch, err} = boundaryAt(p);
   if (err){ log(err, 'e'); return; }
-  const a = entityArea(b);
+  const hh = hatch || entities.find(z=>z.type==='hatch' && z.ref===b.id);
+  const a = hh ? hatchNet(hh, b) : entityArea(b);        // a hatch measures net of its islands
   if (!a){ log('Could not measure that shape.', 'e'); return; }
-  const what = hatch ? `${materialByKey(hatch.mat)?.name || 'Hatch'}` : (b.type==='circle' ? 'Circle' : 'Polyline');
+  const what = hh ? `${materialByKey(hh.mat)?.name || 'Hatch'}` : (b.type==='circle' ? 'Circle' : 'Polyline');
   log(`${what} — area ${areaLabel(a)}.`, 'r');
 }
 function makeCircle(r){
@@ -991,7 +1030,10 @@ function doMirror(eraseSrc){
   const idMap = new Map();
   const clones = cmd.sel.map(id=>{ const e=entities.find(z=>z.id===id); if(!e) return null;
                                    const c=deep(e); const nid=nextId(); idMap.set(id, nid); c.id=nid; return c; }).filter(Boolean);
-  clones.forEach(c=>{ if (c.type==='hatch' && idMap.has(c.ref)) c.ref = idMap.get(c.ref); });
+  clones.forEach(c=>{ if (c.type==='hatch'){
+    if (idMap.has(c.ref)) c.ref = idMap.get(c.ref);
+    if (c.holes) c.holes = c.holes.map(id=>idMap.get(id) ?? id);
+  }});
   clones.forEach(c=>mirrorEnt(c, cmd.p1, cmd.p2));
   entities.push(...clones);
   if (eraseSrc){
@@ -1016,10 +1058,15 @@ function stretchEnt(e, r, dx, dy){   // move vertices inside r; null r = move ev
   else if (e.type==='text'){ if (inR({x:e.x,y:e.y})){ e.x+=dx; e.y+=dy; } }
 }
 
-// erase ids + any hatches whose boundary is going away; returns the count (no snapshot)
+// erase ids + any hatches whose boundary is going away; a hatch survives the
+// erase of one of its ISLANDS — the hole just closes up. Returns the count.
 export function eraseWithDependents(ids){
   const doomed = new Set(ids);
   for (const e of entities) if (e.type==='hatch' && doomed.has(e.ref)) doomed.add(e.id);
+  for (const e of entities) if (e.type==='hatch' && e.holes && !doomed.has(e.id)){
+    e.holes = e.holes.filter(id=>!doomed.has(id));
+    if (!e.holes.length) delete e.holes;
+  }
   setEntities(entities.filter(e=>!doomed.has(e.id)));
   return doomed.size;
 }

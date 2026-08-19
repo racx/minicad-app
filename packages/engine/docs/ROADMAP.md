@@ -176,6 +176,19 @@ screenshots), DXF acceptance by third-party CAD (checked with ezdxf ad hoc).
 > architects — browser-first, DXF-native ("open the DXF a client sent you"). The household
 > tool is the incubator, not the destination. This re-tiers DXF import into Tier 1.
 
+### Hatch island detection — shipped 2026-08-19 (suites 22, 31)
+
+Hatching between two loops fills the ring, not the slab (Rachad hit this with an
+offset trapezoid). A hatch now carries `holes:[ids]` — every visible closed shape
+wholly inside the boundary at placement (`islandsWithin`), rendered even-odd on
+canvas and in plot SVG so nested islands alternate AutoCAD-style. Live like the
+boundary itself: islands move with their shapes; erasing an island closes its
+hole (the hatch survives); COPY/MIRROR remap hole ids; clicking inside a hole
+hits the island, not the hatch. HATCH/AREA report net area, islands deducted.
+DXF export writes one boundary path per island (outer external|polyline=3,
+islands polyline=2; ezdxf 0/0). DXF **import** of multi-loop hatches still
+leaves frozen outlines — the IR would need per-loop grouping first.
+
 ### Drafting UX parity — shipped 2026-08-18 (suites 34–37)
 
 Driven by side-by-side comparison with AutoCAD 2027 (Rachad's screenshots):
