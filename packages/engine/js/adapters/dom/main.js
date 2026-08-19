@@ -4,7 +4,8 @@
 import { fmt } from '../../core/geometry.js';
 import { entities, setEntities, layers, currentLayer, setCurrentLayer, layerOf, snapshot,
          undoStack, view, T, cmd, selection, mouse, curPt, setCurPt, boxSel, setBoxSel,
-         setHoverSel, setHotGrip, setSnapMark, setTrackGuides, units, unitFmt } from '../../core/state.js';
+         setHoverSel, setHotGrip, setSnapMark, setTrackGuides, units, unitFmt,
+         sugSel, setSugSel } from '../../core/state.js';
 import './plotui.js';                                   // print dialog wiring (self-registers)
 import './osnapui.js';                                  // object-snap dialog wiring (self-registers)
 import './hatchui.js';                                  // hatch material picker (self-registers)
@@ -13,7 +14,7 @@ import { findEntityAt, translateIds, entGrips, applyGrip } from '../../core/enti
 import { cv, s2w, w2s, draw, resize, zoomExtents, RULER_PX, W, H } from './view.js';
 import { startCommand, handleEnter, cancelCmd, applyModifiers, eraseWithDependents,
          doUndo, doRedo, setTog, clickSelect, boxSelect, onPoint, startEditText,
-         parsePoint } from '../../core/commands.js';
+         parsePoint, suggestCommands } from '../../core/commands.js';
 import { cmdInput, caretToEnd, coordRead, layerCur, layerColor, log, setPrompt,
          toggleHelp, refreshLayers } from './ui.js';
 import { saveJSON, openJSON, openDXF, openDWG, dxfExport, autosaveTick, restoreAutosave } from './io.js';
@@ -174,8 +175,7 @@ cv.addEventListener('dblclick', ev=>{
 });
 cv.addEventListener('contextmenu', ev=>{
   ev.preventDefault();
-  handleEnter(cmdInput.value); cmdInput.value='';
-  syncPanBtn();
+  submitCmdLine();
 });
 
 /* ================= keyboard ================= */
@@ -190,13 +190,27 @@ function showTyped(){
   const p = cmdInput.value.trim() ? parsePoint(cmdInput.value) : null;
   if (p && isFinite(p.x) && isFinite(p.y)){ setSnapMark(null); setCurPt(p); }
 }
-cmdInput.addEventListener('input', ()=>{ showTyped(); draw(); });   // dynamic input mirrors keystrokes live
+cmdInput.addEventListener('input', ()=>{ setSugSel(0); showTyped(); draw(); });   // dynamic input mirrors keystrokes live
+/* command autocomplete (AutoCAD-style): while idle, typed letters list the
+   matching commands at the cursor; ↑/↓ choose, Tab completes, Enter/Space/
+   right-click runs the highlighted one — so PLI ⏎ runs PLINE, not an error */
+function submitCmdLine(){
+  const sugs = !cmd ? suggestCommands(cmdInput.value) : [];
+  handleEnter(sugs.length ? sugs[Math.min(sugSel, sugs.length-1)].alias : cmdInput.value);
+  cmdInput.value=''; setSugSel(0);
+  syncPanBtn();
+}
 cmdInput.addEventListener('keydown', ev=>{
   const typingText = cmd && cmd.step==='string';        // spaces allowed inside TEXT strings
+  const sugs = !cmd ? suggestCommands(cmdInput.value) : [];
+  if (sugs.length){
+    if (ev.key==='ArrowDown'){ ev.preventDefault(); setSugSel((sugSel+1)%sugs.length); draw(); return; }
+    if (ev.key==='ArrowUp'){ ev.preventDefault(); setSugSel((sugSel+sugs.length-1)%sugs.length); draw(); return; }
+    if (ev.key==='Tab'){ ev.preventDefault(); cmdInput.value = sugs[Math.min(sugSel, sugs.length-1)].alias; setSugSel(0); draw(); return; }
+  }
   if (ev.key==='Enter' || (ev.key===' ' && !typingText)){
     ev.preventDefault();
-    handleEnter(cmdInput.value); cmdInput.value='';
-    syncPanBtn();
+    submitCmdLine();
   }
 });
 /* an editable div would happily take a multi-line paste; a command line is one
@@ -274,6 +288,7 @@ window.addEventListener('keydown', ev=>{
     ev.preventDefault();
     focusCmd();
     cmdInput.value = cmdInput.value + ev.key;
+    setSugSel(0);
     if (T.dyn) draw();
   }
 });

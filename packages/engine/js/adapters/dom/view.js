@@ -2,7 +2,8 @@
    MiniCAD — canvas, view transform, grid, rendering
    ========================================================= */
 import { dist, fmt, arcFrom3, bulgeArc, tangentBulge, bulgeFrom3, plineEndTangent } from '../../core/geometry.js';
-import { entities, view, T, cmd, curPt, snapMark, trackGuides, boxSel, mouse, selection, layerOf, layerVisible, hoverSel, hotGrip, unitFmt, units, lwOf, lwPx } from '../../core/state.js';
+import { entities, view, T, cmd, curPt, snapMark, trackGuides, boxSel, mouse, selection, layerOf, layerVisible, hoverSel, hotGrip, unitFmt, units, lwOf, lwPx, sugSel } from '../../core/state.js';
+import { suggestCommands, rubberBase } from '../../core/commands.js';
 import { entBBox, entGrips, dimGeom, dimH, blockParts } from '../../core/entities.js';
 import { query as spatialQuery } from '../../core/spatial.js';
 import { materialByKey } from '../../core/materials.js';
@@ -23,6 +24,10 @@ import { connectUI } from '../../core/bus.js';
    paid for every frame. Zoom in and they come back. */
 const TEXT_LEGIBLE_PX = 4;
 
+/* Board colors sampled from AutoCAD's dark model space — familiarity is the
+   feature: people coming from AutoCAD should feel at home at first glance. */
+const BG = '#20272f', GRID_MINOR = '#262d36', GRID_MAJOR = '#2e3443';
+
 /* One draw per animation frame.
    A trackpad emits wheel events far faster than a 17,000-entity frame can be
    rasterised, and every one of them used to call draw() synchronously; the
@@ -40,7 +45,7 @@ export function draw(){
 export function drawNow(){
   ctx.setTransform(DPR,0,0,DPR,0,0);
   ctx.clearRect(0,0,W,H);
-  ctx.fillStyle = '#131519'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle = BG; ctx.fillRect(0,0,W,H);
 
   const tl = s2w(0,0), br = s2w(W,H);
   // grid
@@ -52,13 +57,13 @@ export function drawNow(){
     for (let x=x0;x<=x1;x+=s){
       const sx = Math.round(x*view.scale + view.ox)+.5;
       const major = Math.round(x/s) % 5 === 0;
-      ctx.strokeStyle = major ? '#232833' : '#1b1f27';
+      ctx.strokeStyle = major ? GRID_MAJOR : GRID_MINOR;
       ctx.beginPath(); ctx.moveTo(sx,0); ctx.lineTo(sx,H); ctx.stroke();
     }
     for (let y=y0;y<=y1;y+=s){
       const sy = Math.round(-y*view.scale + view.oy)+.5;
       const major = Math.round(y/s) % 5 === 0;
-      ctx.strokeStyle = major ? '#232833' : '#1b1f27';
+      ctx.strokeStyle = major ? GRID_MAJOR : GRID_MINOR;
       ctx.beginPath(); ctx.moveTo(0,sy); ctx.lineTo(W,sy); ctx.stroke();
     }
     // axes
@@ -94,7 +99,7 @@ export function drawNow(){
         const hot = hotGrip && hotGrip.id===e.id && hotGrip.g===g.g;
         ctx.fillStyle = hot ? '#ef7b7b' : '#4db8ff';
         ctx.fillRect(s.x-3.5, s.y-3.5, 7, 7);
-        ctx.strokeStyle = '#131519'; ctx.lineWidth = 1;
+        ctx.strokeStyle = BG; ctx.lineWidth = 1;
         ctx.strokeRect(s.x-3.5, s.y-3.5, 7, 7);
       }
     }
@@ -143,12 +148,17 @@ export function drawNow(){
   // crosshair (hidden while the hand tool is active — the OS hand cursor takes over)
   if (mouse.inside && !(cmd && cmd.name==='PAN')){
     const s = snapMark ? w2s(snapMark.p) : w2s(curPt);
-    ctx.strokeStyle = 'rgba(220,225,235,.55)';
-    ctx.beginPath();
-    ctx.moveTo(0, s.y+.5); ctx.lineTo(W, s.y+.5);
-    ctx.moveTo(s.x+.5, 0); ctx.lineTo(s.x+.5, H);
-    ctx.stroke();
+    // AutoCAD-size crosshair (CURSORSIZE 5: arms are 5% of the screen), with
+    // the arms leaving the pickbox clear — full-window lines read as a tool,
+    // not a cursor, and hide behind busy drawings
+    const arm = Math.max(24, Math.round(Math.min(W,H)*0.05)), box = 4.5;
     ctx.strokeStyle = 'rgba(220,225,235,.9)';
+    ctx.beginPath();
+    ctx.moveTo(s.x-arm, s.y+.5); ctx.lineTo(s.x-box, s.y+.5);
+    ctx.moveTo(s.x+box, s.y+.5); ctx.lineTo(s.x+arm, s.y+.5);
+    ctx.moveTo(s.x+.5, s.y-arm); ctx.lineTo(s.x+.5, s.y-box);
+    ctx.moveTo(s.x+.5, s.y+box); ctx.lineTo(s.x+.5, s.y+arm);
+    ctx.stroke();
     ctx.strokeRect(s.x-4.5, s.y-4.5, 9, 9);
     drawDynInput(s);
     if (hoverSel){                       // "you can drag this" move glyph
@@ -280,24 +290,54 @@ function drawDynInput(s){
   if (!cmd && !typed) return;                       // idle and silent: keep the canvas clean
   if (prompt.length > 46) prompt = prompt.slice(0, 45) + '…';
   ctx.font = '11px ui-monospace, Menlo, monospace';
-  const lines = typed ? [prompt, typed] : [prompt];
+  // distance + angle from the rubber base (AutoCAD's at-cursor readout):
+  // you see how long and how steep before you commit the click
+  let readout = null;
+  const base = rubberBase();
+  if (base){
+    const L = dist(base, curPt);
+    if (L > 1e-9){
+      const deg = (Math.atan2(curPt.y-base.y, curPt.x-base.x)*180/Math.PI + 360) % 360;
+      readout = `${unitFmt(L)} ${units}  ∠ ${deg.toFixed(deg%1 ? 1 : 0)}°`;
+    }
+  }
+  const sugs = (!cmd && typed) ? suggestCommands(typed) : [];
+  const sugLabel = r => r.alias===r.name ? r.name : `${r.alias} (${r.name})`;
+  const lines = [prompt, readout, typed || null].filter(Boolean);
   const tw = t => ctx.measureText(t)?.width ?? t.length*6.2;   // headless ctx stubs measureText
-  const wMax = Math.max(...lines.map(tw));
-  const bw = wMax + 14, bh = lines.length*15 + 8;
+  const wMax = Math.max(...lines.map(tw), ...sugs.map(r=>tw(sugLabel(r))+14));
+  const bw = wMax + 14, bh = lines.length*15 + 8, sh = sugs.length*16;
   let x = s.x + 16, y = s.y + 16;                   // right-below the crosshair…
   if (x + bw > W - 4) x = s.x - 16 - bw;            // …flip when the edge is near
-  if (y + bh > H - 4) y = s.y - 16 - bh;
+  if (y + bh + sh > H - 4) y = s.y - 16 - bh - sh;
   ctx.fillStyle = 'rgba(28,31,37,.92)';
   ctx.fillRect(x, y, bw, bh);
   ctx.strokeStyle = '#2e333d'; ctx.lineWidth = 1;
   ctx.strokeRect(x+.5, y+.5, bw-1, bh-1);
+  let ly = y + 15;
   ctx.fillStyle = '#8b93a1';
-  ctx.fillText(prompt, x+7, y+15);
+  ctx.fillText(prompt, x+7, ly); ly += 15;
+  if (readout){
+    ctx.fillStyle = '#dce1eb';
+    ctx.fillText(readout, x+7, ly); ly += 15;
+  }
   if (typed){
     ctx.fillStyle = '#43d6b5';
-    ctx.fillText(typed, x+7, y+30);
-    const cw = tw(typed);
-    ctx.fillRect(x+8+cw, y+21, 1.5, 11);            // caret
+    ctx.fillText(typed, x+7, ly);
+    ctx.fillRect(x+8+tw(typed), ly-9, 1.5, 11);     // caret
+  }
+  // command suggestions (idle typing): ↑/↓ choose, Tab completes, Enter runs
+  if (sugs.length){
+    ctx.fillStyle = 'rgba(28,31,37,.96)';
+    ctx.fillRect(x, y+bh, bw, sh+4);
+    ctx.strokeStyle = '#2e333d';
+    ctx.strokeRect(x+.5, y+bh+.5, bw-1, sh+3);
+    sugs.forEach((r, i)=>{
+      const ry = y + bh + 2 + i*16;
+      if (i===sugSel){ ctx.fillStyle='#2d3a4d'; ctx.fillRect(x+1, ry, bw-2, 16); }
+      ctx.fillStyle = i===sugSel ? '#e8edf5' : '#8b93a1';
+      ctx.fillText(sugLabel(r), x+11, ry+12);
+    });
   }
 }
 function drawEntity(e, dx, dy, ghost){

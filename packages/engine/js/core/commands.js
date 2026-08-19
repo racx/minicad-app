@@ -44,6 +44,25 @@ export const ALIASES = {
   OSNAP:'OSNAPDLG', OS:'OSNAPDLG',   // AutoCAD-style: typed OSNAP opens the mode picker (F3 = quick toggle)
   UNITS:'UNITS', PLOT:'PLOT', PRINT:'PLOT', PLOTWIN:'PLOTWIN'
 };
+/* ---------- command autocomplete (AutoCAD-style) ----------
+   Typed letters while idle → the matching commands, one row per command,
+   shown under the dynamic-input box. Exact alias first, then shortest. */
+export function suggestCommands(text){
+  const t = (text || '').trim().toUpperCase();
+  if (!t || !/^[A-Z?]+$/.test(t)) return [];
+  const byCmd = new Map();                       // canonical name -> best matching alias
+  for (const [alias, name] of Object.entries(ALIASES)){
+    if (!alias.startsWith(t)) continue;
+    const cur = byCmd.get(name);
+    if (!cur || alias===t || (cur!==t && (alias.length<cur.length || (alias.length===cur.length && alias<cur))))
+      byCmd.set(name, alias);
+  }
+  const rows = [...byCmd].map(([name, alias]) => ({alias, name}));
+  rows.sort((a,b)=> (b.alias===t)-(a.alias===t) || a.alias.length-b.alias.length ||
+                    (a.alias<b.alias ? -1 : 1));
+  return rows.slice(0, 8);
+}
+
 const MODIFY = new Set(['MOVE','COPY','ROTATE','SCALE','ERASE','MIRROR','JOIN','EXPLODE']);
 let filletRadius = 0;   // remembered across FILLET invocations
 let dimTextHeight = 0;  // remembered dim text height; 0 = automatic (4% of length)
