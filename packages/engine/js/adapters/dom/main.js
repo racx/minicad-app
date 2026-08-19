@@ -8,6 +8,7 @@ import { entities, setEntities, layers, currentLayer, setCurrentLayer, layerOf, 
          sugSel, setSugSel } from '../../core/state.js';
 import './plotui.js';                                   // print dialog wiring (self-registers)
 import './osnapui.js';                                  // object-snap dialog wiring (self-registers)
+import './colorui.js';                                  // layer color palette / ACI picker (self-registers)
 import './hatchui.js';                                  // hatch material picker (self-registers)
 import './symbolui.js';                                 // symbol library picker (self-registers)
 import { findEntityAt, translateIds, entGrips, applyGrip } from '../../core/entities.js';
@@ -321,8 +322,8 @@ document.getElementById('btnHelp').addEventListener('click', ()=>toggleHelp());
 document.getElementById('helpClose').addEventListener('click', ()=>toggleHelp(false));
 
 /* layers — the bar is a readout plus a colour and a +; everything else is the
-   panel, so there is exactly one place to hide, lock, delete or switch a layer */
-layerColor.addEventListener('input', ()=>{ layerOf(currentLayer).color=layerColor.value; draw(); });
+   panel, so there is exactly one place to hide, lock, delete or switch a layer.
+   The colour swatch opens the ACI palette (colorui.js wires its own click). */
 /* ---- keep browser autofill off the layer filter ----
    Safari offers saved credit cards on a lone text field. It does skip a field
    that is READONLY at the moment it gains focus, so this one ships readonly and

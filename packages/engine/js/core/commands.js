@@ -42,6 +42,7 @@ export const ALIASES = {
   DI:'DIST', DIST:'DIST', Z:'ZOOM', ZOOM:'ZOOM', ZOOMEXT:'ZOOMEXT', P:'PAN', PAN:'PAN',
   U:'UNDO', UNDO:'UNDO', REDO:'REDO', ORTHO:'TOGORTHO', GRID:'TOGGRID', DYN:'TOGDYN', HELP:'HELP', '?':'HELP',
   OSNAP:'OSNAPDLG', OS:'OSNAPDLG',   // AutoCAD-style: typed OSNAP opens the mode picker (F3 = quick toggle)
+  COLOR:'COLORDLG', COL:'COLORDLG', COLOUR:'COLORDLG',   // ACI palette for the current layer
   UNITS:'UNITS', PLOT:'PLOT', PRINT:'PLOT', PLOTWIN:'PLOTWIN'
 };
 /* ---------- command autocomplete (AutoCAD-style) ----------
@@ -94,6 +95,8 @@ let plotOpener = null;
 export function registerPlotDialog(fn){ plotOpener = fn; }
 let osnapOpener = null;
 export function registerOsnapDialog(fn){ osnapOpener = fn; }
+let colorOpener = null;
+export function registerColorDialog(fn){ colorOpener = fn; }
 let hatchOpener = null;
 export function registerHatchDialog(fn){ hatchOpener = fn; }
 
@@ -290,6 +293,10 @@ export function startCommand(raw){
   }
   if (name==='OSNAPDLG'){
     if (osnapOpener) osnapOpener(); else log('Object snap picker unavailable.', 'e');
+    return;
+  }
+  if (name==='COLORDLG'){
+    if (colorOpener) colorOpener(); else log('Color palette unavailable.', 'e');
     return;
   }
 

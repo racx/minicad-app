@@ -121,7 +121,9 @@ export function refreshLayers(){
   layerCur.title = `Drawing on "${cur.name}"` +
     (cur.off ? ' — hidden, so nothing you draw will show' : '') +
     (cur.locked ? ' — locked' : '') + '. Click for all layers.';
-  layerColor.value = cur.color;
+  layerColor.value = cur.color;                    // kept for anything reading .value
+  const chip = document.getElementById('layerColorChip');
+  if (chip) chip.style.background = cur.color;     // the visible swatch on the button
 }
 
 /* the command-line adapter implements the core's UI sink */

@@ -54,7 +54,9 @@ check('entities carry an owner back-pointer', codeVals('330').length > 5);
 check('true colour written for each layer (and each of the 5 hatches)',
       codeVals('420').length === doc.layers.length + 5);
 check('the blue layer keeps its exact colour', codeVals('420').includes(String(0x4db8ff)));
-check('a hidden layer is written as a negative ACI', codeVals('62').includes('-7'));
+check('a hidden layer is written as a negative ACI — its OWN index (red = 1)',
+      codeVals('62').includes('-1'));
+check('a green layer says color 3, not a flat 7', codeVals('62').includes('3'));
 check('a locked layer is flagged', codeVals('70').includes('4'));
 check('layer lineweight in hundredths of a mm', codeVals('370').includes('50'));
 check('entity lineweight too', codeVals('370').includes('35'));

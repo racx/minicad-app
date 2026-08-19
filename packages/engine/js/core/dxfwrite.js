@@ -15,6 +15,7 @@
 import { normAng, fmt } from './geometry.js';
 import { dimGeom, dimH, entBBox } from './entities.js';
 import { materialByKey } from './materials.js';
+import { aciOf } from './aci.js';
 
 const UNIT_CODE = { mm: 4, cm: 5, m: 6 };
 const D = a => normAng(a) * 180 / Math.PI;
@@ -88,8 +89,10 @@ export function buildDXF({entities = [], layers = [], units = 'cm',
       p('0','LAYER','5',h(),'330',hLAYER,'100','AcDbSymbolTableRecord','100','AcDbLayerTableRecord',
         '2', l.name,
         '70', l.locked ? 4 : 0,
-        // a negative ACI is how DXF says "off"; true colour rides alongside in 420
-        '62', l.off ? -7 : 7,
+        // the REAL colour index, not a flat 7 — a layer painted "color 253"
+        // from the palette must open as 253; negative ACI is how DXF says
+        // "off"; true colour rides alongside in 420
+        '62', (l.off ? -1 : 1) * aciOf(l.color),
         '420', rgb,
         '6','Continuous',
         '370', lwCode(l.lw),
@@ -299,19 +302,9 @@ function hex(c){
   return m ? parseInt(m[1], 16) : 0xffffff;
 }
 
-/* nearest classic ACI for group 62 — coarse on purpose: 420 carries the true
-   colour, 62 only keeps ancient viewers from painting everything white */
-const ACI = [[1,0xff0000],[2,0xffff00],[3,0x00ff00],[4,0x00ffff],[5,0x0000ff],
-             [6,0xff00ff],[7,0xffffff],[8,0x808080],[9,0xc0c0c0]];
-function aci(c){
-  const v = hex(c), r = v>>16, g = (v>>8)&255, b = v&255;
-  let best = 7, bd = Infinity;
-  for (const [code, w] of ACI){
-    const d = (r-(w>>16))**2 + (g-((w>>8)&255))**2 + (b-(w&255))**2;
-    if (d < bd){ bd = d; best = code; }
-  }
-  return best;
-}
+// group 62 uses the full canonical index (aci.js) — a palette-picked colour
+// round-trips to the exact number people call it by; 420 still carries truth
+const aci = aciOf;
 
 /* mm → the DXF lineweight code (hundredths of a mm), snapped to the standard
    ladder because AutoCAD rejects values that are not on it. */

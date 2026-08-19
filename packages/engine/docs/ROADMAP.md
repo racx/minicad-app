@@ -176,6 +176,19 @@ screenshots), DXF acceptance by third-party CAD (checked with ezdxf ad hoc).
 > architects — browser-first, DXF-native ("open the DXF a client sent you"). The household
 > tool is the incubator, not the destination. This re-tiers DXF import into Tier 1.
 
+### ACI color palette — shipped 2026-08-19 (suite 38)
+
+Layer colors are picked from the numbered **AutoCAD Color Index** (Janaina:
+the numbers are the convention — "color 253" IS the light gray). Canonical
+256-entry table generated from ezdxf into `core/aci.js` (`aciHex`/`aciOf`/
+`aciName`; exact match prefers the classic 1–9 so pure red is "1", never 10).
+Dialog in `adapters/dom/colorui.js` (swatch click or typed `COLOR`/`COL`),
+laid out like AutoCAD's: 24×10 hue grid + classics 1–9 + grays 250–255, live
+number/name readout, true-color input for off-index values. DXF export now
+writes each layer's real index in group 62 (negative = off) instead of a flat
+±7 — a 253 layer opens as 253 (ezdxf-verified). The importer's approximate
+`aciColor` formula in dxf.js still stands for reading foreign files.
+
 ### Hatch island detection — shipped 2026-08-19 (suites 22, 31)
 
 Hatching between two loops fills the ring, not the slab (Rachad hit this with an
