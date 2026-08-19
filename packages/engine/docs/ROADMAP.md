@@ -1,8 +1,9 @@
 # MiniCAD — Feature Inventory & Roadmap
 
 **Single source of truth** for what exists, how complete it is, and what comes next.
-Evidence-based: every claim below cites `file:line` in the codebase as of commit `536d7c7`.
-Verified against the test suite: `node tests/run.mjs` → **37 suites, 1014 checks, all passing** (2026-08-04).
+Evidence-based: every claim below cites `file:line` in the codebase as of commit `536d7c7`
+(line numbers may have drifted since; section updates carry their own dates).
+Verified against the test suite: `node tests/run.mjs` → **41 suites, 1060 checks, all passing** (2026-08-18).
 
 Update this file whenever a feature lands or a decision changes the plan.
 
@@ -174,6 +175,28 @@ screenshots), DXF acceptance by third-party CAD (checked with ezdxf ad hoc).
 > **Product intent (see CLAUDE.md):** MiniCAD is being built toward a SaaS for solo
 > architects — browser-first, DXF-native ("open the DXF a client sent you"). The household
 > tool is the incubator, not the destination. This re-tiers DXF import into Tier 1.
+
+### Drafting UX parity — shipped 2026-08-18 (suites 34–37)
+
+Driven by side-by-side comparison with AutoCAD 2027 (Rachad's screenshots):
+
+- **Ortho defaults OFF** (AutoCAD's ORTHOMODE=0); it never applies to RECTANG's
+  second corner (h/v from corner 1 is precisely the zero-area rectangle).
+- **PLINE closes on its own first vertex**: in-progress vertices are endpoint
+  snap + tracking candidates (the entity doesn't exist yet, so `snapCandidates`
+  can't see them), and landing on the first vertex finishes with `closed:true`
+  — the flag HATCH needs. Typed `C` still works; two points never auto-close.
+- **Command autocomplete** (`suggestCommands` in core): idle typing lists
+  matching commands under the dyn box, one row per command, exact alias first.
+  ↑/↓ choose, Tab completes, Enter/Space/right-click run the highlighted row —
+  `PLI ⏎` runs PLINE. Suppressed during a command (letters are options there).
+- **Angle + length preview on the rubber band**: dashed East-to-line arc with
+  the angle boxed at it (whole degrees CCW from East), live length boxed on
+  the line. Obeys F12/DYN.
+- **Board looks like AutoCAD's dark model space**: background/grid sampled from
+  a real screenshot (`BG`/`GRID_*` constants in `adapters/dom/view.js`),
+  CURSORSIZE-5 crosshair (5%-of-screen arms, clear pickbox), and a compass
+  rose (N/E/S/W + TOP badge) top-right.
 
 ### State of play — 2026-08-03
 
