@@ -20,6 +20,9 @@ const doc = {
     {id:5,type:'text',layer:'0',x:1,y:1,h:0.5,str:'ÁREA DE SERVIÇO',rot:Math.PI/4},
     {id:6,type:'hatch',layer:'walls',ref:4,mat:'solid'},
     {id:7,type:'dim',layer:'0',x1:0,y1:0,x2:10,y2:0,off:2},
+    {id:8,type:'hatch',layer:'0',ref:2,mat:'brick'},
+    {id:9,type:'hatch',layer:'0',ref:4,mat:'water'},
+    {id:10,type:'hatch',layer:'0',ref:2,mat:'green'},
   ],
 };
 const out = X.buildDXF(doc);
@@ -46,7 +49,8 @@ check(`every handle is unique (${hs.length} of them)`, new Set(hs).size === hs.l
 check('entities carry an owner back-pointer', codeVals('330').length > 5);
 
 /* ===== what R12 could not carry ===== */
-check('true colour written for each layer', codeVals('420').length === doc.layers.length);
+check('true colour written for each layer (and each of the 4 hatches)',
+      codeVals('420').length === doc.layers.length + 4);
 check('the blue layer keeps its exact colour', codeVals('420').includes(String(0x4db8ff)));
 check('a hidden layer is written as a negative ACI', codeVals('62').includes('-7'));
 check('a locked layer is flagged', codeVals('70').includes('4'));
@@ -54,6 +58,24 @@ check('layer lineweight in hundredths of a mm', codeVals('370').includes('50'));
 check('entity lineweight too', codeVals('370').includes('35'));
 check('HATCH is exported', has('HATCH') && has('AcDbHatch'));
 check('a solid hatch says SOLID', has('SOLID'));
+
+/* ===== hatches carry their material, not one generic pattern ===== */
+check('patterned hatches are named per material',
+      has('MINICAD_BRICK') && has('MINICAD_WATER') && has('MINICAD_GREEN') && !has('ANSI31'));
+// brick = two line families (0° and 90°); count 78 values across the file
+check('brick writes two pattern line families', codeVals('78').includes('2'));
+// water's dash rhythm survives: dashes positive, gaps negative (scaled ×50 for m units → ×0.05)
+check('water keeps its dash pattern', codeVals('79').includes('2') && codeVals('49').length >= 2);
+check('dots become dot-dash families (a zero-length dash)', codeVals('49').includes('0'));
+check('hatch carries its material colour', codeVals('420').includes(String(0xc98a6b)));
+// the circle boundary is four exact quarter arcs, not a 32-gon
+const hatchChunks = out.split('AcDbHatch').slice(1);
+const circleHatch = hatchChunks.find(c => c.includes('MINICAD_BRICK'));
+check('circle boundary is exact (4 quarter-arc vertices, bulge tan π/8)',
+      circleHatch.split('\n93\n')[1].startsWith('4') && circleHatch.includes('\n42\n0.41421356\n'));
+// the pline boundary keeps its author-drawn bulge
+const waterHatch = hatchChunks.find(c => c.includes('MINICAD_WATER'));
+check('pline boundary keeps its bulge', waterHatch.includes('\n42\n0.5\n'));
 
 /* ===== lineweights snap to the ladder AutoCAD accepts ===== */
 check('0.5mm → 50', X.lwCode(0.5)===50);
@@ -92,6 +114,10 @@ check('round-trip keeps text rotation', near(of('text')[0].rot, Math.PI/4, 1e-6)
 check('round-trip keeps the circle exactly',
       near(of('circle')[0].cx,5,1e-9) && near(of('circle')[0].r,2,1e-9));
 check('round-trip keeps a bulge', of('pline').some(pl=>pl.pts.length>3));
+const mats = of('hatch').map(hh=>hh.mat);
+check('round-trip keeps every hatch', of('hatch').length===4);
+check('round-trip keeps hatch materials (our pattern names map back)',
+      mats.includes('solid') && mats.includes('brick') && mats.includes('water') && mats.includes('green'));
 
 /* ===== degenerate input ===== */
 check('an empty drawing still produces a loadable file',

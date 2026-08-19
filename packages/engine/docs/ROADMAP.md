@@ -264,7 +264,14 @@ as a shape one segment short of shut.
 - ~~Rotated TEXT~~ ✅ **shipped**: `rot` on the text entity (optional — absent = horizontal, so
   old drawings load unchanged), a baseline-end rotation grip, ROTATE spins glyphs, DXF code 50. Suite 28.
   LWPOLYLINE bulge now has a native home (pline arc segments, shipped 2026-07-06).
-- **DXF HATCH export** (currently hatches stay in the JSON doc only).
+- ~~DXF HATCH export~~ ✅ **shipped 2026-08-19** (a basic writer had landed with the R2000
+  work; this made it faithful): per-material user-defined pattern lines (brick opens as
+  brick, not ANSI31 — angles/gaps/dashes from `materials.js`, dots as zero-length dashes,
+  spacing scaled mm-on-paper → model units at the 1:50 reference), boundary bulges kept
+  (group 42; circles as four exact quarter arcs, not 32-gons), material colour on the
+  entity (62 nearest-ACI + 420 true colour). ezdxf audit: 0 errors / 0 fixes with all 7
+  materials. Round-trips through our importer (`MINICAD_*` names map back; `GREEN` added
+  to the pattern→material table). Suite 31.
 - **OFFSET for curved polylines** (arc segments offset to r±d, joint recompute) — the current
   refusal points users at EXPLODE → offset → JOIN.
 - **Radius + angular dimensions** (`DIMRAD`, `DIMANG`) on the existing dim entity family.

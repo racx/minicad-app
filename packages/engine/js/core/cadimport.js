@@ -168,7 +168,7 @@ const PATTERN_MAT = [
   // most common fill in a real drawing (1044 of 1121 in one house plan), so
   // mapping it to a line pattern blankets the whole sheet in diagonals.
   [/^SOLID\b|^SOLID,/i,                             'solid'],
-  [/GRASS|GRAVEL|EARTH|SWAMP|AR-SAND|GARDEN|LAND/i, 'green'],
+  [/GRASS|GRAVEL|EARTH|SWAMP|AR-SAND|GARDEN|LAND|GREEN/i, 'green'],
   [/BRICK|AR-B\d|AR-BRSTD|AR-BRELM|MASON|BLOCK/i,   'brick'],
   [/GLASS|AR-RSHKE|WINDOW/i,                        'glass'],
   [/WOOD|AR-PARQ|PLAST|TIMBER|DOLMIT/i,             'wood'],

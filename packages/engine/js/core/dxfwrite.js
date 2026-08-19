@@ -149,10 +149,12 @@ export function buildDXF({entities = [], layers = [], units = 'cm',
   });
   p('0','ENDSEC');
 
-  // common preamble for every entity: handle, owner, layer, and the author's
-  // lineweight when they set one
-  const headFor = owner => (type, e, subclass) => {
+  // common preamble for every entity: handle, owner, layer, the author's
+  // lineweight when they set one, and an entity colour when the caller has
+  // one to declare (hatches carry their material's colour)
+  const headFor = owner => (type, e, subclass, color) => {
     p('0', type, '5', h(), '330', owner, '100', 'AcDbEntity', '8', e.layer || '0');
+    if (color){ p('62', aci(color), '420', hex(color)); }
     if (e.lw) p('370', lwCode(e.lw));
     p('100', subclass);
   };
@@ -190,7 +192,7 @@ export function buildDXF({entities = [], layers = [], units = 'cm',
     }
     else if (e.type === 'hatch'){
       const b = lookup.get(e.ref);
-      if (b) writeHatch(p, head, e, b);
+      if (b) writeHatch(p, head, e, b, units);
     }
     else if (e.type === 'insert'){
       const b = blockRefs.get(e.name);
@@ -296,6 +298,20 @@ function hex(c){
   return m ? parseInt(m[1], 16) : 0xffffff;
 }
 
+/* nearest classic ACI for group 62 — coarse on purpose: 420 carries the true
+   colour, 62 only keeps ancient viewers from painting everything white */
+const ACI = [[1,0xff0000],[2,0xffff00],[3,0x00ff00],[4,0x00ffff],[5,0x0000ff],
+             [6,0xff00ff],[7,0xffffff],[8,0x808080],[9,0xc0c0c0]];
+function aci(c){
+  const v = hex(c), r = v>>16, g = (v>>8)&255, b = v&255;
+  let best = 7, bd = Infinity;
+  for (const [code, w] of ACI){
+    const d = (r-(w>>16))**2 + (g-((w>>8)&255))**2 + (b-(w&255))**2;
+    if (d < bd){ bd = d; best = code; }
+  }
+  return best;
+}
+
 /* mm → the DXF lineweight code (hundredths of a mm), snapped to the standard
    ladder because AutoCAD rejects values that are not on it. */
 const LADDER = [0,5,9,13,15,18,20,25,30,35,40,50,53,60,70,80,90,100,106,120,140,158,200,211];
@@ -308,32 +324,64 @@ export function lwCode(mm){
 }
 
 /* A hatch as one polyline boundary path. Our boundary is already a closed
-   pline or a circle, which is exactly what a single-loop HATCH wants. */
-function writeHatch(p, head, e, b){
+   pline or a circle, which is exactly what a single-loop HATCH wants — a
+   circle is two half-turn bulged segments, exact, not a 32-gon; a pline
+   keeps its bulges (DXF hatch boundaries carry group 42 per vertex).
+
+   Pattern lines are written per material (user-defined, group 76 = 0), so
+   brick opens as brick and not as ANSI31 like everything else. MiniCAD
+   pattern spacing is visual (mm on paper); a DXF pattern is model-space, so
+   spacing is scaled as if plotted at 1:50 — the reference scale of the house
+   plans this trades with — and converted to the drawing's unit. */
+const MM_PER_UNIT = { mm: 1, cm: 10, m: 1000 };
+function writeHatch(p, head, e, b, units){
   const mat = materialByKey(e.mat);
   const solid = !mat || mat.pattern.solid;
-  head('HATCH', e, 'AcDbHatch');
+  head('HATCH', e, 'AcDbHatch', mat ? mat.color : null);
   p('10',0,'20',0,'30',0,'210',0,'220',0,'230',1);
-  p('2', solid ? 'SOLID' : 'ANSI31');
+  p('2', solid ? 'SOLID' : 'MINICAD_' + mat.key.toUpperCase());
   p('70', solid ? 1 : 0);           // solid fill flag
   p('71', 0);                       // not associative
   p('91', 1);                       // one boundary path
 
+  // a circle is four exact quarter-arc segments (bulge tan π/8) — two
+  // half-turns would be exact too, but readers (ours included) reject
+  // closed loops of fewer than three vertices
+  const qb = Math.tan(Math.PI/8);
   const pts = b.type === 'circle'
-    ? Array.from({length:32}, (_,i) => {
-        const a = i/32 * Math.PI*2;
-        return {x:b.cx + b.r*Math.cos(a), y:b.cy + b.r*Math.sin(a)};
-      })
+    ? [{x:b.cx + b.r, y:b.cy, bulge:qb}, {x:b.cx, y:b.cy + b.r, bulge:qb},
+       {x:b.cx - b.r, y:b.cy, bulge:qb}, {x:b.cx, y:b.cy - b.r, bulge:qb}]
     : b.pts;
+  const bulged = pts.some(q => q.bulge);
   p('92', 3);                       // external | polyline
-  p('72', 0);                       // no bulges (we hand over tessellated points)
+  p('72', bulged ? 1 : 0);          // has-bulge flag
   p('73', 1);                       // closed
   p('93', pts.length);
-  for (const q of pts) p('10', q.x, '20', q.y);
+  for (const q of pts){
+    p('10', q.x, '20', q.y);
+    if (bulged) p('42', q.bulge || 0);
+  }
   p('97', 0);                       // no source boundary objects
 
-  p('75', 0, '76', 1);              // hatch style / pattern type
-  if (!solid) p('52', 45, '41', 1, '77', 0, '78', 1, '53', 45, '43', 0, '44', 0, '45', 0, '46', 3.18, '79', 0);
+  p('75', 0, '76', solid ? 1 : 0);  // hatch style / predefined vs user-defined
+  if (!solid){
+    const scale = 50 / MM_PER_UNIT[units] || 50;  // mm on paper → model units at 1:50
+    // dots are a line family whose dash pattern is dot-gap; dashed lines keep
+    // their rhythm; plain families carry no dash data at all
+    const fams = mat.pattern.lines
+      ? mat.pattern.lines.map(l => ({ang:l.ang, gap:l.gap, dash:l.dash || null}))
+      : [{ang:45, gap:mat.pattern.dots.gap, dash:[0, mat.pattern.dots.gap]}];
+    p('52', 0, '41', 1, '77', 0, '78', fams.length);
+    for (const fm of fams){
+      const rad = fm.ang * Math.PI/180, gap = fm.gap * scale;
+      // group 45/46 hold the offset to the next parallel line, rotated into
+      // the pattern line's frame — (0, gap) turned by the line's angle
+      p('53', fm.ang, '43', 0, '44', 0, '45', -gap*Math.sin(rad), '46', gap*Math.cos(rad));
+      const dash = fm.dash ? fm.dash.map((d,i) => (i%2 ? -d : d) * scale) : [];
+      p('79', dash.length);
+      for (const d of dash) p('49', d);
+    }
+  }
   p('98', 0);                       // no seed points
 }
 
