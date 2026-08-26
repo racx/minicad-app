@@ -3,6 +3,7 @@ class User < ApplicationRecord
 
   has_many :drawings, dependent: :destroy
   has_many :ai_calls, dependent: :delete_all   # a deleted user takes their logs along
+  has_one :editor_preference, dependent: :destroy
 
   validates :name, presence: true
   validates :email, presence: true, uniqueness: true

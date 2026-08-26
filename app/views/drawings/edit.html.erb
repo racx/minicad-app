@@ -13,6 +13,7 @@
      data-update-url="<%= drawing_path(@drawing) %>"
      data-ai-url="<%= api_drawing_ai_commands_path(@drawing) %>"
      data-copy-url="<%= drawings_path %>"
+     data-preferences-url="<%= api_preferences_path %>"
      data-drawings-url="<%= drawings_path %>">
   <script type="application/json" id="drawing-doc"><%= raw ERB::Util.json_escape(@drawing.doc.to_json) %></script>
 </div>

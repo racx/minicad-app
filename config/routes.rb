@@ -21,6 +21,9 @@ Rails.application.routes.draw do
     # DWG→DXF conversion (GPL subprocess — see packages/dwg/README.md).
     # Reachable signed-out too, because /try lets anyone open a drawing.
     post "dwg", to: "dwg#create", as: :dwg
+    # Editor personalization (osnap config, toggles) — follows the user across devices.
+    get   "preferences", to: "preferences#show", as: :preferences
+    patch "preferences", to: "preferences#update"
   end
 
   resources :drawings, except: [ :new, :show ] do

@@ -15,6 +15,12 @@ export const sink = {
   editText: () => {},      // (str) — seed the command input for in-place text editing
   clearAutosave: () => {}, // NEW command wipes the crash-net copy
   layersChanged: () => {}, // layer list/props changed — adapter refreshes the layer widget
+  prefsChanged: () => {},  // editor preferences (osnap config, toggles) changed — hosts may persist
 };
+
+/* prefs.js mutes emission while it APPLIES preferences, so a host pushing
+   saved settings into the engine doesn't get them echoed straight back. */
+export const prefsGate = { muted: false };
+export function emitPrefs(){ if (!prefsGate.muted) sink.prefsChanged(); }
 
 export function connectUI(impl){ Object.assign(sink, impl); }

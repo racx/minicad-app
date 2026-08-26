@@ -392,7 +392,52 @@ function startAdapter() {
     }
   })
 
+  startPrefsSync()
   startAiLoop()
+}
+
+/* ---------- editor preferences sync ----------
+   Osnap config and the toggle row are personalization, not drawing data: the
+   engine keeps a per-browser localStorage fallback, and here the server copy
+   is layered on top (per user, so a laptop opens with the desktop's snaps).
+   Server wins on boot; every change PATCHes back, debounced. Offline just
+   means the localStorage fallback carries the session — no error surface. */
+const PREFS_QUIET_MS = 1200
+
+async function startPrefsSync() {
+  let synced = null
+  try {
+    const res = await fetch(cfg.preferencesUrl, { headers: { 'Accept': 'application/json' } })
+    if (res.ok) {
+      const { prefs } = await res.json()
+      if (prefs && Object.keys(prefs).length) engine.face.applyEditorPrefs(prefs)
+      synced = JSON.stringify(engine.face.getEditorPrefs())
+    }
+  } catch { /* offline — the engine already booted from its localStorage copy */ }
+
+  let timer = null
+  engine.face.connectUI({
+    prefsChanged: () => {
+      clearTimeout(timer)
+      timer = setTimeout(async () => {
+        const prefs = engine.face.getEditorPrefs()
+        const payload = JSON.stringify(prefs)
+        if (payload === synced) return
+        try {
+          const res = await fetch(cfg.preferencesUrl, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content
+            },
+            body: JSON.stringify({ prefs })
+          })
+          if (res.ok) synced = payload
+        } catch { /* the next change retries; localStorage still has it */ }
+      }, PREFS_QUIET_MS)
+    }
+  })
 }
 
 /* ---------- AI commands: request → engine MScript validation → ghost → Enter/Esc ---------- */

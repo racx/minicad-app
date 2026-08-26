@@ -15,7 +15,7 @@ import { entities, setEntities, nextId, layers, setLayers, currentLayer, setCurr
          setTrackGuides, layerVisible, layerUnlocked, blocks, blockDef, defineBlock, bumpGeom } from './state.js';
 import { findEntityAt, entHitDist, entInWindow, entBBox, snapCandidates, translateEnt, translateIds, mirrorEnt, blockParts } from './entities.js';
 import { query as spatialQuery } from './spatial.js';
-import { sink } from './bus.js';
+import { sink, emitPrefs } from './bus.js';
 import { gridStep, s2w } from './viewport.js';
 
 /* All UI/effect traffic goes through the sink — commands stays DOM-free.
@@ -106,6 +106,7 @@ export function registerHatchDialog(fn){ hatchOpener = fn; }
 export function setTog(k){
   T[k]=!T[k];
   sink.toggled(k, T[k]);
+  emitPrefs();
   log(`${k.toUpperCase()} ${T[k]?'on':'off'}`);
   draw();
 }
@@ -128,11 +129,13 @@ export function setSnapActive(kinds, persist=true){
   SNAP_ACTIVE.clear();
   for (const k of kinds) if (SNAP_PRIORITY.includes(k)) SNAP_ACTIVE.add(k);
   if (persist) saveSnapConfig();
+  emitPrefs();
   draw();
 }
 export function setSnapTracking(on, persist=true){
   SNAP_FLAGS.tracking = !!on;
   if (persist) saveSnapConfig();
+  emitPrefs();
   draw();
 }
 function saveSnapConfig(){

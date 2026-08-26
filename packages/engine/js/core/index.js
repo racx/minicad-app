@@ -11,8 +11,10 @@ import { buildPlotSVG, buildTestPageSVG } from './plot.js';
 import { MATERIALS, materialByKey } from './materials.js';
 import { entityArea } from './geometry.js';
 import { connectUI } from './bus.js';
+import { getEditorPrefs, applyEditorPrefs } from './prefs.js';
 
-export { executeScript, parseScript, previewScript, connectUI, MATERIALS };
+export { executeScript, parseScript, previewScript, connectUI, MATERIALS,
+         getEditorPrefs, applyEditorPrefs };
 export const renderPlotSVG = buildPlotSVG;
 export { buildTestPageSVG };
 
@@ -25,6 +27,7 @@ export function createEngine(){
     serializeContext,
     renderPlotSVG,
     connectUI,
+    getEditorPrefs, applyEditorPrefs,   // host-persisted personalization (osnap config, toggles)
     MATERIALS,
   };
 }
