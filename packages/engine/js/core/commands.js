@@ -8,6 +8,7 @@ import { dist, fmt, deep, rotPt, ptSegDist, TAU, normAng, arcSweep, arcPt, arcFr
 import { materialByKey } from './materials.js';
 import { SYMBOLS, symbolDef } from './symbols.js';
 import { entIntersections, lineEntT, lineLine, lineCircleT, circleCircle, perpFoot, tangentPts, nearestOnEnt } from './intersect.js';
+import { traceBoundary } from './boundary.js';
 import { entities, setEntities, nextId, layers, setLayers, currentLayer, setCurrentLayer, undoStack, redoStack, snapshot,
          view, T, cmd, setCmd, lastCmdName, setLastCmdName, selection, curPt, setSnapMark,
          selRect, setSelRect, plotWin, setPlotWin, units, setUnits,
@@ -38,6 +39,7 @@ export const ALIASES = {
   J:'JOIN', JOIN:'JOIN', PEDIT:'JOIN', X:'EXPLODE', EXPLODE:'EXPLODE',
   B:'BLOCK', BLOCK:'BLOCK', I:'INSERT', INSERT:'INSERT', DDINSERT:'INSERT',
   H:'HATCH', HATCH:'HATCH', BHATCH:'HATCH', AREA:'AREA', AA:'AREA',
+  BO:'BOUNDARY', BOUNDARY:'BOUNDARY', BPOLY:'BOUNDARY',
   DIM:'DIM', DLI:'DIM', DAL:'DIM', DIMLINEAR:'DIM', DIMTXT:'DIMTXT', DTX:'DIMTXT',
   DI:'DIST', DIST:'DIST', Z:'ZOOM', ZOOM:'ZOOM', ZOOMEXT:'ZOOMEXT', P:'PAN', PAN:'PAN',
   U:'UNDO', UNDO:'UNDO', REDO:'REDO', ORTHO:'TOGORTHO', GRID:'TOGGRID', DYN:'TOGDYN', HELP:'HELP', '?':'HELP',
@@ -340,6 +342,7 @@ export function startCommand(raw){
     if (hatchOpener) hatchOpener(); else log('Material picker unavailable.', 'e');
   }
   else if (name==='AREA'){ cmd.step='pick'; setPrompt('AREA — Click a hatch or closed shape (Enter to end):'); }
+  else if (name==='BOUNDARY'){ cmd.step='pick'; setPrompt('BOUNDARY — Pick a point inside an enclosed area (Enter to end):'); }
   else if (name==='RECTANG') setPrompt('RECTANG — Specify first corner:');
   else if (name==='CIRCLE') setPrompt('CIRCLE — Specify center point:');
   else if (name==='TEXT'){ cmd.step='point'; setPrompt('TEXT — Specify insertion point:'); }
@@ -632,6 +635,9 @@ export function onPoint(p){
   else if (n==='AREA'){
     if (cmd.step==='pick') reportArea(p);
   }
+  else if (n==='BOUNDARY'){
+    if (cmd.step==='pick') placeBoundary(p);
+  }
   else if (n==='OFFSET'){
     if (cmd.step==='pick'){
       const e = findEntityAt(p);
@@ -743,6 +749,19 @@ function placeHatch(p){
   if (err){ log(err, 'e'); return; }
   if (!hatchBoundary(b, cmd.mat)) return;
   setPrompt(`HATCH (${materialByKey(cmd.mat).name.toLowerCase()}) — Click another closed shape (Enter to end):`);
+}
+/* BOUNDARY: trace the region around the pick and drop a closed pline on it.
+   Works on linework that merely crosses — the tracer cuts everything at the
+   crossings and walks the enclosing loop out of the pieces (boundary.js). */
+function placeBoundary(p){
+  const visible = entities.filter(e=>layerVisible(e.layer) && layerUnlocked(e.layer) && !e.frozen);
+  const {pts, err} = traceBoundary(p, visible);
+  if (err){ log(err, 'e'); return; }
+  snapshot();
+  const e = {id:nextId(), type:'pline', closed:true, pts, layer:currentLayer};
+  entities.push(e);
+  log(`Boundary traced — closed polyline, ${pts.length} vertices, area ${areaLabel(entityArea(e))}.`, 'r');
+  setPrompt('BOUNDARY — Pick a point inside another area (Enter to end):');
 }
 function reportArea(p){
   const {b, hatch, err} = boundaryAt(p);
@@ -1523,7 +1542,7 @@ export function handleEnter(text){
     if (cmd.step==='select'){ afterSelect(); return; }
     if (n==='PLINE'){ finishPline(false); return; }
     if (n==='PAN'){ endCmd(); return; }
-    if (n==='LINE' || n==='OFFSET' || n==='TRIM' || n==='EXTEND' || n==='HATCH' || n==='AREA' || (n==='COPY'&&cmd.step==='dest')){
+    if (n==='LINE' || n==='OFFSET' || n==='TRIM' || n==='EXTEND' || n==='HATCH' || n==='AREA' || n==='BOUNDARY' || (n==='COPY'&&cmd.step==='dest')){
       if (n==='TRIM' || n==='EXTEND') selection.clear();   // edge highlights are command-internal
       endCmd(); return;
     }
