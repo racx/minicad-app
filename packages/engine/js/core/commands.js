@@ -35,7 +35,7 @@ export const ALIASES = {
   M:'MOVE', MOVE:'MOVE', CO:'COPY', CP:'COPY', COPY:'COPY', RO:'ROTATE', ROTATE:'ROTATE', SC:'SCALE', SCALE:'SCALE',
   O:'OFFSET', OFFSET:'OFFSET', E:'ERASE', ERASE:'ERASE', DEL:'ERASE', TR:'TRIM', TRIM:'TRIM',
   EX:'EXTEND', EXTEND:'EXTEND', F:'FILLET', FILLET:'FILLET',
-  MI:'MIRROR', MIRROR:'MIRROR', S:'STRETCH', STRETCH:'STRETCH',
+  MI:'MIRROR', MIRROR:'MIRROR', S:'STRETCH', STRETCH:'STRETCH', AL:'ALIGN', ALIGN:'ALIGN',
   J:'JOIN', JOIN:'JOIN', PEDIT:'JOIN', X:'EXPLODE', EXPLODE:'EXPLODE',
   B:'BLOCK', BLOCK:'BLOCK', I:'INSERT', INSERT:'INSERT', DDINSERT:'INSERT',
   H:'HATCH', HATCH:'HATCH', BHATCH:'HATCH', AREA:'AREA', AA:'AREA',
@@ -69,7 +69,7 @@ export function suggestCommands(text){
   return sugMemo.rows;
 }
 
-const MODIFY = new Set(['MOVE','COPY','ROTATE','SCALE','ERASE','MIRROR','JOIN','EXPLODE']);
+const MODIFY = new Set(['MOVE','COPY','ROTATE','SCALE','ERASE','MIRROR','JOIN','EXPLODE','ALIGN']);
 let filletRadius = 0;   // remembered across FILLET invocations
 let dimTextHeight = 0;  // remembered dim text height; 0 = automatic (4% of length)
 // scripted execution (mscript) snapshots these so a failed script restores them
@@ -268,6 +268,8 @@ export function rubberBase(){
   if (cmd.name==='MIRROR' && cmd.step==='p2') return cmd.p1;
   if (cmd.name==='STRETCH' && cmd.step==='dest') return cmd.base;
   if (cmd.name==='DIM' && cmd.step==='p2') return cmd.p1;
+  if (cmd.name==='ALIGN' && cmd.step==='d1') return cmd.s1;   // pair 1: source → dest
+  if (cmd.name==='ALIGN' && cmd.step==='d2') return cmd.s2;   // pair 2
   return null;
 }
 
@@ -410,6 +412,11 @@ export function afterSelect(){
     setPrompt('MIRROR — Specify first point of mirror line:');
     return;
   }
+  if (cmd.name==='ALIGN'){
+    cmd.step='s1';
+    setPrompt('ALIGN — Specify first source point:');
+    return;
+  }
   if (cmd.name==='STRETCH'){
     cmd.rect = selRect;                       // world rect of the crossing box (null = move whole)
     cmd.step='base';
@@ -540,6 +547,19 @@ export function onPoint(p){
         log(`Copied ${clones.length}.`, 'r');
         setPrompt('COPY — Specify second point (Enter to end):');
       }
+    }
+  }
+  else if (n==='ALIGN'){
+    if (cmd.step==='s1'){ cmd.s1=p; cmd.step='d1'; setPrompt('ALIGN — Specify first destination point:'); }
+    else if (cmd.step==='d1'){ cmd.d1=p; cmd.step='s2'; setPrompt('ALIGN — Specify second source point (Enter to just move):'); }
+    else if (cmd.step==='s2'){
+      if (dist(p, cmd.s1) < 1e-9){ log('Second source point must differ from the first.', 'e'); return; }
+      cmd.s2=p; cmd.step='d2'; setPrompt('ALIGN — Specify second destination point:');
+    }
+    else if (cmd.step==='d2'){
+      if (dist(p, cmd.d1) < 1e-9){ log('Second destination point must differ from the first.', 'e'); return; }
+      cmd.d2=p; cmd.step='scale';
+      setPrompt('ALIGN — Scale objects based on alignment points? [Y/N] <N>:');
     }
   }
   else if (n==='MIRROR'){
@@ -799,27 +819,29 @@ function makeCircle(r){
   entities.push({id:nextId(), type:'circle', cx:cmd.center.x, cy:cmd.center.y, r, layer:currentLayer});
   endCmd();
 }
-function applyRotate(ang){
+// rotate the entities in `ids` about `base` — shared by ROTATE and ALIGN
+function rotateIds(ids, base, ang){
   const c=Math.cos(ang), s=Math.sin(ang);
-  snapshot();
-  for (const id of cmd.sel){
+  for (const id of ids){
     const e=entities.find(z=>z.id===id); if(!e) continue;
-    if (e.type==='line'){ const a=rotPt({x:e.x1,y:e.y1},cmd.base,c,s), b=rotPt({x:e.x2,y:e.y2},cmd.base,c,s); e.x1=a.x;e.y1=a.y;e.x2=b.x;e.y2=b.y; }
-    else if (e.type==='circle'){ const p=rotPt({x:e.cx,y:e.cy},cmd.base,c,s); e.cx=p.x;e.cy=p.y; }
-    else if (e.type==='arc'){ const p=rotPt({x:e.cx,y:e.cy},cmd.base,c,s); e.cx=p.x;e.cy=p.y; e.a0=normAng(e.a0+ang); e.a1=normAng(e.a1+ang); }
-    else if (e.type==='pline'){ e.pts=e.pts.map(p=>{ const q=rotPt(p,cmd.base,c,s); return p.bulge?{...q,bulge:p.bulge}:q; }); }
-    else if (e.type==='text'){ const p=rotPt({x:e.x,y:e.y},cmd.base,c,s); e.x=p.x;e.y=p.y; e.rot=normAng((e.rot||0)+ang); }
-    else if (e.type==='dim'){ const a=rotPt({x:e.x1,y:e.y1},cmd.base,c,s), b=rotPt({x:e.x2,y:e.y2},cmd.base,c,s); e.x1=a.x;e.y1=a.y;e.x2=b.x;e.y2=b.y; }
+    if (e.type==='line'){ const a=rotPt({x:e.x1,y:e.y1},base,c,s), b=rotPt({x:e.x2,y:e.y2},base,c,s); e.x1=a.x;e.y1=a.y;e.x2=b.x;e.y2=b.y; }
+    else if (e.type==='circle'){ const p=rotPt({x:e.cx,y:e.cy},base,c,s); e.cx=p.x;e.cy=p.y; }
+    else if (e.type==='arc'){ const p=rotPt({x:e.cx,y:e.cy},base,c,s); e.cx=p.x;e.cy=p.y; e.a0=normAng(e.a0+ang); e.a1=normAng(e.a1+ang); }
+    else if (e.type==='pline'){ e.pts=e.pts.map(p=>{ const q=rotPt(p,base,c,s); return p.bulge?{...q,bulge:p.bulge}:q; }); }
+    else if (e.type==='text'){ const p=rotPt({x:e.x,y:e.y},base,c,s); e.x=p.x;e.y=p.y; e.rot=normAng((e.rot||0)+ang); }
+    else if (e.type==='dim'){ const a=rotPt({x:e.x1,y:e.y1},base,c,s), b=rotPt({x:e.x2,y:e.y2},base,c,s); e.x1=a.x;e.y1=a.y;e.x2=b.x;e.y2=b.y; }
   }
+}
+function applyRotate(ang){
+  snapshot();
+  rotateIds(cmd.sel, cmd.base, ang);
   log(`Rotated ${cmd.sel.length} by ${fmt(ang*180/Math.PI)}°.`, 'r');
   endCmd();
 }
-function applyScale(f){
-  if (!(f>0)){ log('Factor must be positive.', 'e'); return; }
-  snapshot();
-  const b=cmd.base;
-  const sp=p=>({x:b.x+(p.x-b.x)*f, y:b.y+(p.y-b.y)*f});
-  for (const id of cmd.sel){
+// scale the entities in `ids` about `base` by f — shared by SCALE and ALIGN
+function scaleIds(ids, base, f){
+  const sp=p=>({x:base.x+(p.x-base.x)*f, y:base.y+(p.y-base.y)*f});
+  for (const id of ids){
     const e=entities.find(z=>z.id===id); if(!e) continue;
     if (e.type==='line'){ const a=sp({x:e.x1,y:e.y1}), q=sp({x:e.x2,y:e.y2}); e.x1=a.x;e.y1=a.y;e.x2=q.x;e.y2=q.y; }
     else if (e.type==='circle' || e.type==='arc'){ const p=sp({x:e.cx,y:e.cy}); e.cx=p.x;e.cy=p.y;e.r*=f; }
@@ -827,7 +849,32 @@ function applyScale(f){
     else if (e.type==='text'){ const p=sp({x:e.x,y:e.y}); e.x=p.x;e.y=p.y;e.h*=f; }
     else if (e.type==='dim'){ const a=sp({x:e.x1,y:e.y1}), q=sp({x:e.x2,y:e.y2}); e.x1=a.x;e.y1=a.y;e.x2=q.x;e.y2=q.y;e.off*=f; if (e.h) e.h*=f; }
   }
+}
+function applyScale(f){
+  if (!(f>0)){ log('Factor must be positive.', 'e'); return; }
+  snapshot();
+  scaleIds(cmd.sel, cmd.base, f);
   log(`Scaled ${cmd.sel.length} by ${f}.`, 'r');
+  endCmd();
+}
+/* ALIGN: source/destination point pairs → translate + rotate (+ uniform scale).
+   One pair is a plain move; two pairs also rotate about the first destination,
+   and — the AutoCAD question — optionally scale so the second source lands
+   exactly on the second destination. One snapshot, one undo step. */
+function performAlign(scaleIt){
+  const {s1, d1, s2, d2} = cmd;
+  snapshot();
+  translateIds(cmd.sel, d1.x-s1.x, d1.y-s1.y);
+  let what = 'moved';
+  if (s2){
+    rotateIds(cmd.sel, d1, Math.atan2(d2.y-d1.y, d2.x-d1.x) - Math.atan2(s2.y-s1.y, s2.x-s1.x));
+    what = 'moved and rotated';
+    if (scaleIt){
+      scaleIds(cmd.sel, d1, dist(d1,d2)/dist(s1,s2));
+      what = 'moved, rotated and scaled';
+    }
+  }
+  log(`Aligned ${cmd.sel.length} object${cmd.sel.length>1?'s':''} — ${what}.`, 'r');
   endCmd();
 }
 function offsetEntity(e, d, side){
@@ -1540,6 +1587,14 @@ export function handleEnter(text){
     log(v>0 ? `Dimension text height: ${fmt(v)}.` : 'Dimension text height: automatic.', 'r');
     endCmd(); return;
   }
+  if (n==='ALIGN' && cmd.step==='scale'){
+    const c = text.toUpperCase();
+    if (c==='Y' || c==='YES') performAlign(true);
+    else if (c==='' || c==='N' || c==='NO') performAlign(false);
+    else log('Enter Y or N.', 'e');
+    return;
+  }
+  if (n==='ALIGN' && cmd.step==='s2' && !text){ performAlign(false); return; }  // one pair = plain move
   if (n==='MIRROR' && cmd.step==='erase'){
     const c = text.toUpperCase();
     if (c==='Y' || c==='YES') doMirror(true);
