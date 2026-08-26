@@ -49,6 +49,7 @@ point steps accept `x,y` / `@dx,dy` / `@d<a` / direct-distance via `parsePoint`
 | MIRROR | `MI` | ✅ Complete. Two-point axis (rubber line), `Erase source? [Y/N] <N>` (`:783`). Arc reflected CCW-correct, text insertion-only (MIRRTEXT=0 style). One snapshot. | `:275`, doMirror `:571`, mirrorEnt `entities.js:195` |
 | STRETCH | `S` | ✅ Complete. Forces fresh crossing-box selection (`:151`, box rect captured in `boxSelect` via `selRect`); vertices inside box move, circles/arcs/text move iff center/insertion inside; dims stretch per-defpoint. One snapshot. | `:283`, stretchEnt `:585` |
 | ALIGN | `AL` `ALIGN` | ✅ AutoCAD 2D ALIGN: select, then source→destination point pairs. One pair = move; two pairs = move + rotate about the first destination, then `Scale objects based on alignment points? [Y/N] <N>` scales uniformly so the second pair lands exactly. Composition of the shared transform helpers (translateIds/rotateIds/scaleIds — the latter two extracted from ROTATE/SCALE); coincident-point picks refused with re-prompt; rubber line source→dest per pair. One snapshot. | `commands.js` performAlign, suite 41 |
+| ARRAY | `AR` `ARRAY` `ARRAYCLASSIC` | ✅ Classic (non-associative) array with AutoCAD's questions: `[R]ectangular/[P]olar <R>`. Rect: columns `<4>` × rows `<3>` + signed spacings (skipped for a single row/column). Polar: center click, item count `<6>` (original included), fill angle `<360>` (÷n full circle, ÷n-1 partial), `Rotate items as they are copied? [Y/N] <Y>` — N spins each copy back about its own footprint. Copies via the shared `cloneSel` (extracted from COPY — hatch ref/holes remap per copy). 500-object cap catches typos; one snapshot. No associative array entity — copies are plain geometry. | `commands.js` arrayEnter/performRectArray/performPolarArray/cloneSel, suite 42 |
 | ERASE | `E` `DEL` | ✅ Complete. Also Delete/Backspace key when idle (`main.js:164–170`). One snapshot. | afterSelect `:180–186` |
 | LAYDEL | `LAYDEL` `LAYDELETE` `LADEL` | ✅ Deletes matching layers and every object on them, ignoring the file's lock flag (client drawings ship scratch layers locked). Trailing/embedded `*` matches a family — `EXCLUIR*` cleared 13 layers / 4460 objects (20% of a real plan) in one command. Layer `0` protected; hatches orphaned by a deleted boundary go too; one snapshot. | `commands.js` LAYDEL, suite 11 |
 | THAW | `THAW` | ✅ Clears the `frozen` flag on every imported approximation, making them editable. One snapshot; says how many it released; no-ops with a message when nothing is frozen. | `commands.js` THAW, suite 26 |
@@ -69,12 +70,13 @@ point steps accept `x,y` / `@dx,dy` / `@d<a` / direct-distance via `parsePoint`
 | TOGDYN | `DYN`, F12, chip | ✅ Dynamic input: prompt + live typing rendered in a tooltip riding the crosshair (edge-aware flip), on by default. Pure display — input routing/UX unchanged. | `view.js` drawDynInput, `main.js` (F12, input redraw), suite 23 |
 | EDITTEXT | *(no alias — double-click a text)* | ✅ Complete. Prefills input with current string; Enter applies (one snapshot), Esc/empty keeps. | `startEditText commands.js:825`, dblclick `main.js:129–133`, apply `:760–766` |
 
-### Explicitly ABSENT (confirmed by grep over `js/` and `index.html`)
+### Explicitly ABSENT (confirmed by grep over `js/` and `index.html`, 2026-08-26)
 
-**EXPLODE: does not exist** — no alias, no handler, no reference. Likewise absent:
-**ARRAY, HATCH, BLOCK/INSERT/WBLOCK, PEDIT, CHAMFER, BREAK, JOIN, LENGTHEN, ELLIPSE,
-SPLINE, POLYGON, DONUT, GROUP, PURGE.** The only grep hits for these strings are CSS
-`display:block` and an unrelated comment.
+**WBLOCK, CHAMFER, BREAK, LENGTHEN, ELLIPSE, SPLINE, POLYGON, DONUT, GROUP, PURGE.**
+(An earlier revision of this list also named EXPLODE, ARRAY, HATCH, BLOCK/INSERT,
+PEDIT and JOIN — all shipped since; see their rows above. PEDIT is an alias of JOIN.
+Ellipses and splines DO arrive via DXF/DWG import, as frozen tessellated outlines —
+there is just no command to draw or edit them natively yet.)
 (PAN shipped 2026-07-06: `P`/`PAN` hand tool — left-drag pans, grab cursor,
 Enter/Esc exits — alongside the existing middle-drag/space-drag. Suite 17.)
 
@@ -151,6 +153,7 @@ engine through a stubbed DOM (`tests/stub-dom.mjs`):
 | 10-autosave-new | tick/restore/clear, NEW confirm, empty-save guard |
 | 11-layers-editing | hide/lock filters incl. TRIM edges, CHLAYER, dblclick edit |
 | 12-offset-pline | closed/open pline miters, arc offset, collapse + refusal messages |
+| 42-array | rect grid math + defaults, hatch remap per copy, polar rotate/no-rotate orientation, partial-fill ÷n-1, refusals (type, 1×1, cap, zero spacing), one-undo |
 | 41-align | pair math (move / move+rotate / +scale lands exactly), group rigidity, circle radius scaling, coincident-point refusals, Y/N/garbage answers, undo, selection flow |
 | 40-prefs | editor-prefs face: bundle shape, prefsChanged on every osnap/toggle change, apply (server copy wins, silently, chips synced), garbage tolerance, round trip |
 | 39-boundary | tracer on loose lines / # crossings / overlapping rects / circles (bulge loops, mixed arc+line regions), outside-pick and gap refusals, command flow (undo step, repeat, hatchable result), HATCH pick-points fallback (trace+fill = one undo) and AREA region measurement, hidden-layer and text exclusion |

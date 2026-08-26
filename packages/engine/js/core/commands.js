@@ -36,6 +36,7 @@ export const ALIASES = {
   O:'OFFSET', OFFSET:'OFFSET', E:'ERASE', ERASE:'ERASE', DEL:'ERASE', TR:'TRIM', TRIM:'TRIM',
   EX:'EXTEND', EXTEND:'EXTEND', F:'FILLET', FILLET:'FILLET',
   MI:'MIRROR', MIRROR:'MIRROR', S:'STRETCH', STRETCH:'STRETCH', AL:'ALIGN', ALIGN:'ALIGN',
+  AR:'ARRAY', ARRAY:'ARRAY', ARRAYCLASSIC:'ARRAY',
   J:'JOIN', JOIN:'JOIN', PEDIT:'JOIN', X:'EXPLODE', EXPLODE:'EXPLODE',
   B:'BLOCK', BLOCK:'BLOCK', I:'INSERT', INSERT:'INSERT', DDINSERT:'INSERT',
   H:'HATCH', HATCH:'HATCH', BHATCH:'HATCH', AREA:'AREA', AA:'AREA',
@@ -69,7 +70,7 @@ export function suggestCommands(text){
   return sugMemo.rows;
 }
 
-const MODIFY = new Set(['MOVE','COPY','ROTATE','SCALE','ERASE','MIRROR','JOIN','EXPLODE','ALIGN']);
+const MODIFY = new Set(['MOVE','COPY','ROTATE','SCALE','ERASE','MIRROR','JOIN','EXPLODE','ALIGN','ARRAY']);
 let filletRadius = 0;   // remembered across FILLET invocations
 let dimTextHeight = 0;  // remembered dim text height; 0 = automatic (4% of length)
 // scripted execution (mscript) snapshots these so a failed script restores them
@@ -417,6 +418,11 @@ export function afterSelect(){
     setPrompt('ALIGN — Specify first source point:');
     return;
   }
+  if (cmd.name==='ARRAY'){
+    cmd.step='type';
+    setPrompt('ARRAY — Enter array type [R]ectangular / [P]olar <R>:');
+    return;
+  }
   if (cmd.name==='STRETCH'){
     cmd.rect = selRect;                       // world rect of the crossing box (null = move whole)
     cmd.step='base';
@@ -536,12 +542,7 @@ export function onPoint(p){
       snapshot();
       if (n==='MOVE'){ translateIds(cmd.sel, dx, dy); log(`Moved ${cmd.sel.length}.`, 'r'); endCmd(); return; }
       else {
-        const idMap = new Map();
-        const clones = cmd.sel.map(id=>{ const e=deep(entities.find(z=>z.id===id)); const nid=nextId(); idMap.set(id, nid); e.id=nid; return e; });
-        clones.forEach(e=>{ if (e.type==='hatch'){
-          if (idMap.has(e.ref)) e.ref = idMap.get(e.ref);
-          if (e.holes) e.holes = e.holes.map(id=>idMap.get(id) ?? id);
-        }});
+        const clones = cloneSel(cmd.sel);
         clones.forEach(e=>translateEnt(e,dx,dy));
         entities.push(...clones);
         log(`Copied ${clones.length}.`, 'r');
@@ -560,6 +561,12 @@ export function onPoint(p){
       if (dist(p, cmd.d1) < 1e-9){ log('Second destination point must differ from the first.', 'e'); return; }
       cmd.d2=p; cmd.step='scale';
       setPrompt('ALIGN — Scale objects based on alignment points? [Y/N] <N>:');
+    }
+  }
+  else if (n==='ARRAY'){
+    if (cmd.step==='center'){
+      cmd.center=p; cmd.step='count';
+      setPrompt('ARRAY — Number of items (the original counts) <6>:');
     }
   }
   else if (n==='MIRROR'){
@@ -798,6 +805,101 @@ function placeBoundary(p){
   log(`Boundary traced — closed polyline, ${pts.length} vertices, area ${areaLabel(entityArea(e))}.`, 'r');
   setPrompt('BOUNDARY — Pick a point inside another area (Enter to end):');
 }
+/* ARRAY (classic, non-associative): rectangular rows × columns, or polar
+   about a center point with AutoCAD's questions — items count includes the
+   original, full-circle spacing divides by n, partial fill by n-1, and
+   "Rotate items as they are copied? [Y/N] <Y>". Copies are plain entities
+   (no array object to re-edit later); one snapshot per array. */
+const ARRAY_CAP = 500;   // new objects per array — a typo guard, not a feature
+function arrayEnter(text){
+  const t = text.toUpperCase();
+  if (cmd.step==='type'){
+    if (t==='' || t==='R' || t==='REC' || t==='RECT' || t==='RECTANGULAR'){
+      cmd.kind='rect'; cmd.step='cols'; setPrompt('ARRAY — Number of columns <4>:');
+    } else if (t==='P' || t==='PO' || t==='POL' || t==='POLAR'){
+      cmd.kind='polar'; cmd.step='center'; setPrompt('ARRAY — Specify center point of array:');
+    } else log('Enter R (rectangular) or P (polar).', 'e');
+    return;
+  }
+  if (cmd.step==='cols' || cmd.step==='rows'){
+    const v = t==='' ? (cmd.step==='cols' ? 4 : 3) : parseInt(text, 10);
+    if (!(v>=1)){ log(`Enter a whole number of ${cmd.step} (1 or more).`, 'e'); return; }
+    if (cmd.step==='cols'){ cmd.cols=v; cmd.step='rows'; setPrompt('ARRAY — Number of rows <3>:'); return; }
+    cmd.rows=v;
+    if (cmd.rows*cmd.cols===1){ log('1 row × 1 column is just the original — nothing to array.', 'e'); cmd.step='cols'; setPrompt('ARRAY — Number of columns <4>:'); return; }
+    if ((cmd.rows*cmd.cols-1)*cmd.sel.length > ARRAY_CAP){ log(`That would create ${(cmd.rows*cmd.cols-1)*cmd.sel.length} objects — keep it under ${ARRAY_CAP}.`, 'e'); cmd.step='cols'; setPrompt('ARRAY — Number of columns <4>:'); return; }
+    if (cmd.cols>1){ cmd.step='coldist'; setPrompt('ARRAY — Column spacing (negative = leftward):'); }
+    else { cmd.step='rowdist'; setPrompt('ARRAY — Row spacing (negative = downward):'); }
+    return;
+  }
+  if (cmd.step==='coldist' || cmd.step==='rowdist'){
+    const v = parseFloat(text);
+    if (!text || isNaN(v) || !v){ log('Enter a non-zero spacing number.', 'e'); return; }
+    if (cmd.step==='coldist'){
+      cmd.dx=v;
+      if (cmd.rows>1){ cmd.step='rowdist'; setPrompt('ARRAY — Row spacing (negative = downward):'); return; }
+    } else cmd.dy=v;
+    performRectArray();
+    return;
+  }
+  if (cmd.step==='count'){
+    const v = t==='' ? 6 : parseInt(text, 10);
+    if (!(v>=2)){ log('Enter at least 2 items (the original counts as one).', 'e'); return; }
+    if ((v-1)*cmd.sel.length > ARRAY_CAP){ log(`That would create ${(v-1)*cmd.sel.length} objects — keep it under ${ARRAY_CAP}.`, 'e'); return; }
+    cmd.count=v; cmd.step='fill';
+    setPrompt('ARRAY — Angle to fill <360> (+ = counter-clockwise):');
+    return;
+  }
+  if (cmd.step==='fill'){
+    const v = t==='' ? 360 : parseFloat(text);
+    if (isNaN(v) || !v || Math.abs(v)>360){ log('Enter an angle between -360 and 360 (not 0).', 'e'); return; }
+    cmd.fill=v; cmd.step='rotitems';
+    setPrompt('ARRAY — Rotate items as they are copied? [Y/N] <Y>:');
+    return;
+  }
+  if (cmd.step==='rotitems'){
+    if (t==='' || t==='Y' || t==='YES') performPolarArray(true);
+    else if (t==='N' || t==='NO') performPolarArray(false);
+    else log('Enter Y or N.', 'e');
+  }
+}
+function performRectArray(){
+  const {rows, cols, dx=0, dy=0} = cmd;
+  snapshot();
+  const made=[];
+  for (let r=0; r<rows; r++) for (let c=0; c<cols; c++){
+    if (!r && !c) continue;                        // the original holds cell 0,0
+    const clones = cloneSel(cmd.sel);
+    clones.forEach(e=>translateEnt(e, c*dx, r*dy));
+    made.push(...clones);
+  }
+  entities.push(...made);
+  log(`Array created — ${rows} row${rows>1?'s':''} × ${cols} column${cols>1?'s':''} (${made.length} new object${made.length>1?'s':''}).`, 'r');
+  endCmd();
+}
+function performPolarArray(rotItems){
+  const {count, fill, center} = cmd;
+  const full = Math.abs(Math.abs(fill)-360) < 1e-9;
+  const step = (fill*Math.PI/180) / (full ? count : count-1);
+  snapshot();
+  for (let k=1; k<count; k++){
+    const clones = cloneSel(cmd.sel);
+    entities.push(...clones);                      // rotateIds resolves by id
+    const ids = clones.map(e=>e.id);
+    rotateIds(ids, center, step*k);
+    if (!rotItems){
+      // keep each copy's orientation: spin it back about its own footprint
+      let bb=[Infinity, Infinity, -Infinity, -Infinity];
+      for (const e of clones){
+        const b=entBBox(e); if (!b) continue;
+        bb=[Math.min(bb[0],b[0]), Math.min(bb[1],b[1]), Math.max(bb[2],b[2]), Math.max(bb[3],b[3])];
+      }
+      if (isFinite(bb[0])) rotateIds(ids, {x:(bb[0]+bb[2])/2, y:(bb[1]+bb[3])/2}, -step*k);
+    }
+  }
+  log(`Polar array created — ${count} items over ${fmt(fill)}°.`, 'r');
+  endCmd();
+}
 function reportArea(p){
   const {b, hatch, err} = boundaryAt(p);
   if (err){
@@ -856,6 +958,17 @@ function applyScale(f){
   scaleIds(cmd.sel, cmd.base, f);
   log(`Scaled ${cmd.sel.length} by ${f}.`, 'r');
   endCmd();
+}
+// deep-clone entities by id with fresh ids; hatch ref/holes remap into the
+// clone set so a copied hatch fills its copied outline — shared by COPY/ARRAY
+function cloneSel(ids){
+  const idMap = new Map();
+  const clones = ids.map(id=>{ const e=deep(entities.find(z=>z.id===id)); const nid=nextId(); idMap.set(id, nid); e.id=nid; return e; });
+  clones.forEach(e=>{ if (e.type==='hatch'){
+    if (idMap.has(e.ref)) e.ref = idMap.get(e.ref);
+    if (e.holes) e.holes = e.holes.map(id=>idMap.get(id) ?? id);
+  }});
+  return clones;
 }
 /* ALIGN: source/destination point pairs → translate + rotate (+ uniform scale).
    One pair is a plain move; two pairs also rotate about the first destination,
@@ -1587,6 +1700,7 @@ export function handleEnter(text){
     log(v>0 ? `Dimension text height: ${fmt(v)}.` : 'Dimension text height: automatic.', 'r');
     endCmd(); return;
   }
+  if (n==='ARRAY' && cmd.step!=='select' && cmd.step!=='center'){ arrayEnter(text); return; }
   if (n==='ALIGN' && cmd.step==='scale'){
     const c = text.toUpperCase();
     if (c==='Y' || c==='YES') performAlign(true);
