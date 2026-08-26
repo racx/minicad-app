@@ -50,12 +50,13 @@ const hatches = S.entities.filter(e=>e.type==='hatch');
 check('re-hatch replaces material, no duplicate', hatches.length===1 && hatches[0].mat==='green');
 C.cancelCmd(true);
 
-/* refusals */
+/* refusals: an open pline that encloses nothing can't be traced either */
 C.startCommand('H');
 C.chooseHatchMaterial('glass');
 S.entities.push({id:S.nextId(), type:'pline', closed:false, layer:'0', pts:[{x:200,y:0},{x:300,y:0},{x:300,y:50}]});
 C.onPoint({x:300,y:25});                                 // on the open pline's edge
-check('open pline refused with JOIN hint', dom.logs.some(l=>l.includes("isn't closed")));
+check('unenclosable pick refused with a gap hint', dom.logs.some(l=>/enclos|closed outline/i.test(l)) &&
+      !S.entities.some(e=>e.type==='hatch' && e.mat==='glass'));
 C.cancelCmd(true);
 
 /* ===== hatch entity behavior ===== */

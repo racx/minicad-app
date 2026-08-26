@@ -101,6 +101,30 @@ check('hatching the traced boundary works',
       S.entities.some(e=>e.type==='hatch' && e.ref===plines()[0].id));
 C.cancelCmd(true);
 
+/* ===== HATCH pick-points fallback: loose lines → traced outline + hatch ===== */
+reset();
+line(0,0,10,0); line(10,0,10,10); line(10,10,0,10); line(0,10,0,0);
+C.startCommand('H');
+C.chooseHatchMaterial('concrete');
+C.onPoint({x:5,y:5});
+const tracedPl = plines()[0];
+check('HATCH on loose lines traces the outline and fills it',
+      !!tracedPl && tracedPl.closed &&
+      S.entities.some(e=>e.type==='hatch' && e.ref===tracedPl.id && e.mat==='concrete'));
+check('the trace is announced', dom.logs.some(l=>l.includes('traced for you')));
+C.handleEnter('');
+C.startCommand('U');
+check('traced outline + hatch undo as ONE step', plines().length===0 &&
+      !S.entities.some(e=>e.type==='hatch') && S.entities.length===4);
+
+/* AREA fallback: measures the enclosed region, creates nothing */
+C.startCommand('AA');
+C.onPoint({x:5,y:5});
+check('AREA measures loose-line region without creating anything',
+      dom.logs.some(l=>l.includes('Enclosed region') && l.includes('100')) &&
+      plines().length===0 && S.entities.length===4);
+C.handleEnter('');
+
 /* hidden layers don't take part */
 reset();
 line(0,0,10,0); line(10,0,10,10); line(10,10,0,10);

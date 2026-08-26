@@ -724,10 +724,11 @@ export function hatchNet(hatch, b){
 }
 // create/update the hatch on a validated boundary — shared by the interactive
 // HATCH command and scripted HATCH (mscript). Returns false if unmeasurable.
-export function hatchBoundary(b, matKey){
+// snap=false when the caller already snapshotted (traced boundary + hatch = one undo).
+export function hatchBoundary(b, matKey, snap=true){
   const a = entityArea(b);
   if (!a){ log('Could not measure that shape.', 'e'); return false; }
-  snapshot();
+  if (snap) snapshot();
   const holes = islandsWithin(b).map(e=>e.id);
   const existing = entities.find(z=>z.type==='hatch' && z.ref===b.id);
   const matName = materialByKey(matKey).name;
@@ -744,18 +745,29 @@ export function hatchBoundary(b, matKey){
   }
   return true;
 }
+const traceable = () => entities.filter(e=>layerVisible(e.layer) && layerUnlocked(e.layer) && !e.frozen);
 function placeHatch(p){
   const {b, err} = boundaryAt(p);
-  if (err){ log(err, 'e'); return; }
-  if (!hatchBoundary(b, cmd.mat)) return;
-  setPrompt(`HATCH (${materialByKey(cmd.mat).name.toLowerCase()}) — Click another closed shape (Enter to end):`);
+  if (!err){
+    if (!hatchBoundary(b, cmd.mat)) return;
+  } else {
+    // no closed shape under the pick — trace one out of the loose linework
+    // (AutoCAD's pick-points flow) and hatch it, all as one undo step
+    const t = traceBoundary(p, traceable());
+    if (t.err){ log(t.err, 'e'); return; }
+    snapshot();
+    const pl = {id:nextId(), type:'pline', closed:true, pts:t.pts, layer:currentLayer};
+    entities.push(pl);
+    log('No closed shape there, so the outline was traced for you (closed polyline added).');
+    if (!hatchBoundary(pl, cmd.mat, false)) return;
+  }
+  setPrompt(`HATCH (${materialByKey(cmd.mat).name.toLowerCase()}) — Click another shape (Enter to end):`);
 }
 /* BOUNDARY: trace the region around the pick and drop a closed pline on it.
    Works on linework that merely crosses — the tracer cuts everything at the
    crossings and walks the enclosing loop out of the pieces (boundary.js). */
 function placeBoundary(p){
-  const visible = entities.filter(e=>layerVisible(e.layer) && layerUnlocked(e.layer) && !e.frozen);
-  const {pts, err} = traceBoundary(p, visible);
+  const {pts, err} = traceBoundary(p, traceable());
   if (err){ log(err, 'e'); return; }
   snapshot();
   const e = {id:nextId(), type:'pline', closed:true, pts, layer:currentLayer};
@@ -765,7 +777,13 @@ function placeBoundary(p){
 }
 function reportArea(p){
   const {b, hatch, err} = boundaryAt(p);
-  if (err){ log(err, 'e'); return; }
+  if (err){
+    // no closed shape — measure the enclosed region without creating anything
+    const t = traceBoundary(p, traceable());
+    if (t.err){ log(t.err, 'e'); return; }
+    log(`Enclosed region — area ${areaLabel(entityArea({type:'pline', closed:true, pts:t.pts}))}.`, 'r');
+    return;
+  }
   const hh = hatch || entities.find(z=>z.type==='hatch' && z.ref===b.id);
   const a = hh ? hatchNet(hh, b) : entityArea(b);        // a hatch measures net of its islands
   if (!a){ log('Could not measure that shape.', 'e'); return; }
