@@ -137,6 +137,33 @@ check('a hidden closing edge means not enclosed', plines().length===0 &&
 S.setLayers(S.layers.map(l=>({name:l.name, color:l.color})));
 C.cancelCmd(true);
 
+/* a hair-thin arc sliver (two cuts almost coinciding on a big drawing) must
+   refuse politely, not crash — bulgeArc collapses to null on it */
+reset();
+S.entities.push({id:S.nextId(), type:'arc', cx:0, cy:0, r:1, a0:0, a1:Math.PI, layer:'0'});
+line(0,-2,0,2); line(1.2e-4,-2,1.2e-4,2); line(100,0,100,1);   // last line blows the extent → coarse tol
+r = (()=>{ try { return B.traceBoundary({x:0.5,y:0.5}, S.entities); } catch(e){ return {crash:e.message}; } })();
+check('degenerate arc sliver never throws', !r.crash && !!r.err);
+
+/* scale: thousands of scattered parts stay interactive (grid-bucketed pairs) */
+reset();
+for (let i=0;i<3000;i++){ const x=(i*97)%5000, y=(i*61)%5000;
+  line(x, y, x+((i%7)-3)*8, y+((i%5)-2)*8); }
+line(0,0,10,0); line(10,0,10,10); line(10,10,0,10); line(0,10,0,0);
+const t0 = Date.now();
+r = B.traceBoundary({x:5,y:5}, S.entities);
+check('3000-part drawing traces correctly', !r.err && r.pts.length===4);
+check('…and fast enough for a click handler', Date.now()-t0 < 2000);
+
+/* a block insert fences like the geometry it stands for */
+reset();
+S.setBlocks({ gate: { base:{x:0,y:0}, ents:[{id:1, type:'line', layer:'0', x1:0,y1:10,x2:0,y2:0}] }});
+line(0,0,10,0); line(10,0,10,10); line(10,10,0,10);
+S.entities.push({id:S.nextId(), type:'insert', name:'gate', x:0, y:0, layer:'0'});   // the 4th wall
+r = B.traceBoundary({x:5,y:5}, S.entities);
+check('a block closes the loop for the tracer', !r.err &&
+      near(G.plineArea({type:'pline',closed:true,pts:r.pts}).area, 100));
+
 /* text/dims never fence a region in */
 reset();
 line(0,0,10,0); line(10,0,10,10); line(10,10,0,10); line(0,10,0,0);

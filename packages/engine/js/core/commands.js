@@ -932,6 +932,7 @@ function rotateIds(ids, base, ang){
     else if (e.type==='pline'){ e.pts=e.pts.map(p=>{ const q=rotPt(p,base,c,s); return p.bulge?{...q,bulge:p.bulge}:q; }); }
     else if (e.type==='text'){ const p=rotPt({x:e.x,y:e.y},base,c,s); e.x=p.x;e.y=p.y; e.rot=normAng((e.rot||0)+ang); }
     else if (e.type==='dim'){ const a=rotPt({x:e.x1,y:e.y1},base,c,s), b=rotPt({x:e.x2,y:e.y2},base,c,s); e.x1=a.x;e.y1=a.y;e.x2=b.x;e.y2=b.y; }
+    else if (e.type==='insert'){ const p=rotPt({x:e.x,y:e.y},base,c,s); e.x=p.x;e.y=p.y; e.rot=normAng((e.rot||0)+ang); }
   }
 }
 function applyRotate(ang){
@@ -950,6 +951,7 @@ function scaleIds(ids, base, f){
     else if (e.type==='pline'){ e.pts=e.pts.map(p=>{ const q=sp(p); return p.bulge?{...q,bulge:p.bulge}:q; }); }
     else if (e.type==='text'){ const p=sp({x:e.x,y:e.y}); e.x=p.x;e.y=p.y;e.h*=f; }
     else if (e.type==='dim'){ const a=sp({x:e.x1,y:e.y1}), q=sp({x:e.x2,y:e.y2}); e.x1=a.x;e.y1=a.y;e.x2=q.x;e.y2=q.y;e.off*=f; if (e.h) e.h*=f; }
+    else if (e.type==='insert'){ const p=sp({x:e.x,y:e.y}); e.x=p.x;e.y=p.y; e.s=(e.s||1)*f; }
   }
 }
 function applyScale(f){

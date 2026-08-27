@@ -106,6 +106,24 @@ C.handleEnter('Y');
 check('partial fill divides by n-1 (last copy on the 90° mark)',
       S.entities.filter(e=>e.type==='line').some(e=>near(e.x1,0)&&near(e.y1,10)));
 
+/* ===== block inserts orbit a polar array (they used to stack on the original) ===== */
+reset();
+S.setBlocks({ chair: { base:{x:0,y:0}, ents:[{id:1, type:'line', layer:'0', x1:0,y1:0,x2:2,y2:0}] }});
+const ins0 = {id:S.nextId(), type:'insert', name:'chair', x:10, y:0, layer:'0'};
+S.entities.push(ins0);
+S.selection.add(ins0.id);
+C.startCommand('AR');
+C.handleEnter('P');
+C.onPoint({x:0, y:0});
+C.handleEnter('4');
+C.handleEnter('');
+C.handleEnter('Y');
+const chairs = S.entities.filter(e=>e.type==='insert');
+check('4 block copies orbit the center', chairs.length===4 &&
+      chairs.some(e=>near(e.x,0)&&near(e.y,10)) && chairs.some(e=>near(e.x,-10)&&near(e.y,0)));
+check('and they turn as they go around',
+      chairs.some(e=>near(e.x,0)&&near(e.y,10)&&near(e.rot,Math.PI/2)));
+
 /* ===== refusals ===== */
 reset();
 const r3 = rect(0,0,10,5);

@@ -84,6 +84,16 @@ check('non-Y/N answer re-asks', S.cmd && S.cmd.step==='scale' &&
 C.handleEnter('N');
 check('the align then completes', S.cmd===null && near(e.y2,110));
 
+/* ===== block inserts ride the full transform (rotate + scale, not just move) ===== */
+reset();
+S.setBlocks({ chair: { base:{x:0,y:0}, ents:[{id:1, type:'line', layer:'0', x1:0,y1:0,x2:2,y2:0}] }});
+const ins = {id:S.nextId(), type:'insert', name:'chair', x:0, y:0, layer:'0'};
+S.entities.push(ins);
+S.selection.add(ins.id);
+alignFlow([{x:0,y:0},{x:50,y:50},{x:10,y:0},{x:50,y:70}], 'Y');
+check('aligned block moves, turns and scales',
+      near(ins.x,50)&&near(ins.y,50)&&near(ins.rot,Math.PI/2)&&near(ins.s,2));
+
 /* nothing selected: MODIFY flow asks for selection first */
 reset();
 line(0,0, 10,0);

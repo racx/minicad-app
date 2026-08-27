@@ -19,6 +19,7 @@
 import { TAU, normAng, arcPt, arcSweep, bulgeArc, plineParts, pointInPoly,
          tessellateBoundary } from './geometry.js';
 import { segSeg, segCircle, circleCircle, lineSegT, lineCircleT } from './intersect.js';
+import { blockParts } from './entities.js';
 
 const ANG_EPS = 1e-9;
 
@@ -35,6 +36,12 @@ function partsOf(e){
     return plineParts(e).map(p => p.arc
       ? {arc:{cx:p.arc.cx, cy:p.arc.cy, r:p.arc.r, a0:p.arc.a0}, sweep:arcSweep(p.arc)}
       : {a:p.a, b:p.b});
+  if (e.type==='insert'){
+    // a block fences like the geometry it stands for — same rule as hit/snap
+    const out=[];
+    for (const part of blockParts(e)) out.push(...partsOf(part));
+    return out;
+  }
   return [];
 }
 const partBBox = p => p.arc
@@ -61,11 +68,33 @@ function segT(part, q){
 // edge: {a, b, bulge} — bulge>0 means the piece bows CCW (DXF convention)
 function buildEdges(parts, tol){
   for (const p of parts) p.cuts = [];
-  for (let i=0;i<parts.length;i++){
-    const A=parts[i], ab=partBBox(A);
-    for (let j=i+1;j<parts.length;j++){
-      const B=parts[j];
-      if (!bboxTouch(ab, partBBox(B), tol)) continue;
+  /* candidate pairs via a uniform grid over part bboxes — a real imported plan
+     carries 10⁵+ parts, and the naive all-pairs scan is billions of visits
+     inside a click handler. Long parts register in every cell they cross;
+     a Set keyed on the pair id dedupes across shared cells. */
+  const boxes = parts.map(partBBox);
+  let gx0=Infinity, gy0=Infinity, gx1=-Infinity, gy1=-Infinity;
+  for (const b of boxes){ gx0=Math.min(gx0,b[0]); gy0=Math.min(gy0,b[1]); gx1=Math.max(gx1,b[2]); gy1=Math.max(gy1,b[3]); }
+  const cell = Math.max(gx1-gx0, gy1-gy0, tol) / 100 || 1;
+  const buckets = new Map();
+  boxes.forEach((b, i)=>{
+    const ix0=Math.floor((b[0]-gx0-tol)/cell), ix1=Math.floor((b[2]-gx0+tol)/cell);
+    const iy0=Math.floor((b[1]-gy0-tol)/cell), iy1=Math.floor((b[3]-gy0+tol)/cell);
+    for (let ix=ix0; ix<=ix1; ix++) for (let iy=iy0; iy<=iy1; iy++){
+      const k=ix*4096+iy;
+      let arr=buckets.get(k); if (!arr) buckets.set(k, arr=[]);
+      arr.push(i);
+    }
+  });
+  const seen = new Set();
+  for (const arr of buckets.values()){
+    for (let a=0; a<arr.length; a++) for (let b=a+1; b<arr.length; b++){
+      const i=Math.min(arr[a],arr[b]), j=Math.max(arr[a],arr[b]);
+      const pk=i*parts.length+j;
+      if (seen.has(pk)) continue;
+      seen.add(pk);
+      const A=parts[i], B=parts[j];
+      if (!bboxTouch(boxes[i], boxes[j], tol)) continue;
       let qs=[];
       if (!A.arc && !B.arc){
         const q=segSeg(A.a, A.b, B.a, B.b); if (q) qs=[q];
@@ -142,6 +171,7 @@ function buildGraph(edges, tol){
       e.ta = e.tb = {x:(e.b.x-e.a.x)/L, y:(e.b.y-e.a.y)/L};
     } else {
       const A=bulgeArc(e.a, e.b, e.bulge), s=Math.sign(e.bulge);
+      if (!A) continue;   // hair-thin sliver: arcFrom3 collapses — drop it, don't crash
       const dir=q=>{ const th=Math.atan2(q.y-A.cy, q.x-A.cx);
                      return {x:-Math.sin(th)*s, y:Math.cos(th)*s}; };
       e.A=A; e.ta=dir(e.a); e.tb=dir(e.b);
@@ -149,15 +179,17 @@ function buildGraph(edges, tol){
     na.out.push({e, fwd:true});
     nb.out.push({e, fwd:false});
   }
-  // prune dead ends: an edge with a degree-1 endpoint is never part of a loop
-  let changed=true;
-  while (changed){
-    changed=false;
-    for (const n of nodes.values()){
-      if (n.out.length!==1) continue;
-      const {e}=n.out[0];
-      for (const m of [e.na, e.nb]) m.out=m.out.filter(o=>o.e!==e);
-      changed=true;
+  // prune dead ends: an edge with a degree-1 endpoint is never part of a loop.
+  // Worklist, not fixed-point rescans — big imported plans have many stubs.
+  const q=[];
+  for (const n of nodes.values()) if (n.out.length===1) q.push(n);
+  while (q.length){
+    const n=q.pop();
+    if (n.out.length!==1) continue;             // may have been drained meanwhile
+    const {e}=n.out[0];
+    for (const m of [e.na, e.nb]){
+      m.out=m.out.filter(o=>o.e!==e);
+      if (m.out.length===1) q.push(m);
     }
   }
   const live=[];
