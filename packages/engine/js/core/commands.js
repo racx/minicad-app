@@ -709,10 +709,19 @@ function boundaryFor(e){                  // resolve what a click means for HATC
   return {err:'Pick a closed shape — a closed polyline or a circle.'};
 }
 // what a HATCH/AREA click means: an edge under the cursor, else the smallest
-// closed shape CONTAINING the point (the pick-inside-the-room gesture)
+// closed shape CONTAINING the point (the pick-inside-the-room gesture).
+// A refused edge hit (open pline, orphaned hatch) still falls through to the
+// containing search — clicking a door swing inside a room means the room —
+// and the result carries `hit` so callers know the tracer is NOT a sane
+// fallback (the click was on geometry, not in empty enclosed space).
 function boundaryAt(p){
   const hit = findEntityAt(p);
-  if (hit) return boundaryFor(hit);
+  let hitErr = null;
+  if (hit){
+    const r = boundaryFor(hit);
+    if (!r.err) return r;
+    hitErr = r.err;
+  }
   let best=null, bestArea=Infinity;
   for (const e of entities){
     if (!layerVisible(e.layer) || !layerUnlocked(e.layer) || e.frozen) continue;
@@ -720,7 +729,8 @@ function boundaryAt(p){
     if (!a || a.area>=bestArea) continue;
     if (pointInPoly(p, tessellateBoundary(e))){ best=e; bestArea=a.area; }
   }
-  return best ? {b:best} : {err:'No closed shape there — click inside a room or on its outline.'};
+  if (best) return {b:best};
+  return {err: hitErr || 'No closed shape there — click inside a room or on its outline.', hit: !!hit};
 }
 /* island detection (AutoCAD "normal" style): every closed shape lying wholly
    inside the boundary becomes a hole in the fill — hatch the offset of a room
@@ -777,9 +787,11 @@ export function hatchBoundary(b, matKey, snap=true){
 }
 const traceable = () => entities.filter(e=>layerVisible(e.layer) && layerUnlocked(e.layer) && !e.frozen);
 function placeHatch(p){
-  const {b, err} = boundaryAt(p);
+  const {b, err, hit} = boundaryAt(p);
   if (!err){
     if (!hatchBoundary(b, cmd.mat)) return;
+  } else if (hit){
+    log(err, 'e'); return;   // the click landed ON a refused shape: tracing would mutate, not clarify
   } else {
     // no closed shape under the pick — trace one out of the loose linework
     // (AutoCAD's pick-points flow) and hatch it, all as one undo step
@@ -901,12 +913,18 @@ function performPolarArray(rotItems){
   endCmd();
 }
 function reportArea(p){
-  const {b, hatch, err} = boundaryAt(p);
+  const {b, hatch, err, hit} = boundaryAt(p);
   if (err){
-    // no closed shape — measure the enclosed region without creating anything
+    if (hit){ log(err, 'e'); return; }
+    // no closed shape — measure the enclosed region without creating anything,
+    // net of islands, the same figure hatching this region would report
     const t = traceBoundary(p, traceable());
     if (t.err){ log(t.err, 'e'); return; }
-    log(`Enclosed region — area ${areaLabel(entityArea({type:'pline', closed:true, pts:t.pts}))}.`, 'r');
+    const tmp = {type:'pline', closed:true, pts:t.pts};
+    const a = entityArea(tmp);
+    let net = a.area;
+    for (const isl of islandsWithin(tmp)){ const ia=entityArea(isl); if (ia) net -= ia.area; }
+    log(`Enclosed region — area ${areaLabel({area:Math.max(net,0), perim:a.perim})}.`, 'r');
     return;
   }
   const hh = hatch || entities.find(z=>z.type==='hatch' && z.ref===b.id);

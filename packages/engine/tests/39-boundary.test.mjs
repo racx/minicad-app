@@ -125,6 +125,15 @@ check('AREA measures loose-line region without creating anything',
       plines().length===0 && S.entities.length===4);
 C.handleEnter('');
 
+/* …and net of islands, the same figure hatching the region would report */
+S.entities.push({id:S.nextId(), type:'pline', closed:true, layer:'0',
+  pts:[{x:2,y:2},{x:4,y:2},{x:4,y:4},{x:2,y:4}]});      // a 2×2 island inside
+C.startCommand('AA');
+C.onPoint({x:7,y:5});                                    // clear of every edge's hit tolerance
+check('AREA fallback deducts islands (96, not 100)',
+      dom.logs.some(l=>l.includes('Enclosed region') && l.includes('96')));
+C.handleEnter('');
+
 /* hidden layers don't take part */
 reset();
 line(0,0,10,0); line(10,0,10,10); line(10,10,0,10);

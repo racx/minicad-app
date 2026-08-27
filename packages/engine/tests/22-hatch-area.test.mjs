@@ -50,13 +50,27 @@ const hatches = S.entities.filter(e=>e.type==='hatch');
 check('re-hatch replaces material, no duplicate', hatches.length===1 && hatches[0].mat==='green');
 C.cancelCmd(true);
 
-/* refusals: an open pline that encloses nothing can't be traced either */
+/* refusals: clicking ON an open pline in the void gets the JOIN hint back
+   (the tracer must not fire for clicks that land on refused geometry) */
 C.startCommand('H');
 C.chooseHatchMaterial('glass');
 S.entities.push({id:S.nextId(), type:'pline', closed:false, layer:'0', pts:[{x:200,y:0},{x:300,y:0},{x:300,y:50}]});
 C.onPoint({x:300,y:25});                                 // on the open pline's edge
-check('unenclosable pick refused with a gap hint', dom.logs.some(l=>/enclos|closed outline/i.test(l)) &&
+check('open pline refused with JOIN hint', dom.logs.some(l=>l.includes("isn't closed")) &&
       !S.entities.some(e=>e.type==='hatch' && e.mat==='glass'));
+C.cancelCmd(true);
+
+/* …but an open pline INSIDE a room means the room: the containing shape wins,
+   nothing is traced, no duplicate outline appears */
+C.startCommand('H');
+C.chooseHatchMaterial('glass');
+S.entities.push({id:S.nextId(), type:'pline', closed:false, layer:'0',
+  pts:[{x:40,y:20},{x:60,y:20},{x:60,y:30}]});           // a door swing inside the room
+const plCount = S.entities.filter(e=>e.type==='pline').length;
+C.onPoint({x:60,y:25});                                  // click ON the swing's edge
+check('door swing inside the room hatches the room itself',
+      S.entities.some(e=>e.type==='hatch' && e.ref===room.id && e.mat==='glass') &&
+      S.entities.filter(e=>e.type==='pline').length===plCount);
 C.cancelCmd(true);
 
 /* ===== hatch entity behavior ===== */
