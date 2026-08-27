@@ -29,8 +29,10 @@ export function applyEditorPrefs(p){
   prefsGate.muted = true;
   try{
     if (p.osnap && typeof p.osnap === 'object'){
-      if (Array.isArray(p.osnap.modes)) setSnapActive(p.osnap.modes);
-      if (typeof p.osnap.tracking === 'boolean') setSnapTracking(p.osnap.tracking);
+      // persist=false: the server copy is USER-scoped and must not overwrite
+      // the browser-shared localStorage key that anonymous /try boots from
+      if (Array.isArray(p.osnap.modes)) setSnapActive(p.osnap.modes, false);
+      if (typeof p.osnap.tracking === 'boolean') setSnapTracking(p.osnap.tracking, false);
     }
     if (p.toggles && typeof p.toggles === 'object'){
       for (const k of Object.keys(T)){

@@ -12,17 +12,16 @@ module Api
 
     def update
       # Not mass assignment: the whole blob goes into ONE jsonb column, so the
-      # raw body is parsed directly instead of strong-params' permit machinery.
-      body = begin
-        JSON.parse(request.raw_post)
-      rescue JSON::ParserError
-        nil
-      end
+      # already-parsed JSON body is read directly instead of strong-params'
+      # permit machinery (request_parameters is the middleware-parsed body).
+      body = request.request_parameters
       unless body.is_a?(Hash) && body.key?("prefs")
         return render json: { error: "prefs is required" }, status: :bad_request
       end
 
-      record = current_user.editor_preference || current_user.build_editor_preference
+      # create_or_find_by rides the unique index, so two first-PATCHes racing
+      # (two tabs at boot) converge on one row instead of a 500
+      record = EditorPreference.create_or_find_by(user: current_user)
       record.prefs = body["prefs"]                      # non-object → model 422
 
       if record.save

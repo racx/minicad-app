@@ -56,7 +56,10 @@ class EditorPreferencesTest < ActionDispatch::IntegrationTest
 
     patch api_preferences_path, params: { prefs: { "blob" => "x" * 5.kilobytes } }, as: :json
     assert_response :unprocessable_entity
-    assert_equal 0, EditorPreference.count
+    # create_or_find_by may leave an empty row behind a refused PATCH — benign,
+    # as long as no refused prefs were stored
+    get api_preferences_path, as: :json
+    assert_equal({}, JSON.parse(response.body)["prefs"])
   end
 
   test "signed out is refused" do

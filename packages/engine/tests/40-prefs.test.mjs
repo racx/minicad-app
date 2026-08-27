@@ -28,10 +28,15 @@ C.setSnapActive(['end','mid']);
 C.setSnapTracking(false);
 check('osnap config changes fire too', fired===3);
 
-/* ===== apply: server copy wins, silently ===== */
+/* ===== apply: server copy wins, silently — and never leaks into the
+   browser-shared localStorage key that anonymous /try boots from ===== */
+localStorage.setItem('minicad.osnap', 'SENTINEL');
 fired = 0;
 F.applyEditorPrefs({ osnap:{ modes:['end','cen'], tracking:true },
                      toggles:{ ortho:false, grid:false, dyn:true } });
+check('apply leaves the shared localStorage key alone',
+      localStorage.getItem('minicad.osnap')==='SENTINEL');
+localStorage.removeItem('minicad.osnap');
 check('apply sets the osnap modes', C.SNAP_ACTIVE.size===2 &&
       C.SNAP_ACTIVE.has('end') && C.SNAP_ACTIVE.has('cen'));
 check('apply sets tracking + toggles', C.SNAP_FLAGS.tracking===true &&

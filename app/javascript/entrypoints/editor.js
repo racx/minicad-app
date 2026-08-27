@@ -406,38 +406,49 @@ const PREFS_QUIET_MS = 1200
 
 async function startPrefsSync() {
   let synced = null
+  let timer = null
+  let touched = false          // did the user change a setting while the boot GET was in flight?
+
+  const push = () => {
+    clearTimeout(timer)
+    timer = setTimeout(async () => {
+      const prefs = engine.face.getEditorPrefs()
+      const payload = JSON.stringify(prefs)
+      if (payload === synced) return
+      try {
+        const res = await fetch(cfg.preferencesUrl, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content
+          },
+          body: JSON.stringify({ prefs })
+        })
+        if (res.ok) synced = payload
+      } catch { /* the next change retries; localStorage still has it */ }
+    }, PREFS_QUIET_MS)
+  }
+
+  // listen BEFORE the fetch: a toggle hit while the GET is in flight must
+  // neither vanish into the no-op sink nor be reverted by the server copy
+  engine.face.connectUI({ prefsChanged: () => { touched = true; push() } })
+
   try {
     const res = await fetch(cfg.preferencesUrl, { headers: { 'Accept': 'application/json' } })
     if (res.ok) {
       const { prefs } = await res.json()
-      if (prefs && Object.keys(prefs).length) engine.face.applyEditorPrefs(prefs)
-      synced = JSON.stringify(engine.face.getEditorPrefs())
+      if (prefs && Object.keys(prefs).length && !touched) {
+        engine.face.applyEditorPrefs(prefs)
+        synced = JSON.stringify(engine.face.getEditorPrefs())
+      } else {
+        // empty server record (or the user already changed something): the
+        // browser's current settings are the truth — seed the server with
+        // them, so a long-tuned desktop setup follows to the next device
+        push()
+      }
     }
   } catch { /* offline — the engine already booted from its localStorage copy */ }
-
-  let timer = null
-  engine.face.connectUI({
-    prefsChanged: () => {
-      clearTimeout(timer)
-      timer = setTimeout(async () => {
-        const prefs = engine.face.getEditorPrefs()
-        const payload = JSON.stringify(prefs)
-        if (payload === synced) return
-        try {
-          const res = await fetch(cfg.preferencesUrl, {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content
-            },
-            body: JSON.stringify({ prefs })
-          })
-          if (res.ok) synced = payload
-        } catch { /* the next change retries; localStorage still has it */ }
-      }, PREFS_QUIET_MS)
-    }
-  })
 }
 
 /* ---------- AI commands: request → engine MScript validation → ghost → Enter/Esc ---------- */
